@@ -57,3 +57,37 @@ export function getStreamUrl(
   const baseUrl = serverUrl.replace(/\/+$/, '');
   return `${baseUrl}/Videos/${itemId}/stream?static=true&api_key=${encodeURIComponent(token)}`;
 }
+
+// Construit l'URL de streaming HLS (transcodage adaptatif) pour preview web/mobile
+export function getHlsStreamUrl(
+  serverUrl: string,
+  itemId: string,
+  token: string,
+  options?: {
+    maxWidth?: number;
+    videoBitRate?: number;
+    audioBitRate?: number;
+  },
+): string {
+  if (!serverUrl || !itemId || !token) return '';
+  const baseUrl = serverUrl.replace(/\/+$/, '');
+  const params = new URLSearchParams({
+    api_key: token,
+    DeviceId: 'jellystream-web',
+    MediaSourceId: itemId,
+    VideoCodec: 'h264',
+    AudioCodec: 'aac',
+    MaxStreamingBitrate: String(options?.videoBitRate ?? 4000000),
+    VideoBitrate: String(options?.videoBitRate ?? 4000000),
+    AudioBitrate: String(options?.audioBitRate ?? 128000),
+    TranscodingMaxAudioChannels: '2',
+    SegmentContainer: 'ts',
+    MinSegments: '1',
+    BreakOnNonKeyFrames: 'true',
+    TranscodeReasons: 'ContainerNotSupported',
+  });
+  if (options?.maxWidth) {
+    params.set('MaxWidth', String(options.maxWidth));
+  }
+  return `${baseUrl}/Videos/${itemId}/master.m3u8?${params.toString()}`;
+}

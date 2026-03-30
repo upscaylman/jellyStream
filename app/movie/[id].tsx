@@ -77,9 +77,6 @@ export default function MovieScreen() {
                     description: item.Overview ?? '',
                     cast: castNames.length > 0 ? castNames : undefined,
                     director: director || undefined,
-                    type: item.Type ?? undefined,
-                    seasonCount: item.ChildCount ?? undefined,
-                    seriesId: item.SeriesId ?? undefined,
                 }}
             />
         </View>

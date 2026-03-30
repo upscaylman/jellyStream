@@ -11,9 +11,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Slider } from 'react-native-awesome-slider';
 import { useSharedValue } from 'react-native-reanimated';
 import { Image as ExpoImage } from 'expo-image';
-import { useSimilarItems } from '@/src/api/queries/useMediaQueries';
+import { useSimilarItems, useSeasons, useEpisodes } from '@/src/api/queries/useMediaQueries';
 import { useAuthStore } from '@/src/stores/authStore';
-import { getImageUrl, getStreamUrl } from '@/src/utils/imageUrl';
+import { getImageUrl, getHlsStreamUrl } from '@/src/utils/imageUrl';
 
 interface MovieData {
     id: string | number;
@@ -27,6 +27,9 @@ interface MovieData {
     cast?: string[];
     director?: string;
     ranking_text?: string;
+    type?: string;
+    seasonCount?: number;
+    seriesId?: string;
 }
 
 interface ExpandedPlayerProps {
@@ -47,6 +50,26 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
     const serverUrl = useAuthStore((s) => s.serverUrl) ?? '';
     const token = useAuthStore((s) => s.token) ?? '';
     const { data: similarItems } = useSimilarItems(typeof movie.id === 'string' ? movie.id : movie.id.toString());
+
+    const isSeries = movie.type === 'Series' || movie.type === 'Episode';
+    const itemId = typeof movie.id === 'string' ? movie.id : movie.id.toString();
+    // Pour un épisode, on remonte à la série parente via seriesId
+    const seriesId = movie.seriesId ?? (movie.type === 'Series' ? itemId : '');
+
+    // Saisons & épisodes pour les séries
+    const { data: seasons } = useSeasons(isSeries ? seriesId : '');
+    const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(null);
+    const [showSeasonPicker, setShowSeasonPicker] = useState(false);
+
+    // Sélectionner la première saison par défaut
+    useEffect(() => {
+        if (seasons && seasons.length > 0 && !selectedSeasonId) {
+            setSelectedSeasonId(seasons[0].Id ?? null);
+        }
+    }, [seasons]);
+
+    const { data: episodes } = useEpisodes(isSeries ? seriesId : '', selectedSeasonId ?? '');
+    const selectedSeason = seasons?.find((s) => s.Id === selectedSeasonId);
 
     const defaultMovieData = {
         video_url: '',
@@ -70,10 +93,11 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
         )
     };
 
-    // URL de stream Jellyfin pour le preview
-    const itemId = typeof movie.id === 'string' ? movie.id : movie.id.toString();
-    const streamUrl = getStreamUrl(serverUrl, itemId, token);
-    const previewUrl = streamUrl || movieData.video_url;
+    // URL HLS Jellyfin pour le preview (transcodé en H.264/AAC, compatible web+mobile)
+    const previewUrl = getHlsStreamUrl(serverUrl, itemId, token, {
+        maxWidth: 720,
+        videoBitRate: 2000000,
+    }) || movieData.video_url;
 
     const player = useVideoPlayer(previewUrl, (p) => {
         p.loop = true;
@@ -102,9 +126,7 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
     }, []);
 
     return (
-        <View
-            style={[styles.rootContainer, { paddingTop: insets.top }]}
-        >
+        <View style={[styles.rootContainer, { paddingTop: insets.top }]}>
             <View style={styles.backHeader}>
                 <Pressable
                     style={styles.backButton}
@@ -114,55 +136,54 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
                 </Pressable>
             </View>
 
-            <View style={styles.videoContainer}>
-                <VideoView
-                    ref={videoViewRef}
-                    style={styles.video}
-                    player={player}
-                    nativeControls={false}
-                    contentFit="cover"
-                />
-                <View style={styles.videoOverlay} />
-                <View style={styles.muteOverlay}>
-                    <Pressable
-                        style={styles.soundButton}
-                        onPress={() => setIsMuted(!isMuted)}
-                    >
-                        <Ionicons
-                            name={isMuted ? "volume-mute" : "volume-medium"}
-                            size={18}
-                            color="white"
-                        />
-                    </Pressable>
-                </View>
-                <View style={styles.sliderContainer}>
-                    <Slider
-                        style={styles.slider}
-                        progress={progress}
-                        minimumValue={min}
-                        maximumValue={max}
-                        onValueChange={(value) => {
-                            player.currentTime = value / 1000;
-                        }}
-                        theme={{
-                            minimumTrackTintColor: '#db0000',
-                            // maximumTrackTintColor: 'rgba(255, 255, 255, 0.795)',
-                            bubbleBackgroundColor: '#db0000',
-                        }}
-                        thumbWidth={5}
-                        sliderHeight={5}
-                        containerStyle={styles.sliderInner}
-                        disableTrackFollow={false}
-                        disableTapEvent={false}
-                    />
-                </View>
-            </View>
-
             <ScrollComponentToUse
                 style={styles.scrollView}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingBottom: 76 }}
             >
+                <View style={styles.videoContainer}>
+                    <VideoView
+                        ref={videoViewRef}
+                        style={styles.video}
+                        player={player}
+                        nativeControls={false}
+                        contentFit="cover"
+                    />
+                    <View style={styles.videoOverlay} />
+                    <View style={styles.muteOverlay}>
+                        <Pressable
+                            style={styles.soundButton}
+                            onPress={() => setIsMuted(!isMuted)}
+                        >
+                            <Ionicons
+                                name={isMuted ? "volume-mute" : "volume-medium"}
+                                size={18}
+                                color="white"
+                            />
+                        </Pressable>
+                    </View>
+                    <View style={styles.sliderContainer}>
+                        <Slider
+                            style={styles.slider}
+                            progress={progress}
+                            minimumValue={min}
+                            maximumValue={max}
+                            onValueChange={(value) => {
+                                player.currentTime = value / 1000;
+                            }}
+                            theme={{
+                                minimumTrackTintColor: '#db0000',
+                                bubbleBackgroundColor: '#db0000',
+                            }}
+                            thumbWidth={5}
+                            sliderHeight={5}
+                            containerStyle={styles.sliderInner}
+                            disableTrackFollow={false}
+                            disableTapEvent={false}
+                        />
+                    </View>
+                </View>
+
                 <View style={styles.contentContainer}>
                     <ThemedText style={styles.title}>{movieData.title}</ThemedText>
 
@@ -189,7 +210,6 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
                         </Pressable>
 
                         <Pressable style={styles.downloadButton}>
-                            {/* <Ionicons name="download" size={20} color="white" /> */}
                             <ExpoImage
                                 source={require('../../assets/images/replace-these/download-netflix-transparent.png')}
                                 style={{ width: 28, height: 28 }}
@@ -220,7 +240,6 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
 
                     <View style={styles.actionButtons}>
                         <Pressable style={[styles.actionButton, {
-                            // backgroundColor: '#000000bb',
                             width: 100,
                             borderBottomWidth: 4,
                             borderBottomColor: '#db0000',
@@ -241,6 +260,114 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
                         </Pressable>
                     </View>
                 </View>
+
+                {/* Épisodes pour les séries */}
+                {isSeries && seasons && seasons.length > 0 && (
+                    <View style={episodeStyles.container}>
+                        {/* Dropdown saison si plusieurs */}
+                        {seasons.length > 1 ? (
+                            <View>
+                                <Pressable
+                                    style={episodeStyles.seasonDropdown}
+                                    onPress={() => setShowSeasonPicker(!showSeasonPicker)}
+                                >
+                                    <ThemedText style={episodeStyles.seasonDropdownText}>
+                                        {selectedSeason?.Name ?? 'Saison 1'}
+                                    </ThemedText>
+                                    <Ionicons
+                                        name={showSeasonPicker ? 'chevron-up' : 'chevron-down'}
+                                        size={18}
+                                        color="white"
+                                    />
+                                </Pressable>
+                                {showSeasonPicker && (
+                                    <View style={episodeStyles.seasonPickerList}>
+                                        {seasons.map((season) => (
+                                            <Pressable
+                                                key={season.Id}
+                                                style={[
+                                                    episodeStyles.seasonPickerItem,
+                                                    season.Id === selectedSeasonId && episodeStyles.seasonPickerItemActive,
+                                                ]}
+                                                onPress={() => {
+                                                    setSelectedSeasonId(season.Id ?? null);
+                                                    setShowSeasonPicker(false);
+                                                }}
+                                            >
+                                                <ThemedText style={[
+                                                    episodeStyles.seasonPickerItemText,
+                                                    season.Id === selectedSeasonId && { color: '#E50914' },
+                                                ]}>
+                                                    {season.Name}
+                                                </ThemedText>
+                                            </Pressable>
+                                        ))}
+                                    </View>
+                                )}
+                            </View>
+                        ) : (
+                            <ThemedText style={episodeStyles.sectionTitle}>
+                                {seasons[0]?.Name ?? 'Épisodes'}
+                            </ThemedText>
+                        )}
+
+                        {/* Liste des épisodes */}
+                        {(episodes ?? []).map((ep) => {
+                            const epTag = ep.ImageTags?.['Primary'];
+                            const epThumb = ep.Id
+                                ? getImageUrl({ serverUrl, itemId: ep.Id, maxWidth: 400, quality: 80, tag: epTag ?? undefined })
+                                : '';
+                            const epDuration = ep.RunTimeTicks
+                                ? `${Math.round(ep.RunTimeTicks / 600000000)}m`
+                                : '';
+                            return (
+                                <Pressable
+                                    key={ep.Id}
+                                    style={episodeStyles.episodeRow}
+                                    onPress={() => {
+                                        if (ep.Id) {
+                                            player.pause();
+                                            router.push({
+                                                pathname: '/player',
+                                                params: { itemId: ep.Id, title: ep.Name ?? '' },
+                                            });
+                                        }
+                                    }}
+                                >
+                                    <View style={episodeStyles.episodeThumbContainer}>
+                                        {epThumb ? (
+                                            <ExpoImage
+                                                source={{ uri: epThumb }}
+                                                style={episodeStyles.episodeThumb}
+                                                cachePolicy="memory-disk"
+                                                transition={200}
+                                                contentFit="cover"
+                                            />
+                                        ) : (
+                                            <View style={[episodeStyles.episodeThumb, { backgroundColor: '#2a2a2a' }]} />
+                                        )}
+                                        <View style={episodeStyles.playOverlay}>
+                                            <Ionicons name="play-circle-outline" size={30} color="white" />
+                                        </View>
+                                    </View>
+                                    <View style={episodeStyles.episodeInfo}>
+                                        <ThemedText style={episodeStyles.episodeTitle} numberOfLines={1}>
+                                            {ep.IndexNumber ? `${ep.IndexNumber}. ` : ''}{ep.Name}
+                                        </ThemedText>
+                                        {epDuration ? (
+                                            <ThemedText style={episodeStyles.episodeDuration}>{epDuration}</ThemedText>
+                                        ) : null}
+                                        {ep.Overview ? (
+                                            <ThemedText style={episodeStyles.episodeOverview} numberOfLines={2}>
+                                                {ep.Overview}
+                                            </ThemedText>
+                                        ) : null}
+                                    </View>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+                )}
 
                 <View style={styles.moreLikeThis}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
@@ -284,3 +411,92 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
     );
 }
 
+const episodeStyles = StyleSheet.create({
+    container: {
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 16,
+    },
+    sectionTitle: {
+        fontSize: 17,
+        fontWeight: 'bold',
+        marginBottom: 12,
+        color: '#fff',
+    },
+    seasonDropdown: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: '#2a2a2a',
+        borderRadius: 4,
+        alignSelf: 'flex-start',
+    },
+    seasonDropdownText: {
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: '#fff',
+    },
+    seasonPickerList: {
+        backgroundColor: '#1a1a1a',
+        borderRadius: 4,
+        marginBottom: 12,
+        overflow: 'hidden',
+    },
+    seasonPickerItem: {
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+    },
+    seasonPickerItemActive: {
+        backgroundColor: '#2a2a2a',
+    },
+    seasonPickerItemText: {
+        fontSize: 14,
+        color: '#ccc',
+    },
+    episodeRow: {
+        flexDirection: 'row',
+        marginBottom: 14,
+        gap: 10,
+    },
+    episodeThumbContainer: {
+        position: 'relative',
+        width: 130,
+        aspectRatio: 16 / 9,
+        borderRadius: 4,
+        overflow: 'hidden',
+    },
+    episodeThumb: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 4,
+    },
+    playOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.3)',
+    },
+    episodeInfo: {
+        flex: 1,
+        justifyContent: 'center',
+    },
+    episodeTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#fff',
+        marginBottom: 2,
+    },
+    episodeDuration: {
+        fontSize: 12,
+        color: '#999',
+        marginBottom: 4,
+    },
+    episodeOverview: {
+        fontSize: 12,
+        lineHeight: 16,
+        color: '#888',
+    },
+});

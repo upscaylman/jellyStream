@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getItemsApi } from '@jellyfin/sdk/lib/utils/api/items-api';
 import { getUserLibraryApi } from '@jellyfin/sdk/lib/utils/api/user-library-api';
 import { getLibraryApi } from '@jellyfin/sdk/lib/utils/api/library-api';
+import { getTvShowsApi } from '@jellyfin/sdk/lib/utils/api/tv-shows-api';
 import { BaseItemKind, SortOrder, ItemSortBy, ItemFields } from '@jellyfin/sdk/lib/generated-client/models';
 import { useAuthStore } from '@/src/stores/authStore';
 
@@ -293,5 +294,46 @@ export function useNewlyAdded(limit = 20) {
       return result.data.Items ?? [];
     },
     enabled: !!api && !!userId,
+  });
+}
+
+// Saisons d'une série
+export function useSeasons(seriesId: string) {
+  const { api, userId } = useJellyfinApi();
+
+  return useQuery({
+    queryKey: ['seasons', seriesId],
+    queryFn: async () => {
+      const tvApi = getTvShowsApi(api!);
+      const result = await tvApi.getSeasons({
+        seriesId,
+        userId,
+        fields: [ItemFields.Overview],
+      });
+      return result.data.Items ?? [];
+    },
+    enabled: !!api && !!userId && !!seriesId,
+  });
+}
+
+// Épisodes d'une saison
+export function useEpisodes(seriesId: string, seasonId: string) {
+  const { api, userId } = useJellyfinApi();
+
+  return useQuery({
+    queryKey: ['episodes', seriesId, seasonId],
+    queryFn: async () => {
+      const tvApi = getTvShowsApi(api!);
+      const result = await tvApi.getEpisodes({
+        seriesId,
+        seasonId,
+        userId,
+        fields: [ItemFields.Overview, ItemFields.People],
+        imageTypeLimit: 1,
+        enableImageTypes: ['Primary', 'Thumb'],
+      });
+      return result.data.Items ?? [];
+    },
+    enabled: !!api && !!userId && !!seriesId && !!seasonId,
   });
 }
