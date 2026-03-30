@@ -104,12 +104,21 @@ export default function NewScreen() {
                             const ytId = extractYouTubeId(item.RemoteTrailers?.[0]?.Url);
                             if (ytId && Platform.OS === 'web') {
                                 return (
-                                    <iframe
-                                        src={`https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytId}&modestbranding=1&rel=0&showinfo=0`}
-                                        style={{ width: '100%', height: '100%', border: 'none' } as any}
-                                        allow="autoplay; encrypted-media"
-                                        allowFullScreen
-                                    />
+                                    <View style={{ width: '100%', height: '100%' } as any}>
+                                        {imageUri && (
+                                            <ExpoImage
+                                                source={{ uri: imageUri }}
+                                                style={[newStyles.previewImage, { position: 'absolute', top: 0, left: 0, zIndex: 0 }] as any}
+                                                cachePolicy="memory-disk"
+                                            />
+                                        )}
+                                        <iframe
+                                            src={`https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytId}&modestbranding=1&rel=0&showinfo=0`}
+                                            style={{ width: '100%', height: '100%', border: 'none', position: 'relative', zIndex: 1 } as any}
+                                            allow="autoplay; encrypted-media"
+                                            allowFullScreen
+                                        />
+                                    </View>
                                 );
                             }
                             if (imageUri) {
