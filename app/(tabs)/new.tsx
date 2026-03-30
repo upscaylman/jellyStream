@@ -105,7 +105,7 @@ export default function NewScreen() {
                             if (ytId && Platform.OS === 'web') {
                                 return (
                                     <iframe
-                                        src={`https://www.youtube.com/embed/${ytId}?autoplay=0&mute=1&controls=0&loop=1&playlist=${ytId}&modestbranding=1&rel=0&showinfo=0`}
+                                        src={`https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytId}&modestbranding=1&rel=0&showinfo=0`}
                                         style={{ width: '100%', height: '100%', border: 'none' } as any}
                                         allow="autoplay; encrypted-media"
                                         allowFullScreen
