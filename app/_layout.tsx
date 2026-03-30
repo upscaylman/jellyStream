@@ -84,26 +84,6 @@ function AnimatedStack() {
                     <Stack.Screen name="(auth)" options={{headerShown: false}}/>
                     <Stack.Screen name="(tabs)" options={{headerShown: false}}/>
                     <Stack.Screen
-                        name="movie/[id]"
-                        options={{
-                            presentation: 'transparentModal',
-                            headerShown: false,
-                            contentStyle: {
-                                backgroundColor: 'transparent',
-                            },
-                        }}
-                        listeners={{
-                            focus: () => {
-                                setIsModalActive(true);
-                                setCanBlur(true);
-                            },
-                            beforeRemove: () => {
-                                setIsModalActive(false);
-                                setCanBlur(false);
-                            },
-                        }}
-                    />
-                    <Stack.Screen
                         name="switch-profile"
                         options={{
                             presentation: 'transparentModal',

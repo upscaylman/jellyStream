@@ -1,7 +1,6 @@
 import { View, StyleSheet, Text, Pressable, Dimensions, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { ThemedText } from '@/components/ThemedText';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -31,7 +30,7 @@ interface MovieData {
 }
 
 interface ExpandedPlayerProps {
-    scrollComponent: (props: any) => React.ReactElement;
+    scrollComponent?: (props: any) => React.ReactElement;
     movie: MovieData;
 }
 
@@ -103,11 +102,18 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
     }, []);
 
     return (
-        <BlurView
-            intensity={85}
-            tint="systemThickMaterialDark"
-            style={[styles.rootContainer, { marginTop: insets.top }]}
+        <View
+            style={[styles.rootContainer, { paddingTop: insets.top }]}
         >
+            <View style={styles.backHeader}>
+                <Pressable
+                    style={styles.backButton}
+                    onPress={() => router.back()}
+                >
+                    <Ionicons name="arrow-back" size={24} color="white" />
+                </Pressable>
+            </View>
+
             <View style={styles.videoContainer}>
                 <VideoView
                     ref={videoViewRef}
@@ -116,14 +122,7 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
                     nativeControls={false}
                     contentFit="cover"
                 />
-                <View style={styles.videoOverlay}>
-                    <Pressable
-                        style={styles.closeButton}
-                        onPress={() => {/* handle close */ }}
-                    >
-                        <Ionicons name="close-outline" size={26} color="white" />
-                    </Pressable>
-                </View>
+                <View style={styles.videoOverlay} />
                 <View style={styles.muteOverlay}>
                     <Pressable
                         style={styles.soundButton}
@@ -162,6 +161,7 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
             <ScrollComponentToUse
                 style={styles.scrollView}
                 showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 76 }}
             >
                 <View style={styles.contentContainer}>
                     <ThemedText style={styles.title}>{movieData.title}</ThemedText>
@@ -247,7 +247,7 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
                         <ThemedText style={styles.moreLikeThisTitle}>Similaires</ThemedText>
                     </View>
                     <View style={styles.movieGrid}>
-                        {(similarItems ?? []).slice(0, 6).map((similar) => {
+                        {(similarItems ?? []).slice(0, 12).map((similar) => {
                             const tag = similar.ImageTags?.['Primary'];
                             const uri = similar.Id
                                 ? getImageUrl({ serverUrl, itemId: similar.Id, maxWidth: 300, quality: 80, tag: tag ?? undefined })
@@ -280,7 +280,7 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
                     </View>
                 </View>
             </ScrollComponentToUse>
-        </BlurView>
+        </View>
     );
 }
 

@@ -7,10 +7,21 @@ export const expandedPlayerStyles = StyleSheet.create({
         flex: 1,
         height: '100%',
         width: '100%',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
+        backgroundColor: '#141414',
         overflow: 'hidden',
-
+    },
+    backHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+    },
+    backButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     scrollView: {
         flex: 1,
@@ -188,8 +199,9 @@ export const expandedPlayerStyles = StyleSheet.create({
         color: '#fff',
     },
     moreLikeThis: {
-        padding: 16,
+        paddingHorizontal: 16,
         paddingTop: 0,
+        paddingBottom: 0,
     },
     moreLikeThisTitle: {
         fontSize: 17,
@@ -200,12 +212,14 @@ export const expandedPlayerStyles = StyleSheet.create({
     movieGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 8,
+        gap: 6,
+        justifyContent: 'space-between',
     },
     moviePoster: {
-        width: '31%',
+        width: '32%',
         aspectRatio: 2 / 3,
-        borderRadius: 4,
+        borderRadius: 6,
+        marginBottom: 2,
     },
     sliderContainer: {
         position: 'absolute',
