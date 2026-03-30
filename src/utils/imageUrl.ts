@@ -58,6 +58,38 @@ export function getStreamUrl(
   return `${baseUrl}/Videos/${itemId}/stream?static=true&api_key=${encodeURIComponent(token)}`;
 }
 
+// Construit l'URL de streaming transcodé progressif (MP4/H.264) pour le web
+// Fonctionne dans <video> sur tous les navigateurs, pas besoin de HLS.js
+export function getWebTranscodedUrl(
+  serverUrl: string,
+  itemId: string,
+  token: string,
+  options?: {
+    maxWidth?: number;
+    videoBitRate?: number;
+    audioBitRate?: number;
+  },
+): string {
+  if (!serverUrl || !itemId || !token) return '';
+  const baseUrl = serverUrl.replace(/\/+$/, '');
+  const params = new URLSearchParams({
+    api_key: token,
+    DeviceId: 'jellystream-web',
+    MediaSourceId: itemId,
+    Container: 'mp4',
+    VideoCodec: 'h264',
+    AudioCodec: 'aac',
+    MaxStreamingBitrate: String(options?.videoBitRate ?? 4000000),
+    VideoBitrate: String(options?.videoBitRate ?? 4000000),
+    AudioBitrate: String(options?.audioBitRate ?? 128000),
+    TranscodingMaxAudioChannels: '2',
+  });
+  if (options?.maxWidth) {
+    params.set('MaxWidth', String(options.maxWidth));
+  }
+  return `${baseUrl}/Videos/${itemId}/stream.mp4?${params.toString()}`;
+}
+
 // Construit l'URL de streaming HLS (transcodage adaptatif) pour preview web/mobile
 export function getHlsStreamUrl(
   serverUrl: string,

@@ -21,7 +21,8 @@ export default function Root({ children }: PropsWithChildren) {
 
         {/* Using raw CSS styles as an escape-hatch to ensure the background color never flickers in dark-mode. */}
         <style dangerouslySetInnerHTML={{ __html: responsiveBackground }} />
-        {/* Add any additional <head> elements that you want globally available on web... */}
+        {/* Icon fonts — chargés via CSS pour garantir la dispo en prod */}
+        <style dangerouslySetInnerHTML={{ __html: iconFontFaces }} />
       </head>
       <body>{children}</body>
     </html>
@@ -37,3 +38,26 @@ body {
     background-color: #000;
   }
 }`;
+
+const iconFontFaces = `
+@font-face {
+  font-family: 'Ionicons';
+  src: url('/fonts/Ionicons.ttf') format('truetype');
+  font-display: block;
+}
+@font-face {
+  font-family: 'MaterialIcons';
+  src: url('/fonts/MaterialIcons.ttf') format('truetype');
+  font-display: block;
+}
+@font-face {
+  font-family: 'MaterialCommunityIcons';
+  src: url('/fonts/MaterialCommunityIcons.ttf') format('truetype');
+  font-display: block;
+}
+@font-face {
+  font-family: 'FontAwesome';
+  src: url('/fonts/FontAwesome.ttf') format('truetype');
+  font-display: block;
+}
+`;

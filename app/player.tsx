@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Slider } from 'react-native-awesome-slider';
 import { useSharedValue } from 'react-native-reanimated';
 import { useAuthStore } from '@/src/stores/authStore';
-import { getStreamUrl, getHlsStreamUrl } from '@/src/utils/imageUrl';
+import { getStreamUrl, getWebTranscodedUrl } from '@/src/utils/imageUrl';
 import { useItemDetail } from '@/src/api/queries/useMediaQueries';
 
 // Formatage du temps mm:ss ou h:mm:ss
@@ -44,9 +44,9 @@ export default function PlayerScreen() {
   const min = useSharedValue(0);
   const max = useSharedValue(1);
 
-  // HLS sur web (transcodage garanti compatible), direct play sur natif
+  // MP4 transcodé sur web (compatible tous navigateurs), direct play sur natif
   const streamUrl = Platform.OS === 'web'
-    ? getHlsStreamUrl(serverUrl, itemId ?? '', token)
+    ? getWebTranscodedUrl(serverUrl, itemId ?? '', token)
     : getStreamUrl(serverUrl, itemId ?? '', token);
 
   const player = useVideoPlayer(streamUrl, (p) => {

@@ -13,7 +13,7 @@ import { useSharedValue } from 'react-native-reanimated';
 import { Image as ExpoImage } from 'expo-image';
 import { useSimilarItems, useSeasons, useEpisodes } from '@/src/api/queries/useMediaQueries';
 import { useAuthStore } from '@/src/stores/authStore';
-import { getImageUrl, getHlsStreamUrl } from '@/src/utils/imageUrl';
+import { getImageUrl, getWebTranscodedUrl, getHlsStreamUrl } from '@/src/utils/imageUrl';
 import { CategoriesListModal } from '@/components/CategoriesListModal/CategoriesListModal';
 
 // Extraire l'ID YouTube d'une URL (youtube.com/watch?v=, youtu.be/, youtube.com/embed/)
@@ -112,10 +112,10 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
         : null;
 
     const previewUrl = !youtubeEmbedUrl
-        ? (getHlsStreamUrl(serverUrl, itemId, token, {
-            maxWidth: 720,
-            videoBitRate: 2000000,
-          }) || movieData.video_url)
+        ? ((Platform.OS === 'web'
+            ? getWebTranscodedUrl(serverUrl, itemId, token, { maxWidth: 720, videoBitRate: 2000000 })
+            : getHlsStreamUrl(serverUrl, itemId, token, { maxWidth: 720, videoBitRate: 2000000 })
+          ) || movieData.video_url)
         : '';
 
     const player = useVideoPlayer(previewUrl, (p) => {
