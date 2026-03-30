@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { View, Text, Pressable, Image, FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
 import { styles } from '@/styles';
 import { Movie, MovieRow } from '@/types/movie';
+import { useWebDragScroll } from '@/hooks/useWebDragScroll';
 
 const GameItem = ({ item, router }: { item: Movie; router: any }) => (
     <Pressable
@@ -20,11 +21,14 @@ const GameItem = ({ item, router }: { item: Movie; router: any }) => (
 
 export function GameList({ rowTitle, movies }: MovieRow) {
     const router = useRouter();
+    const flatListRef = useRef<FlatList>(null);
+    useWebDragScroll(flatListRef);
 
     return (
         <View style={styles.movieRow}>
             <Text style={styles.sectionTitle}>{rowTitle}</Text>
             <FlatList
+                ref={flatListRef}
                 horizontal
 
                 data={movies}

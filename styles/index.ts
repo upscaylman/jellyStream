@@ -198,7 +198,7 @@ export const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginLeft: 16,
         marginBottom: 10,
-        marginTop: -8,
+        marginTop: 18,
     },
     contentList: {
 
@@ -224,7 +224,7 @@ export const styles = StyleSheet.create({
     thumbnail: {
         width: '100%',
         aspectRatio: 2 / 3,
-        borderRadius: 14,
+        borderRadius: 6,
     },
     movieRow: {
         marginBottom: 30,

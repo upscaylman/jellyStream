@@ -46,3 +46,14 @@ export function getBackdropUrl(
     tag,
   });
 }
+
+// Construit l'URL de streaming direct pour un item Jellyfin
+export function getStreamUrl(
+  serverUrl: string,
+  itemId: string,
+  token: string,
+): string {
+  if (!serverUrl || !itemId || !token) return '';
+  const baseUrl = serverUrl.replace(/\/+$/, '');
+  return `${baseUrl}/Videos/${itemId}/stream?static=true&api_key=${encodeURIComponent(token)}`;
+}

@@ -14,7 +14,7 @@ import { useSharedValue } from 'react-native-reanimated';
 import { Image as ExpoImage } from 'expo-image';
 import { useSimilarItems } from '@/src/api/queries/useMediaQueries';
 import { useAuthStore } from '@/src/stores/authStore';
-import { getImageUrl } from '@/src/utils/imageUrl';
+import { getImageUrl, getStreamUrl } from '@/src/utils/imageUrl';
 
 interface MovieData {
     id: string | number;
@@ -46,10 +46,11 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
     const max = useSharedValue(100);
     const [duration, setDuration] = useState(0);
     const serverUrl = useAuthStore((s) => s.serverUrl) ?? '';
+    const token = useAuthStore((s) => s.token) ?? '';
     const { data: similarItems } = useSimilarItems(typeof movie.id === 'string' ? movie.id : movie.id.toString());
 
     const defaultMovieData = {
-        video_url: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+        video_url: '',
         year: '2024',
         duration: '2h 30m',
         rating: 'PG-13',
@@ -70,10 +71,15 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
         )
     };
 
-    const player = useVideoPlayer(movieData.video_url, (p) => {
+    // URL de stream Jellyfin pour le preview
+    const itemId = typeof movie.id === 'string' ? movie.id : movie.id.toString();
+    const streamUrl = getStreamUrl(serverUrl, itemId, token);
+    const previewUrl = streamUrl || movieData.video_url;
+
+    const player = useVideoPlayer(previewUrl, (p) => {
         p.loop = true;
         p.muted = isMuted;
-        p.play();
+        if (previewUrl) p.play();
         p.timeUpdateEventInterval = 0.5;
     });
 
@@ -168,7 +174,16 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
                     </View>
 
                     <View style={styles.buttonContainer}>
-                        <Pressable style={styles.playButton}>
+                        <Pressable
+                            style={styles.playButton}
+                            onPress={() => {
+                                player.pause();
+                                router.push({
+                                    pathname: '/player',
+                                    params: { itemId, title: movieData.title },
+                                });
+                            }}
+                        >
                             <Ionicons name="play" size={24} color="black" />
                             <ThemedText style={styles.playButtonText}>Play</ThemedText>
                         </Pressable>

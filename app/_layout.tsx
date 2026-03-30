@@ -141,6 +141,16 @@ function AnimatedStack() {
                             },
                         }}
                     />
+                    <Stack.Screen
+                        name="player"
+                        options={{
+                            headerShown: false,
+                            animation: 'fade',
+                            contentStyle: {
+                                backgroundColor: '#000',
+                            },
+                        }}
+                    />
                     <Stack.Screen name="+not-found"/>
                 </Stack>
             </Animated.View>

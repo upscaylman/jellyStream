@@ -66,7 +66,7 @@ export function FeaturedContent({
                             style={styles.playButton}
                             onPress={() => {
                                 if (movie.id && movie.id !== 'placeholder') {
-                                    router.push({ pathname: '/movie/[id]', params: { id: movie.id } });
+                                    router.push({ pathname: '/player', params: { itemId: movie.id, title: movie.title } });
                                 }
                             }}
                         >

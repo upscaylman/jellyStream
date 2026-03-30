@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { View, Text, Pressable, FlatList, StyleSheet } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { useRouter } from 'expo-router';
@@ -7,6 +7,7 @@ import { Movie, MovieRow } from '@/types/movie';
 import Svg, { Path } from 'react-native-svg';
 import { useVisionOS } from '@/hooks/useVisionOS';
 import { HoverableView } from '@/components/ui/VisionContainer';
+import { useWebDragScroll } from '@/hooks/useWebDragScroll';
 
 const NumberBackground = ({ number }: { number: number }) => {
     const num = (number).toString().padStart(2, '0');
@@ -72,6 +73,8 @@ export function MovieList({ rowTitle, movies, type }: MovieRow) {
     const router = useRouter();
     const isTop10 = type === 'top_10';
     const { isVisionOS } = useVisionOS();
+    const flatListRef = useRef<FlatList>(null);
+    useWebDragScroll(flatListRef);
 
     const renderItem = ({ item, index }) => (
         <HoverableView key={`${item.id}-${index}`}>
@@ -88,6 +91,7 @@ export function MovieList({ rowTitle, movies, type }: MovieRow) {
         <View style={isVisionOS ? styles.visionContainer : styles.container}>
             <Text style={styles.sectionTitle}>{rowTitle}</Text>
             <FlatList
+                ref={flatListRef}
                 horizontal
                 data={movies}
                 renderItem={renderItem}
@@ -111,8 +115,8 @@ const badgeStyles = StyleSheet.create({
         backgroundColor: '#E50914',
         paddingVertical: 3,
         paddingHorizontal: 6,
-        borderBottomLeftRadius: 14,
-        borderBottomRightRadius: 14,
+        borderBottomLeftRadius: 6,
+        borderBottomRightRadius: 6,
         alignItems: 'center',
     },
     badgeText: {
