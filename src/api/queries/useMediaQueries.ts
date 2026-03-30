@@ -121,7 +121,7 @@ export function useTrending(limit = 20) {
         sortOrder: [SortOrder.Descending],
         limit,
         recursive: true,
-        fields: [ItemFields.Overview, ItemFields.Genres, ItemFields.DateCreated, ItemFields.DateLastMediaAdded, ItemFields.ChildCount],
+        fields: [ItemFields.Overview, ItemFields.Genres, ItemFields.DateCreated, ItemFields.DateLastMediaAdded, ItemFields.ChildCount, ItemFields.RemoteTrailers],
         imageTypeLimit: 1,
         enableImageTypes: ['Primary', 'Backdrop'],
       });
@@ -287,7 +287,7 @@ export function useNewlyAdded(limit = 20) {
         sortOrder: [SortOrder.Descending],
         limit,
         recursive: true,
-        fields: [ItemFields.Overview, ItemFields.Genres, ItemFields.People, ItemFields.DateCreated, ItemFields.DateLastMediaAdded, ItemFields.ChildCount],
+        fields: [ItemFields.Overview, ItemFields.Genres, ItemFields.People, ItemFields.DateCreated, ItemFields.DateLastMediaAdded, ItemFields.ChildCount, ItemFields.RemoteTrailers],
         imageTypeLimit: 1,
         enableImageTypes: ['Primary', 'Backdrop', 'Thumb'],
       });

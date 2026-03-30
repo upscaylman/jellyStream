@@ -19,6 +19,16 @@ import { useNewlyAdded, useTrending } from '@/src/api/queries/useMediaQueries';
 import { useAuthStore } from '@/src/stores/authStore';
 import { getImageUrl, getBackdropUrl } from '@/src/utils/imageUrl';
 import { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models';
+import { Platform } from 'react-native';
+
+// Extraire l'ID YouTube d'une URL
+function extractYouTubeId(url?: string): string | null {
+    if (!url) return null;
+    const match = url.match(
+        /(?:youtube\.com\/(?:watch\?.*v=|embed\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+    );
+    return match?.[1] ?? null;
+}
 
 const TAB_OPTIONS = [
     { id: 'newly-added', label: 'Nouveautés', icon: 'time-outline' as const },
@@ -90,18 +100,34 @@ export default function NewScreen() {
                                 <Text style={newStyles.rated}>{item.OfficialRating}</Text>
                             </View>
                         )}
-                        {imageUri ? (
-                            <ExpoImage
-                                source={{ uri: imageUri }}
-                                style={newStyles.previewImage}
-                                cachePolicy="memory-disk"
-                                transition={200}
-                            />
-                        ) : (
-                            <View style={[newStyles.previewImage, { backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' }]}>
-                                <Ionicons name="film-outline" size={32} color="#555" />
-                            </View>
-                        )}
+                        {(() => {
+                            const ytId = extractYouTubeId(item.RemoteTrailers?.[0]?.Url);
+                            if (ytId && Platform.OS === 'web') {
+                                return (
+                                    <iframe
+                                        src={`https://www.youtube.com/embed/${ytId}?autoplay=0&mute=1&controls=0&loop=1&playlist=${ytId}&modestbranding=1&rel=0&showinfo=0`}
+                                        style={{ width: '100%', height: '100%', border: 'none' } as any}
+                                        allow="autoplay; encrypted-media"
+                                        allowFullScreen
+                                    />
+                                );
+                            }
+                            if (imageUri) {
+                                return (
+                                    <ExpoImage
+                                        source={{ uri: imageUri }}
+                                        style={newStyles.previewImage}
+                                        cachePolicy="memory-disk"
+                                        transition={200}
+                                    />
+                                );
+                            }
+                            return (
+                                <View style={[newStyles.previewImage, { backgroundColor: '#1a1a2e', justifyContent: 'center', alignItems: 'center' }]}>
+                                    <Ionicons name="film-outline" size={32} color="#555" />
+                                </View>
+                            );
+                        })()}
                     </View>
 
                     <View style={newStyles.titleContainer}>
