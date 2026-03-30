@@ -8,6 +8,9 @@ import * as Haptics from 'expo-haptics';
 interface CategoriesListModalProps {
     visible: boolean;
     onClose: () => void;
+    items?: { id: string; label: string }[];
+    selectedId?: string | null;
+    onSelect?: (id: string) => void;
 }
 
 const categories = [
@@ -38,11 +41,18 @@ const categories = [
     'Audio Description in English'
 ];
 
-export function CategoriesListModal({ visible, onClose }: CategoriesListModalProps) {
+export function CategoriesListModal({ visible, onClose, items, selectedId, onSelect }: CategoriesListModalProps) {
     const insets = useSafeAreaInsets();
 
-    const handleCategoryPress = async (category: string) => {
+    // Items personnalisés ou catégories par défaut
+    const displayItems = items ?? categories.map((c) => ({ id: c, label: c }));
+
+    const handleItemPress = async (item: { id: string; label: string }) => {
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (onSelect) {
+            onSelect(item.id);
+            onClose();
+        }
     };
 
     const handleClose = async () => {
@@ -65,18 +75,24 @@ export function CategoriesListModal({ visible, onClose }: CategoriesListModalPro
                         contentContainerStyle={[
                             styles.scrollContent,
 
-                            { paddingTop: 40, paddingBottom: insets.bottom + 80 }
+                            { flexGrow: 1, justifyContent: 'center', paddingBottom: insets.bottom + 80 }
                         ]}
                     >
-                        {categories.map((category) => (
-                            <Pressable
-                                key={category}
-                                style={styles.categoryItem}
-                                onPress={() => handleCategoryPress(category)}
-                            >
-                                <Text style={styles.categoryText}>{category}</Text>
-                            </Pressable>
-                        ))}
+                        {displayItems.map((item) => {
+                            const isSelected = selectedId != null && item.id === selectedId;
+                            return (
+                                <Pressable
+                                    key={item.id}
+                                    style={styles.categoryItem}
+                                    onPress={() => handleItemPress(item)}
+                                >
+                                    <Text style={[
+                                        styles.categoryText,
+                                        isSelected && styles.categoryTextSelected,
+                                    ]}>{item.label}</Text>
+                                </Pressable>
+                            );
+                        })}
                     </ScrollView>
 
                     <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + 20 }]}>
@@ -103,6 +119,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingHorizontal: 20,
+        alignItems: 'center',
     },
     categoryItem: {
         paddingVertical: 18,
@@ -111,6 +128,12 @@ const styles = StyleSheet.create({
         color: 'rgba(255, 255, 255, 0.501)',
         fontSize: 18,
         fontWeight: '400',
+        textAlign: 'center',
+    },
+    categoryTextSelected: {
+        color: '#fff',
+        fontSize: 24,
+        fontWeight: 'bold',
     },
     bottomContainer: {
         position: 'absolute',

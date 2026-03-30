@@ -1,11 +1,11 @@
-import { View, StyleSheet, Text, Pressable, Dimensions, ScrollView } from 'react-native';
+import { View, StyleSheet, Text, Pressable, Dimensions, ScrollView, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { ThemedText } from '@/components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEvent } from 'expo';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { expandedPlayerStyles as styles } from '@/styles/expanded-player';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Slider } from 'react-native-awesome-slider';
@@ -14,6 +14,16 @@ import { Image as ExpoImage } from 'expo-image';
 import { useSimilarItems, useSeasons, useEpisodes } from '@/src/api/queries/useMediaQueries';
 import { useAuthStore } from '@/src/stores/authStore';
 import { getImageUrl, getHlsStreamUrl } from '@/src/utils/imageUrl';
+import { CategoriesListModal } from '@/components/CategoriesListModal/CategoriesListModal';
+
+// Extraire l'ID YouTube d'une URL (youtube.com/watch?v=, youtu.be/, youtube.com/embed/)
+function extractYouTubeId(url?: string): string | null {
+    if (!url) return null;
+    const match = url.match(
+        /(?:youtube\.com\/(?:watch\?.*v=|embed\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+    );
+    return match?.[1] ?? null;
+}
 
 interface MovieData {
     id: string | number;
@@ -30,6 +40,7 @@ interface MovieData {
     type?: string;
     seasonCount?: number;
     seriesId?: string;
+    trailerUrl?: string;
 }
 
 interface ExpandedPlayerProps {
@@ -94,10 +105,18 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
     };
 
     // URL HLS Jellyfin pour le preview (transcodé en H.264/AAC, compatible web+mobile)
-    const previewUrl = getHlsStreamUrl(serverUrl, itemId, token, {
-        maxWidth: 720,
-        videoBitRate: 2000000,
-    }) || movieData.video_url;
+    // Priorité : YouTube trailer > HLS stream
+    const youtubeId = useMemo(() => extractYouTubeId(movie.trailerUrl), [movie.trailerUrl]);
+    const youtubeEmbedUrl = youtubeId
+        ? `https://www.youtube.com/embed/${youtubeId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${youtubeId}&modestbranding=1&rel=0&showinfo=0`
+        : null;
+
+    const previewUrl = !youtubeEmbedUrl
+        ? (getHlsStreamUrl(serverUrl, itemId, token, {
+            maxWidth: 720,
+            videoBitRate: 2000000,
+          }) || movieData.video_url)
+        : '';
 
     const player = useVideoPlayer(previewUrl, (p) => {
         p.loop = true;
@@ -142,46 +161,59 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
                 contentContainerStyle={{ paddingBottom: 76 }}
             >
                 <View style={styles.videoContainer}>
-                    <VideoView
-                        ref={videoViewRef}
-                        style={styles.video}
-                        player={player}
-                        nativeControls={false}
-                        contentFit="cover"
-                    />
-                    <View style={styles.videoOverlay} />
-                    <View style={styles.muteOverlay}>
-                        <Pressable
-                            style={styles.soundButton}
-                            onPress={() => setIsMuted(!isMuted)}
-                        >
-                            <Ionicons
-                                name={isMuted ? "volume-mute" : "volume-medium"}
-                                size={18}
-                                color="white"
-                            />
-                        </Pressable>
-                    </View>
-                    <View style={styles.sliderContainer}>
-                        <Slider
-                            style={styles.slider}
-                            progress={progress}
-                            minimumValue={min}
-                            maximumValue={max}
-                            onValueChange={(value) => {
-                                player.currentTime = value / 1000;
-                            }}
-                            theme={{
-                                minimumTrackTintColor: '#db0000',
-                                bubbleBackgroundColor: '#db0000',
-                            }}
-                            thumbWidth={5}
-                            sliderHeight={5}
-                            containerStyle={styles.sliderInner}
-                            disableTrackFollow={false}
-                            disableTapEvent={false}
+                    {youtubeEmbedUrl ? (
+                        <iframe
+                            src={youtubeEmbedUrl}
+                            style={{ width: '100%', height: '100%', border: 'none' } as any}
+                            allow="autoplay; encrypted-media"
+                            allowFullScreen
                         />
-                    </View>
+                    ) : (
+                        <VideoView
+                            ref={videoViewRef}
+                            style={styles.video}
+                            player={player}
+                            nativeControls={false}
+                            contentFit="cover"
+                        />
+                    )}
+                    <View style={styles.videoOverlay} />
+                    {!youtubeEmbedUrl && (
+                        <View style={styles.muteOverlay}>
+                            <Pressable
+                                style={styles.soundButton}
+                                onPress={() => setIsMuted(!isMuted)}
+                            >
+                                <Ionicons
+                                    name={isMuted ? "volume-mute" : "volume-medium"}
+                                    size={18}
+                                    color="white"
+                                />
+                            </Pressable>
+                        </View>
+                    )}
+                    {!youtubeEmbedUrl && (
+                        <View style={styles.sliderContainer}>
+                            <Slider
+                                style={styles.slider}
+                                progress={progress}
+                                minimumValue={min}
+                                maximumValue={max}
+                                onValueChange={(value) => {
+                                    player.currentTime = value / 1000;
+                                }}
+                                theme={{
+                                    minimumTrackTintColor: '#db0000',
+                                    bubbleBackgroundColor: '#db0000',
+                                }}
+                                thumbWidth={5}
+                                sliderHeight={5}
+                                containerStyle={styles.sliderInner}
+                                disableTrackFollow={false}
+                                disableTapEvent={false}
+                            />
+                        </View>
+                    )}
                 </View>
 
                 <View style={styles.contentContainer}>
@@ -192,6 +224,9 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
                         {movieData.duration ? <ThemedText style={styles.duration}>{movieData.duration}</ThemedText> : null}
                         {movieData.rating ? <ThemedText style={styles.rating}>{movieData.rating}</ThemedText> : null}
                         <ThemedText style={styles.quality}>HD</ThemedText>
+                        {isSeries && seasons && seasons.length > 0 && (
+                            <ThemedText style={styles.duration}>{seasons.length} saison{seasons.length > 1 ? 's' : ''}</ThemedText>
+                        )}
                     </View>
 
                     <View style={styles.buttonContainer}>
@@ -264,52 +299,26 @@ export function ExpandedPlayer({ scrollComponent, movie }: ExpandedPlayerProps) 
                 {/* Épisodes pour les séries */}
                 {isSeries && seasons && seasons.length > 0 && (
                     <View style={episodeStyles.container}>
-                        {/* Dropdown saison si plusieurs */}
-                        {seasons.length > 1 ? (
-                            <View>
-                                <Pressable
-                                    style={episodeStyles.seasonDropdown}
-                                    onPress={() => setShowSeasonPicker(!showSeasonPicker)}
-                                >
-                                    <ThemedText style={episodeStyles.seasonDropdownText}>
-                                        {selectedSeason?.Name ?? 'Saison 1'}
-                                    </ThemedText>
-                                    <Ionicons
-                                        name={showSeasonPicker ? 'chevron-up' : 'chevron-down'}
-                                        size={18}
-                                        color="white"
-                                    />
-                                </Pressable>
-                                {showSeasonPicker && (
-                                    <View style={episodeStyles.seasonPickerList}>
-                                        {seasons.map((season) => (
-                                            <Pressable
-                                                key={season.Id}
-                                                style={[
-                                                    episodeStyles.seasonPickerItem,
-                                                    season.Id === selectedSeasonId && episodeStyles.seasonPickerItemActive,
-                                                ]}
-                                                onPress={() => {
-                                                    setSelectedSeasonId(season.Id ?? null);
-                                                    setShowSeasonPicker(false);
-                                                }}
-                                            >
-                                                <ThemedText style={[
-                                                    episodeStyles.seasonPickerItemText,
-                                                    season.Id === selectedSeasonId && { color: '#E50914' },
-                                                ]}>
-                                                    {season.Name}
-                                                </ThemedText>
-                                            </Pressable>
-                                        ))}
-                                    </View>
-                                )}
-                            </View>
-                        ) : (
-                            <ThemedText style={episodeStyles.sectionTitle}>
-                                {seasons[0]?.Name ?? 'Épisodes'}
+                        {/* Bouton saison — ouvre la modal CategoriesListModal */}
+                        <Pressable
+                            style={episodeStyles.seasonDropdown}
+                            onPress={() => setShowSeasonPicker(true)}
+                        >
+                            <ThemedText style={episodeStyles.seasonDropdownText}>
+                                {selectedSeason?.Name ?? seasons[0]?.Name ?? 'Épisodes'}
                             </ThemedText>
-                        )}
+                            {seasons.length > 1 && (
+                                <Ionicons name="chevron-down" size={18} color="white" />
+                            )}
+                        </Pressable>
+
+                        <CategoriesListModal
+                            visible={showSeasonPicker}
+                            onClose={() => setShowSeasonPicker(false)}
+                            items={seasons.map((s) => ({ id: s.Id ?? '', label: s.Name ?? '' }))}
+                            selectedId={selectedSeasonId}
+                            onSelect={(id) => setSelectedSeasonId(id)}
+                        />
 
                         {/* Liste des épisodes */}
                         {(episodes ?? []).map((ep) => {
@@ -438,23 +447,6 @@ const episodeStyles = StyleSheet.create({
         fontSize: 15,
         fontWeight: 'bold',
         color: '#fff',
-    },
-    seasonPickerList: {
-        backgroundColor: '#1a1a1a',
-        borderRadius: 4,
-        marginBottom: 12,
-        overflow: 'hidden',
-    },
-    seasonPickerItem: {
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-    },
-    seasonPickerItemActive: {
-        backgroundColor: '#2a2a2a',
-    },
-    seasonPickerItemText: {
-        fontSize: 14,
-        color: '#ccc',
     },
     episodeRow: {
         flexDirection: 'row',

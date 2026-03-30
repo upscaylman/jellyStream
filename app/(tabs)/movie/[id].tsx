@@ -80,6 +80,7 @@ export default function MovieScreen() {
                     type: item.Type ?? undefined,
                     seasonCount: item.ChildCount ?? undefined,
                     seriesId: item.SeriesId ?? undefined,
+                    trailerUrl: item.RemoteTrailers?.[0]?.Url ?? undefined,
                 }}
             />
         </View>
