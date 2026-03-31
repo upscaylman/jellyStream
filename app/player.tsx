@@ -328,26 +328,21 @@ function SettingsModal({
     </View>
   );
 
+  if (!visible) return null;
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <Pressable style={settingsStyles.backdrop} onPress={onClose}>
-        <Pressable
-          style={settingsStyles.container}
-          onPress={(e) => e.stopPropagation()}
-        >
-          {panel === "main" && renderMainMenu()}
-          {panel === "subtitles" && renderSubtitleList()}
-          {panel === "audio" && renderAudioList()}
-          {panel === "quality" && renderQualityList()}
-          {panel === "aspectRatio" && renderAspectList()}
-        </Pressable>
+    <Pressable style={settingsStyles.backdrop} onPress={onClose}>
+      <Pressable
+        style={settingsStyles.container}
+        onPress={(e) => e.stopPropagation()}
+      >
+        {panel === "main" && renderMainMenu()}
+        {panel === "subtitles" && renderSubtitleList()}
+        {panel === "audio" && renderAudioList()}
+        {panel === "quality" && renderQualityList()}
+        {panel === "aspectRatio" && renderAspectList()}
       </Pressable>
-    </Modal>
+    </Pressable>
   );
 }
 
@@ -812,6 +807,23 @@ function WebPlayer({
               </View>
 
               <View style={s.bottomBar}>
+                <View style={s.timeRow}>
+                  <Text style={s.timeText}>{formatTime(displayTime)}</Text>
+                  <Text style={s.timeTextMuted}>
+                    {" / "}
+                    {formatTime(durationSec)}
+                  </Text>
+                  <View style={{ flex: 1 }} />
+                  <Pressable onPress={toggleFullscreen} style={s.iconButton}>
+                    <Ionicons
+                      name={
+                        isFullscreen ? "contract-outline" : "expand-outline"
+                      }
+                      size={22}
+                      color="#fff"
+                    />
+                  </Pressable>
+                </View>
                 <div
                   ref={progressRef as any}
                   style={{
@@ -860,23 +872,6 @@ function WebPlayer({
                     />
                   </div>
                 </div>
-                <View style={s.timeRow}>
-                  <Text style={s.timeText}>{formatTime(displayTime)}</Text>
-                  <Text style={s.timeTextMuted}>
-                    {" / "}
-                    {formatTime(durationSec)}
-                  </Text>
-                  <View style={{ flex: 1 }} />
-                  <Pressable onPress={toggleFullscreen} style={s.iconButton}>
-                    <Ionicons
-                      name={
-                        isFullscreen ? "contract-outline" : "expand-outline"
-                      }
-                      size={22}
-                      color="#fff"
-                    />
-                  </Pressable>
-                </View>
               </View>
             </>
           )}
@@ -1766,10 +1761,11 @@ const s = StyleSheet.create({
 // Styles panneau paramètres
 const settingsStyles = StyleSheet.create({
   backdrop: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.6)",
     justifyContent: "center",
     alignItems: "flex-end",
+    zIndex: 9999,
   },
   container: {
     width: 320,

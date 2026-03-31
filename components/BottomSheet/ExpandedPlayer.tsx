@@ -461,7 +461,7 @@ export function ExpandedPlayer({
               <Ionicons
                 name={isLiked ? "heart" : "heart-outline"}
                 size={24}
-                color={isLiked ? "#E50914" : "white"}
+                color="white"
               />
               <ThemedText style={styles.actionItemText}>Évaluer</ThemedText>
             </Pressable>

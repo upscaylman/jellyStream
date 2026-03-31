@@ -7,6 +7,7 @@ import React from "react";
 import {
   ActivityIndicator,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,6 +24,65 @@ interface CastModalProps {
 export function CastModal({ visible, onClose, onSelect }: CastModalProps) {
   const { data: sessions, isLoading, refetch } = useCastSessions();
 
+  if (!visible) return null;
+
+  const content = (
+    <Pressable style={s.backdrop} onPress={onClose}>
+      <View style={s.container}>
+        <Pressable onPress={(e) => e.stopPropagation()}>
+          <View style={s.header}>
+            <CastIcon size={24} color="#fff" />
+            <Text style={s.title}>Diffuser sur</Text>
+            <Pressable onPress={onClose} hitSlop={12}>
+              <Ionicons name="close" size={24} color="#fff" />
+            </Pressable>
+          </View>
+
+          {isLoading ? (
+            <View style={s.loadingContainer}>
+              <ActivityIndicator color="#E50914" size="small" />
+              <Text style={s.loadingText}>Recherche d'appareils…</Text>
+            </View>
+          ) : !sessions?.length ? (
+            <View style={s.emptyContainer}>
+              <Text style={s.emptyText}>Aucun appareil disponible</Text>
+              <Pressable style={s.retryButton} onPress={() => refetch()}>
+                <Text style={s.retryText}>Réessayer</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <ScrollView style={s.list}>
+              {sessions.map((session) => (
+                <Pressable
+                  key={session.Id}
+                  style={s.deviceRow}
+                  onPress={() => {
+                    onSelect(session);
+                    onClose();
+                  }}
+                >
+                  <Ionicons name="tv-outline" size={22} color="#B3B3B3" />
+                  <View style={s.deviceInfo}>
+                    <Text style={s.deviceName}>{session.DeviceName}</Text>
+                    <Text style={s.deviceClient}>
+                      {session.Client}
+                      {session.NowPlayingItem
+                        ? ` · ${session.NowPlayingItem.Name}`
+                        : ""}
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
+        </Pressable>
+      </View>
+    </Pressable>
+  );
+
+  // Sur web, rendre inline (pas de <Modal>) pour être visible en fullscreen
+  if (Platform.OS === "web") return content;
+
   return (
     <Modal
       visible={visible}
@@ -30,67 +90,18 @@ export function CastModal({ visible, onClose, onSelect }: CastModalProps) {
       animationType="fade"
       onRequestClose={onClose}
     >
-      <Pressable style={s.backdrop} onPress={onClose}>
-        <View style={s.container}>
-          <Pressable onPress={(e) => e.stopPropagation()}>
-            <View style={s.header}>
-              <CastIcon size={24} color="#fff" />
-              <Text style={s.title}>Diffuser sur</Text>
-              <Pressable onPress={onClose} hitSlop={12}>
-                <Ionicons name="close" size={24} color="#fff" />
-              </Pressable>
-            </View>
-
-            {isLoading ? (
-              <View style={s.loadingContainer}>
-                <ActivityIndicator color="#E50914" size="small" />
-                <Text style={s.loadingText}>Recherche d'appareils…</Text>
-              </View>
-            ) : !sessions?.length ? (
-              <View style={s.emptyContainer}>
-                <Text style={s.emptyText}>Aucun appareil disponible</Text>
-                <Pressable style={s.retryButton} onPress={() => refetch()}>
-                  <Text style={s.retryText}>Réessayer</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <ScrollView style={s.list}>
-                {sessions.map((session) => (
-                  <Pressable
-                    key={session.Id}
-                    style={s.deviceRow}
-                    onPress={() => {
-                      onSelect(session);
-                      onClose();
-                    }}
-                  >
-                    <Ionicons name="tv-outline" size={22} color="#B3B3B3" />
-                    <View style={s.deviceInfo}>
-                      <Text style={s.deviceName}>{session.DeviceName}</Text>
-                      <Text style={s.deviceClient}>
-                        {session.Client}
-                        {session.NowPlayingItem
-                          ? ` · ${session.NowPlayingItem.Name}`
-                          : ""}
-                      </Text>
-                    </View>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            )}
-          </Pressable>
-        </View>
-      </Pressable>
+      {content}
     </Modal>
   );
 }
 
 const s = StyleSheet.create({
   backdrop: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.7)",
     justifyContent: "center",
     alignItems: "center",
+    zIndex: 9999,
   },
   container: {
     width: "85%",
