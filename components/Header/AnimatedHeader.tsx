@@ -118,7 +118,12 @@ export function AnimatedHeader({
   return (
     <>
       <Animated.View style={[styles.header]}>
-        <Animated.View style={[{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }, blurOpacityStyle]}>
+        <Animated.View
+          style={[
+            { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
+            blurOpacityStyle,
+          ]}
+        >
           <AnimatedBlurView
             tint="systemThickMaterialDark"
             style={{ width: "100%", height: "100%" }}
@@ -205,14 +210,21 @@ export function AnimatedHeader({
           </Animated.View>
           <Animated.View style={[styles.categoryTabs, tabsAnimatedStyle]}>
             {subPage ? (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+              >
                 {selectedGenre && (
                   <Pressable
-                    style={[styles.categoryTab, { backgroundColor: "rgba(255,255,255,0.15)" }]}
+                    style={[
+                      styles.categoryTab,
+                      { backgroundColor: "rgba(255,255,255,0.15)" },
+                    ]}
                     onPress={() => onGenreSelect?.(null)}
                   >
                     <Ionicons name="close" size={14} color="#fff" />
-                    <Text style={[styles.categoryTabText, { fontWeight: "bold" }]}>
+                    <Text
+                      style={[styles.categoryTabText, { fontWeight: "bold" }]}
+                    >
                       {selectedGenre}
                     </Text>
                   </Pressable>
@@ -273,11 +285,16 @@ export function AnimatedHeader({
                 {selectedGenre ? (
                   <>
                     <Pressable
-                      style={[styles.categoryTab, { backgroundColor: "rgba(255,255,255,0.15)" }]}
+                      style={[
+                        styles.categoryTab,
+                        { backgroundColor: "rgba(255,255,255,0.15)" },
+                      ]}
                       onPress={() => onGenreSelect?.(null)}
                     >
                       <Ionicons name="close" size={14} color="#fff" />
-                      <Text style={[styles.categoryTabText, { fontWeight: "bold" }]}>
+                      <Text
+                        style={[styles.categoryTabText, { fontWeight: "bold" }]}
+                      >
                         {selectedGenre}
                       </Text>
                     </Pressable>
@@ -293,7 +310,9 @@ export function AnimatedHeader({
                     style={styles.categoryTab}
                     onPress={onCategoryPress}
                   >
-                    <Text style={styles.categoryTabTextWithIcon}>Categories</Text>
+                    <Text style={styles.categoryTabTextWithIcon}>
+                      Categories
+                    </Text>
                     <Ionicons name="chevron-down" size={16} color="#fff" />
                   </Pressable>
                 )}

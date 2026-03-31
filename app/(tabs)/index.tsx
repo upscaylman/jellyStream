@@ -75,9 +75,7 @@ export default function HomeScreen() {
       result = result
         .map((row) => ({
           ...row,
-          movies: row.movies.filter((m) =>
-            m.genres?.includes(selectedGenre),
-          ),
+          movies: row.movies.filter((m) => m.genres?.includes(selectedGenre)),
         }))
         .filter((row) => row.movies.length > 0);
     }

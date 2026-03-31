@@ -14,12 +14,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import React, { useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Dimensions,
-  StyleSheet,
-  View,
-} from "react-native";
+import { ActivityIndicator, Dimensions, StyleSheet, View } from "react-native";
 import Animated, {
   interpolate,
   useAnimatedProps,
