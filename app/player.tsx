@@ -377,12 +377,15 @@ function WebPlayer({
   title,
   itemId,
   onClose,
+  isLive = false,
 }: {
   streamUrl: string;
   title: string;
   itemId: string;
   onClose: () => void;
+  isLive?: boolean;
 }) {
+  const hlsRef = useRef<import("hls.js").default | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const progressRef = useRef<HTMLDivElement | null>(null);
@@ -455,11 +458,10 @@ function WebPlayer({
     }, CONTROLS_HIDE_DELAY);
   }, []);
 
-  // Monter le <video> HTML
+  // Monter le <video> HTML — avec HLS.js pour les streams .m3u8
   useEffect(() => {
     if (!containerRef.current) return;
     const video = document.createElement("video");
-    video.src = streamUrl;
     video.autoplay = true;
     video.playsInline = true;
     video.style.cssText =
@@ -467,6 +469,81 @@ function WebPlayer({
     video.controls = false;
     containerRef.current.appendChild(video);
     videoRef.current = video;
+
+    const isHls = streamUrl.includes(".m3u8");
+
+    if (isHls) {
+      // HLS.js pour Chrome/Firefox (Safari supporte HLS nativement)
+      import("hls.js").then(({ default: Hls }) => {
+        if (Hls.isSupported()) {
+          let networkRetries = 0;
+          const MAX_RETRIES = 5;
+          const hls = new Hls({
+            enableWorker: true,
+            lowLatencyMode: true,
+            manifestLoadingMaxRetry: 5,
+            manifestLoadingRetryDelay: 1000,
+            levelLoadingMaxRetry: 5,
+            levelLoadingRetryDelay: 1000,
+            fragLoadingMaxRetry: 5,
+            fragLoadingRetryDelay: 1000,
+            // Intercepter TOUTES les requêtes pour patcher les URLs générées par Jellyfin
+            // Le master.m3u8 contient des refs vers live.m3u8 avec AudioCodec=copy côté serveur
+            xhrSetup: (xhr: XMLHttpRequest, url: string) => {
+              let fixedUrl = url;
+              fixedUrl = fixedUrl
+                .replace(/AudioCodec=copy/gi, "AudioCodec=aac")
+                .replace(/AudioStreamIndex=-1/gi, "")
+                .replace(/h264-level=\d+/gi, "h264-level=51")
+                .replace(/h264-profile=\w+/gi, "h264-profile=high")
+                .replace(/&&+/g, "&")
+                .replace(/&$/, "")
+                .replace(/\?&/, "?");
+              if (fixedUrl !== url) {
+                console.log("[HLS] URL patchée:", fixedUrl);
+                xhr.open("GET", fixedUrl, true);
+              }
+            },
+          });
+          hls.loadSource(streamUrl);
+          hls.attachMedia(video);
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            video.play().catch(() => {});
+          });
+          hls.on(Hls.Events.ERROR, (_event, data) => {
+            if (data.fatal) {
+              switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                  if (networkRetries < MAX_RETRIES) {
+                    networkRetries++;
+                    hls.startLoad();
+                  } else {
+                    console.error(
+                      "[HLS] Abandon après",
+                      MAX_RETRIES,
+                      "tentatives réseau",
+                    );
+                    hls.destroy();
+                  }
+                  break;
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                  hls.recoverMediaError();
+                  break;
+                default:
+                  hls.destroy();
+                  break;
+              }
+            }
+          });
+          hlsRef.current = hls;
+        } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+          // Safari natif HLS
+          video.src = streamUrl;
+        }
+      });
+    } else {
+      video.src = streamUrl;
+    }
 
     video.addEventListener("loadedmetadata", () => setIsBuffering(false));
     video.addEventListener("play", () => setIsPlaying(true));
@@ -476,6 +553,10 @@ function WebPlayer({
     video.addEventListener("ended", () => setIsPlaying(false));
 
     return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
       video.pause();
       video.src = "";
       video.remove();
@@ -715,6 +796,8 @@ function WebPlayer({
             resetHideTimer();
           }
         }}
+        onTouchStart={resetHideTimer}
+        {...(Platform.OS === "web" ? { onMouseMove: resetHideTimer } : {})}
       >
         <div
           ref={containerRef as any}
@@ -734,6 +817,8 @@ function WebPlayer({
             s.controlsOverlay,
             { paddingTop: 16, paddingBottom: 16, pointerEvents: "box-none" },
           ]}
+          onTouchStart={resetHideTimer}
+          {...(Platform.OS === "web" ? { onMouseMove: resetHideTimer } : {})}
         >
           {isLocked ? (
             <View style={s.lockedContainer}>
@@ -784,12 +869,14 @@ function WebPlayer({
               </View>
 
               <View style={s.centerControls}>
-                <Pressable
-                  onPress={() => seekRelative(-10)}
-                  style={s.seekButton}
-                >
-                  <SkipBackIcon size={40} color="#fff" />
-                </Pressable>
+                {!isLive && (
+                  <Pressable
+                    onPress={() => seekRelative(-10)}
+                    style={s.seekButton}
+                  >
+                    <SkipBackIcon size={40} color="#fff" />
+                  </Pressable>
+                )}
                 <Pressable onPress={togglePlayPause} style={s.playPauseButton}>
                   <Ionicons
                     name={isPlaying ? "pause" : "play"}
@@ -797,80 +884,126 @@ function WebPlayer({
                     color="#fff"
                   />
                 </Pressable>
-                <Pressable
-                  onPress={() => seekRelative(10)}
-                  style={s.seekButton}
-                >
-                  <SkipForwardIcon size={40} color="#fff" />
-                </Pressable>
+                {!isLive && (
+                  <Pressable
+                    onPress={() => seekRelative(10)}
+                    style={s.seekButton}
+                  >
+                    <SkipForwardIcon size={40} color="#fff" />
+                  </Pressable>
+                )}
               </View>
 
               <View style={s.bottomBar}>
-                <View style={s.timeRow}>
-                  <Text style={s.timeText}>{formatTime(displayTime)}</Text>
-                  <Text style={s.timeTextMuted}>
-                    {" / "}
-                    {formatTime(durationSec)}
-                  </Text>
-                  <View style={{ flex: 1 }} />
-                  <Pressable onPress={toggleFullscreen} style={s.iconButton}>
-                    <Ionicons
-                      name={
-                        isFullscreen ? "contract-outline" : "expand-outline"
-                      }
-                      size={22}
-                      color="#fff"
-                    />
-                  </Pressable>
-                </View>
-                <div
-                  ref={progressRef as any}
-                  style={{
-                    height: 40,
-                    display: "flex",
-                    alignItems: "center",
-                    cursor: "pointer",
-                    touchAction: "none",
-                    position: "relative",
-                    paddingTop: 12,
-                    paddingBottom: 12,
-                    marginLeft: -4,
-                    marginRight: -4,
-                    paddingLeft: 4,
-                    paddingRight: 4,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "100%",
-                      height: 3,
-                      backgroundColor: "rgba(255,255,255,0.3)",
-                      borderRadius: 2,
-                      position: "relative",
-                    }}
-                  >
-                    <div
+                {isLive ? (
+                  <View style={s.timeRow}>
+                    <View
                       style={{
-                        width: `${progressPercent}%`,
-                        height: "100%",
-                        backgroundColor: "#E50914",
-                        borderRadius: 2,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 6,
                       }}
-                    />
+                    >
+                      <View
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 4,
+                          backgroundColor: "#E50914",
+                        }}
+                      />
+                      <Text
+                        style={[
+                          s.timeText,
+                          { color: "#E50914", fontWeight: "700" },
+                        ]}
+                      >
+                        EN DIRECT
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }} />
+                    <Pressable onPress={toggleFullscreen} style={s.iconButton}>
+                      <Ionicons
+                        name={
+                          isFullscreen ? "contract-outline" : "expand-outline"
+                        }
+                        size={22}
+                        color="#fff"
+                      />
+                    </Pressable>
+                  </View>
+                ) : (
+                  <>
+                    <View style={s.timeRow}>
+                      <Text style={s.timeText}>{formatTime(displayTime)}</Text>
+                      <Text style={s.timeTextMuted}>
+                        {" / "}
+                        {formatTime(durationSec)}
+                      </Text>
+                      <View style={{ flex: 1 }} />
+                      <Pressable
+                        onPress={toggleFullscreen}
+                        style={s.iconButton}
+                      >
+                        <Ionicons
+                          name={
+                            isFullscreen ? "contract-outline" : "expand-outline"
+                          }
+                          size={22}
+                          color="#fff"
+                        />
+                      </Pressable>
+                    </View>
                     <div
+                      ref={progressRef as any}
                       style={{
-                        position: "absolute",
-                        top: -5,
-                        left: `${progressPercent}%`,
-                        width: 13,
-                        height: 13,
-                        borderRadius: 7,
-                        backgroundColor: "#E50914",
-                        marginLeft: -6,
+                        height: 40,
+                        display: "flex",
+                        alignItems: "center",
+                        cursor: "pointer",
+                        touchAction: "none",
+                        position: "relative",
+                        paddingTop: 12,
+                        paddingBottom: 12,
+                        marginLeft: -4,
+                        marginRight: -4,
+                        paddingLeft: 4,
+                        paddingRight: 4,
                       }}
-                    />
-                  </div>
-                </div>
+                    >
+                      <div
+                        style={{
+                          width: "100%",
+                          height: 3,
+                          backgroundColor: "rgba(255,255,255,0.3)",
+                          borderRadius: 2,
+                          position: "relative",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${progressPercent}%`,
+                            height: "100%",
+                            backgroundColor: "#E50914",
+                            borderRadius: 2,
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: -5,
+                            left: `${progressPercent}%`,
+                            width: 13,
+                            height: 13,
+                            borderRadius: 7,
+                            backgroundColor: "#E50914",
+                            marginLeft: -6,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
               </View>
             </>
           )}
@@ -1492,9 +1625,11 @@ export default function PlayerScreen() {
   const userId = useAuthStore((s) => s.userId) ?? "";
 
   // Si l'item est une série, résoudre vers le premier épisode
+  // Si l'item est un TvChannel, résoudre via PlaybackInfo (TranscodingUrl live)
   const [resolvedItemId, setResolvedItemId] = useState<string | null>(null);
   const [resolvedTitle, setResolvedTitle] = useState(rawTitle ?? "");
   const [resolving, setResolving] = useState(true);
+  const [liveStreamUrl, setLiveStreamUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!rawItemId || !serverUrl || !token) {
@@ -1515,6 +1650,196 @@ export default function PlayerScreen() {
           return;
         }
         const item = await itemResp.json();
+
+        if (item.Type === "TvChannel") {
+          // Live TV : essayer plusieurs stratégies dans l'ordre
+          // 1) Sans DeviceProfile (Jellyfin utilise son profil web par défaut)
+          // 2) Profil complet avec CodecProfiles
+          // 3) Transcodage forcé (pas de stream copy)
+
+          const fetchPlaybackInfo = async (body: object) => {
+            const resp = await fetch(
+              `${baseUrl}/Items/${encodeURIComponent(rawItemId)}/PlaybackInfo?userId=${encodeURIComponent(userId)}`,
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `MediaBrowser Token="${token}"`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify(body),
+              },
+            );
+            if (!resp.ok) return null;
+            return resp.json();
+          };
+
+          // Nettoyer une TranscodingUrl pour éviter les 500
+          const cleanTranscodingUrl = (url: string) => {
+            let fixed = url;
+            // Forcer AAC au lieu de copy (copy échoue si codec source incompatible avec TS)
+            fixed = fixed
+              .replace(/AudioCodec=copy/gi, "AudioCodec=aac")
+              .replace(/AudioStreamIndex=-1/gi, "");
+            // Forcer H.264 Level 5.1 (level 30 = max 480p, trop bas pour la plupart des chaînes)
+            fixed = fixed.replace(/h264-level=\d+/gi, "h264-level=51");
+            // Forcer profil H.264 high (main peut échouer sur certaines sources)
+            fixed = fixed.replace(/h264-profile=\w+/gi, "h264-profile=high");
+            // Nettoyer les doubles & ou & en fin d'URL
+            fixed = fixed
+              .replace(/&&+/g, "&")
+              .replace(/&$/, "")
+              .replace(/\?&/, "?");
+            return fixed;
+          };
+
+          // Extraire l'URL de stream depuis le résultat PlaybackInfo
+          const extractStreamUrl = (
+            pbData: {
+              MediaSources?: {
+                TranscodingUrl?: string;
+                DirectStreamUrl?: string;
+                SupportsDirectPlay?: boolean;
+                SupportsDirectStream?: boolean;
+                SupportsTranscoding?: boolean;
+                Path?: string;
+              }[];
+            } | null,
+          ): string | null => {
+            if (!pbData) return null;
+            const source = pbData.MediaSources?.[0];
+            if (!source) return null;
+            console.log(
+              "[LiveTV] MediaSource:",
+              JSON.stringify({
+                SupportsDirectPlay: source.SupportsDirectPlay,
+                SupportsDirectStream: source.SupportsDirectStream,
+                SupportsTranscoding: source.SupportsTranscoding,
+                hasTranscodingUrl: !!source.TranscodingUrl,
+                hasDirectStreamUrl: !!source.DirectStreamUrl,
+                Path: source.Path?.substring(0, 80),
+              }),
+            );
+            // Préférer le direct stream (pas de transcodage = pas de 500 FFmpeg)
+            if (source.DirectStreamUrl) {
+              console.log("[LiveTV] DirectStreamUrl disponible");
+              return `${baseUrl}${source.DirectStreamUrl}`;
+            }
+            if (source.TranscodingUrl) {
+              console.log(
+                "[LiveTV] TranscodingUrl brute:",
+                source.TranscodingUrl,
+              );
+              const cleaned = cleanTranscodingUrl(source.TranscodingUrl);
+              console.log("[LiveTV] TranscodingUrl nettoyée:", cleaned);
+              return `${baseUrl}${cleaned}`;
+            }
+            return null;
+          };
+
+          // Stratégie 1 : Sans DeviceProfile — Jellyfin utilise son profil web par défaut
+          // C'est ce qui fonctionne normalement dans l'interface web Jellyfin
+          console.log(
+            "[LiveTV] Tentative 1 : sans DeviceProfile (profil serveur par défaut)...",
+          );
+          let pbData = await fetchPlaybackInfo({
+            EnableDirectPlay: true,
+            EnableDirectStream: true,
+            EnableTranscoding: true,
+            AutoOpenLiveStream: true,
+          });
+          let url = extractStreamUrl(pbData);
+          if (url) {
+            console.log("[LiveTV] Stratégie 1 — URL obtenue:", url);
+            setLiveStreamUrl(url);
+            setResolvedItemId(rawItemId);
+            setResolvedTitle(rawTitle ?? item.Name ?? "");
+            setResolving(false);
+            return;
+          }
+
+          // Stratégie 2 : Profil complet avec stream copy vidéo (remux)
+          console.log(
+            "[LiveTV] Tentative 2 : profil complet (remux vidéo + transcode audio)...",
+          );
+          const transcodeProfile = {
+            DeviceProfile: {
+              MaxStreamingBitrate: 8000000,
+              DirectPlayProfiles: [
+                {
+                  Container: "ts,mpegts",
+                  Type: "Video",
+                  AudioCodec: "aac,mp3,ac3,eac3",
+                  VideoCodec: "h264,hevc",
+                },
+              ],
+              TranscodingProfiles: [
+                {
+                  Container: "ts",
+                  Type: "Video",
+                  AudioCodec: "aac",
+                  VideoCodec: "h264",
+                  Context: "Streaming",
+                  Protocol: "hls",
+                  MinSegments: 1,
+                  BreakOnNonKeyFrames: true,
+                  CopyTimestamps: true,
+                },
+              ],
+              ContainerProfiles: [],
+              CodecProfiles: [
+                {
+                  Type: "Video",
+                  Codec: "h264",
+                  Conditions: [
+                    {
+                      Condition: "LessThanEqual",
+                      Property: "VideoLevel",
+                      Value: "52",
+                      IsRequired: false,
+                    },
+                  ],
+                },
+              ],
+              SubtitleProfiles: [{ Format: "vtt", Method: "External" }],
+            },
+            EnableDirectPlay: false,
+            EnableDirectStream: true,
+            EnableTranscoding: true,
+            AutoOpenLiveStream: true,
+            AllowVideoStreamCopy: true,
+            AllowAudioStreamCopy: true,
+          };
+          pbData = await fetchPlaybackInfo(transcodeProfile);
+          url = extractStreamUrl(pbData);
+          if (url) {
+            console.log("[LiveTV] Stratégie 2 — URL obtenue:", url);
+            setLiveStreamUrl(url);
+            setResolvedItemId(rawItemId);
+            setResolvedTitle(rawTitle ?? item.Name ?? "");
+            setResolving(false);
+            return;
+          }
+
+          // Stratégie 3 : Transcodage forcé complet (pas de stream copy)
+          console.log("[LiveTV] Tentative 3 : transcodage forcé complet...");
+          pbData = await fetchPlaybackInfo({
+            ...transcodeProfile,
+            EnableDirectStream: false,
+            AllowVideoStreamCopy: false,
+            AllowAudioStreamCopy: false,
+          });
+          url = extractStreamUrl(pbData);
+          if (url) {
+            console.log("[LiveTV] Stratégie 3 — URL obtenue:", url);
+            setLiveStreamUrl(url);
+          } else {
+            console.error("[LiveTV] Aucune stratégie n'a fonctionné");
+          }
+          setResolvedItemId(rawItemId);
+          setResolvedTitle(rawTitle ?? item.Name ?? "");
+          setResolving(false);
+          return;
+        }
 
         if (item.Type === "Series") {
           // Récupérer le premier épisode
@@ -1545,10 +1870,12 @@ export default function PlayerScreen() {
 
   const itemId = resolvedItemId;
 
+  // Live TV : URL directe depuis PlaybackInfo
   // Web : transcodé MP4/H.264 (compatible tous navigateurs) — seek via StartTimeTicks
   // Natif : direct stream (VLC/expo-video gère tous les codecs)
-  const streamUrl =
-    Platform.OS === "web"
+  const streamUrl = liveStreamUrl
+    ? liveStreamUrl
+    : Platform.OS === "web"
       ? getWebTranscodedUrl(serverUrl, itemId ?? "", token)
       : getStreamUrl(serverUrl, itemId ?? "", token);
 
@@ -1592,6 +1919,7 @@ export default function PlayerScreen() {
         title={resolvedTitle}
         itemId={itemId ?? ""}
         onClose={handleClose}
+        isLive={!!liveStreamUrl}
       />
     );
   }

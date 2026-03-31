@@ -208,7 +208,7 @@ export default function SearchTab() {
           <ScrollView
             style={styles.content}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 82 }}
+            contentContainerStyle={{ paddingBottom: 70 }}
           >
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Résultats</Text>
@@ -272,7 +272,7 @@ export default function SearchTab() {
           <ScrollView
             style={styles.content}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 82 }}
+            contentContainerStyle={{ paddingBottom: 70 }}
           >
             {/* Meilleurs résultats */}
             <View style={styles.section}>
@@ -405,7 +405,7 @@ export default function SearchTab() {
           <ScrollView
             style={styles.content}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 82 }}
+            contentContainerStyle={{ paddingBottom: 70 }}
           >
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Séries et films suggérés</Text>
@@ -525,7 +525,8 @@ const styles = StyleSheet.create({
     flex: 1,
     color: "white",
     fontSize: 16,
-  },
+    outlineStyle: "none",
+  } as any,
   content: {
     flex: 1,
   },

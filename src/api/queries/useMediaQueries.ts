@@ -644,3 +644,61 @@ export function useCollectionForItem(itemId: string) {
     staleTime: 10 * 60 * 1000,
   });
 }
+
+// Top 10 séries TV (les plus jouées)
+export function useTop10Series(limit = 10) {
+  const { api, userId } = useJellyfinApi();
+
+  return useQuery({
+    queryKey: ["top10-series", limit],
+    queryFn: async () => {
+      const itemsApi = getItemsApi(api!);
+      const result = await itemsApi.getItems({
+        userId,
+        includeItemTypes: [BaseItemKind.Series],
+        sortBy: [ItemSortBy.PlayCount],
+        sortOrder: [SortOrder.Descending],
+        limit,
+        recursive: true,
+        fields: [
+          ItemFields.Overview,
+          ItemFields.Genres,
+          ItemFields.DateCreated,
+        ],
+        imageTypeLimit: 1,
+        enableImageTypes: ["Primary", "Backdrop", "Logo"],
+      });
+      return result.data.Items ?? [];
+    },
+    enabled: !!api && !!userId,
+  });
+}
+
+// Top 10 films (les plus joués)
+export function useTop10Movies(limit = 10) {
+  const { api, userId } = useJellyfinApi();
+
+  return useQuery({
+    queryKey: ["top10-movies", limit],
+    queryFn: async () => {
+      const itemsApi = getItemsApi(api!);
+      const result = await itemsApi.getItems({
+        userId,
+        includeItemTypes: [BaseItemKind.Movie],
+        sortBy: [ItemSortBy.PlayCount],
+        sortOrder: [SortOrder.Descending],
+        limit,
+        recursive: true,
+        fields: [
+          ItemFields.Overview,
+          ItemFields.Genres,
+          ItemFields.DateCreated,
+        ],
+        imageTypeLimit: 1,
+        enableImageTypes: ["Primary", "Backdrop", "Logo"],
+      });
+      return result.data.Items ?? [];
+    },
+    enabled: !!api && !!userId,
+  });
+}

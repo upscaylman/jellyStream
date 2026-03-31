@@ -23,7 +23,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import { useRouter } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Linking,
   Platform,
@@ -80,6 +80,8 @@ export function ExpandedPlayer({
   const router = useRouter();
   const [isMuted, setIsMuted] = useState(true);
   const [showCast, setShowCast] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progress = useSharedValue(0);
   const min = useSharedValue(0);
   const max = useSharedValue(100);
@@ -241,24 +243,50 @@ export function ExpandedPlayer({
     };
   }, []);
 
+  // Auto-hide des contrôles après 5s d'inactivité
+  const resetControlsTimer = useCallback(() => {
+    setShowControls(true);
+    if (controlsTimer.current) clearTimeout(controlsTimer.current);
+    controlsTimer.current = setTimeout(() => setShowControls(false), 5000);
+  }, []);
+
+  useEffect(() => {
+    resetControlsTimer();
+    return () => {
+      if (controlsTimer.current) clearTimeout(controlsTimer.current);
+    };
+  }, [resetControlsTimer]);
+
   return (
     <View style={[styles.rootContainer, { paddingTop: insets.top }]}>
-      <View style={styles.backHeader}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="white" />
-        </Pressable>
-        <View style={{ flex: 1 }} />
-        <Pressable style={styles.backButton} onPress={() => setShowCast(true)}>
-          <CastIcon size={24} color="#fff" />
-        </Pressable>
-      </View>
+      {showControls && (
+        <View style={styles.backHeader}>
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </Pressable>
+          <View style={{ flex: 1 }} />
+          <Pressable
+            style={styles.backButton}
+            onPress={() => setShowCast(true)}
+          >
+            <CastIcon size={24} color="#fff" />
+          </Pressable>
+        </View>
+      )}
 
       <ScrollComponentToUse
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 76 }}
       >
-        <View style={styles.videoContainer}>
+        <Pressable
+          style={styles.videoContainer}
+          onPress={resetControlsTimer}
+          onTouchStart={resetControlsTimer}
+          {...(Platform.OS === "web"
+            ? { onMouseMove: resetControlsTimer }
+            : {})}
+        >
           {youtubeEmbedUrl ? (
             <View
               style={
@@ -274,20 +302,22 @@ export function ExpandedPlayer({
                 allow="autoplay; encrypted-media"
                 allowFullScreen
               />
-              <View
-                style={
-                  {
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: 60,
-                    background:
-                      "linear-gradient(to bottom, rgba(0,0,0,0.9), transparent)",
-                  } as any
-                }
-                pointerEvents="none"
-              />
+              {showControls && (
+                <View
+                  style={
+                    {
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: 60,
+                      background:
+                        "linear-gradient(to bottom, rgba(0,0,0,0.9), transparent)",
+                    } as any
+                  }
+                  pointerEvents="none"
+                />
+              )}
             </View>
           ) : hasTrailers ? (
             <>
@@ -308,32 +338,37 @@ export function ExpandedPlayer({
               transition={300}
             />
           )}
-          <View style={styles.videoOverlay} />
-          {(youtubeEmbedUrl || (!youtubeEmbedUrl && hasTrailers)) && (
-            <View style={styles.muteOverlay}>
-              <Pressable
-                style={styles.soundButton}
-                onPress={() => {
-                  const next = !isMuted;
-                  setIsMuted(next);
-                  if (youtubeEmbedUrl && ytIframeRef.current?.contentWindow) {
-                    const cmd = next ? "mute" : "unMute";
-                    ytIframeRef.current.contentWindow.postMessage(
-                      JSON.stringify({ event: "command", func: cmd, args: [] }),
-                      "*",
-                    );
-                  }
-                }}
-              >
-                <Ionicons
-                  name={isMuted ? "volume-mute" : "volume-medium"}
-                  size={18}
-                  color="white"
-                />
-              </Pressable>
-            </View>
-          )}
-          {!youtubeEmbedUrl && hasTrailers && (
+          {showControls && <View style={styles.videoOverlay} />}
+          {showControls &&
+            (youtubeEmbedUrl || (!youtubeEmbedUrl && hasTrailers)) && (
+              <View style={styles.muteOverlay}>
+                <Pressable
+                  style={styles.soundButton}
+                  onPress={() => {
+                    const next = !isMuted;
+                    setIsMuted(next);
+                    if (youtubeEmbedUrl && ytIframeRef.current?.contentWindow) {
+                      const cmd = next ? "mute" : "unMute";
+                      ytIframeRef.current.contentWindow.postMessage(
+                        JSON.stringify({
+                          event: "command",
+                          func: cmd,
+                          args: [],
+                        }),
+                        "*",
+                      );
+                    }
+                  }}
+                >
+                  <Ionicons
+                    name={isMuted ? "volume-mute" : "volume-medium"}
+                    size={18}
+                    color="white"
+                  />
+                </Pressable>
+              </View>
+            )}
+          {showControls && !youtubeEmbedUrl && hasTrailers && (
             <View style={styles.sliderContainer}>
               <Slider
                 style={styles.slider}
@@ -355,7 +390,7 @@ export function ExpandedPlayer({
               />
             </View>
           )}
-        </View>
+        </Pressable>
 
         <View style={styles.contentContainer}>
           <ThemedText style={styles.title}>{movieData.title}</ThemedText>

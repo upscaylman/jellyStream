@@ -1,6 +1,11 @@
 import { TAB_SCREENS } from "@/app/(tabs)/_layout";
 import { TabScreenWrapper } from "@/components/TabScreenWrapper";
-import { useNewlyAdded, useTrending } from "@/src/api/queries/useMediaQueries";
+import {
+  useNewlyAdded,
+  useTop10Movies,
+  useTop10Series,
+  useTrending,
+} from "@/src/api/queries/useMediaQueries";
 import { useAuthStore } from "@/src/stores/authStore";
 import { getBackdropUrl, getImageUrl } from "@/src/utils/imageUrl";
 import { newStyles } from "@/styles/new";
@@ -15,6 +20,7 @@ import {
   ActivityIndicator,
   Platform,
   Pressable,
+  ScrollView,
   Text,
   View,
 } from "react-native";
@@ -116,8 +122,10 @@ function YouTubePreview({
 }
 
 const TAB_OPTIONS = [
-  { id: "newly-added", label: "Nouveautés", icon: "time-outline" as const },
-  { id: "trending", label: "Tendances", icon: "trending-up-outline" as const },
+  { id: "newly-added", label: "Nouveautés", emoji: "🍿" },
+  { id: "trending", label: "Les plus regardés", emoji: "🔥" },
+  { id: "top10-tv", label: "Top 10 séries", emoji: "🔟" },
+  { id: "top10-movies", label: "Top 10 films", emoji: "🔟" },
 ];
 
 export default function NewScreen() {
@@ -140,6 +148,9 @@ export default function NewScreen() {
 
   const { data: newlyAdded, isLoading: isLoadingNew } = useNewlyAdded(30);
   const { data: trending, isLoading: isLoadingTrending } = useTrending(30);
+  const { data: top10Series, isLoading: isLoadingTop10Tv } = useTop10Series();
+  const { data: top10Movies, isLoading: isLoadingTop10Movies } =
+    useTop10Movies();
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
@@ -150,9 +161,23 @@ export default function NewScreen() {
   const scrollViewRef = useRef(null);
   useScrollToTop(scrollViewRef);
 
-  const displayItems = activeTab === "newly-added" ? newlyAdded : trending;
+  const displayItems =
+    activeTab === "newly-added"
+      ? newlyAdded
+      : activeTab === "trending"
+        ? trending
+        : activeTab === "top10-tv"
+          ? top10Series
+          : top10Movies;
   const isLoading =
-    activeTab === "newly-added" ? isLoadingNew : isLoadingTrending;
+    activeTab === "newly-added"
+      ? isLoadingNew
+      : activeTab === "trending"
+        ? isLoadingTrending
+        : activeTab === "top10-tv"
+          ? isLoadingTop10Tv
+          : isLoadingTop10Movies;
+  const isTop10 = activeTab === "top10-tv" || activeTab === "top10-movies";
 
   const getItemBackdrop = (item: BaseItemDto) => {
     const backdropTag = item.BackdropImageTags?.[0];
@@ -249,6 +274,73 @@ export default function NewScreen() {
     );
   };
 
+  const renderTop10Item = (item: BaseItemDto, index: number) => {
+    const posterTag = item.ImageTags?.["Primary"];
+    const posterUri = posterTag
+      ? getImageUrl({
+          serverUrl,
+          itemId: item.Id ?? "",
+          maxWidth: 300,
+          quality: 80,
+          tag: posterTag,
+        })
+      : "";
+    const rank = index + 1;
+
+    return (
+      <Pressable
+        key={item.Id}
+        style={newStyles.top10Item}
+        onPress={() => router.push(`/movie/${item.Id}`)}
+      >
+        <View style={newStyles.top10RankContainer}>
+          <Text
+            style={[
+              newStyles.top10Rank,
+              rank >= 10 && newStyles.top10RankSmall,
+            ]}
+          >
+            {rank}
+          </Text>
+        </View>
+        <View style={newStyles.top10PosterContainer}>
+          {posterUri ? (
+            <ExpoImage
+              source={{ uri: posterUri }}
+              style={newStyles.top10Poster}
+              cachePolicy="memory-disk"
+              transition={200}
+            />
+          ) : (
+            <View
+              style={[
+                newStyles.top10Poster,
+                {
+                  backgroundColor: "#1a1a2e",
+                  justifyContent: "center",
+                  alignItems: "center",
+                },
+              ]}
+            >
+              <Ionicons name="film-outline" size={28} color="#555" />
+            </View>
+          )}
+        </View>
+        <View style={newStyles.top10Info}>
+          <Text style={newStyles.top10Title} numberOfLines={2}>
+            {item.Name}
+          </Text>
+          <Text style={newStyles.top10Meta} numberOfLines={1}>
+            {item.ProductionYear ?? ""}
+            {item.Genres?.length
+              ? ` • ${item.Genres.slice(0, 2).join(", ")}`
+              : ""}
+          </Text>
+        </View>
+      </Pressable>
+    );
+  };
+
   const renderTab = (tab: (typeof TAB_OPTIONS)[0]) => (
     <Pressable
       key={tab.id}
@@ -258,12 +350,7 @@ export default function NewScreen() {
       ]}
       onPress={() => setActiveTab(tab.id)}
     >
-      <Ionicons
-        name={tab.icon}
-        size={18}
-        color={activeTab === tab.id ? "#000" : "#fff"}
-        style={{ marginRight: 6 }}
-      />
+      <Text style={{ fontSize: 16, marginRight: 6 }}>{tab.emoji}</Text>
       <Text
         style={[
           newStyles.categoryTabText,
@@ -290,9 +377,13 @@ export default function NewScreen() {
               </View>
             </View>
 
-            <View style={newStyles.categoryTabs}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={newStyles.categoryTabs}
+            >
               {TAB_OPTIONS.map(renderTab)}
-            </View>
+            </ScrollView>
           </View>
 
           {isLoading ? (
@@ -311,10 +402,33 @@ export default function NewScreen() {
               showsVerticalScrollIndicator={false}
               onScroll={scrollHandler}
               scrollEventThrottle={16}
+              contentContainerStyle={{ paddingBottom: 90 }}
             >
-              <View style={newStyles.comingSoonList}>
-                {(displayItems ?? []).map(renderItem)}
-              </View>
+              {isTop10 ? (
+                <View style={newStyles.top10List}>
+                  <View style={newStyles.top10Header}>
+                    <Ionicons
+                      name={
+                        activeTab === "top10-tv" ? "tv-outline" : "film-outline"
+                      }
+                      size={20}
+                      color="#E50914"
+                    />
+                    <Text style={newStyles.top10HeaderTitle}>
+                      {activeTab === "top10-tv"
+                        ? "Top 10 des séries aujourd'hui"
+                        : "Top 10 des films aujourd'hui"}
+                    </Text>
+                  </View>
+                  {(displayItems ?? []).map((item, index) =>
+                    renderTop10Item(item, index),
+                  )}
+                </View>
+              ) : (
+                <View style={newStyles.comingSoonList}>
+                  {(displayItems ?? []).map(renderItem)}
+                </View>
+              )}
             </Animated.ScrollView>
           )}
         </SafeAreaView>
