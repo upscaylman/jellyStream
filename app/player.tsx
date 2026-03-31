@@ -351,15 +351,23 @@ function SettingsModal({
 function GestureIndicator({
   type,
   value,
+  side,
 }: {
   type: "volume" | "brightness" | null;
   value: number;
+  side?: "left" | "right" | null;
 }) {
   if (!type) return null;
   const icon = type === "volume" ? "volume-high" : "sunny";
   const pct = Math.round(value * 100);
+  const posStyle =
+    side === "left"
+      ? { left: 40, right: undefined, marginLeft: 0 }
+      : side === "right"
+        ? { right: 40, left: undefined, marginLeft: 0 }
+        : {};
   return (
-    <View style={gestureStyles.container}>
+    <View style={[gestureStyles.container, posStyle]}>
       <Ionicons name={icon} size={24} color="#fff" />
       <View style={gestureStyles.barBg}>
         <View style={[gestureStyles.barFill, { height: `${pct}%` }]} />
@@ -583,6 +591,7 @@ function WebPlayer({
       audioIndex?: number;
       subIndex?: number;
       startTimeSec?: number;
+      quality?: QualityProfile;
     }) => {
       const video = videoRef.current;
       if (!video) return;
@@ -590,6 +599,7 @@ function WebPlayer({
         opts.startTimeSec ?? startOffsetRef.current + video.currentTime;
       const audioIdx = opts.audioIndex ?? selectedAudioIndex;
       const subIdx = opts.subIndex ?? selectedSubIndex;
+      const q = opts.quality ?? selectedQuality;
 
       startOffsetRef.current = seekTo;
       setCurrentTimeSec(seekTo);
@@ -601,6 +611,8 @@ function WebPlayer({
         audioStreamIndex: audioIdx,
         subtitleStreamIndex: subIdx,
         playSessionId: webPlaybackInfo?.PlaySessionId,
+        videoBitRate: q.maxBitrate > 0 ? q.maxBitrate : undefined,
+        maxWidth: q.maxWidth,
       });
       video.src = newUrl;
       video.load();
@@ -612,6 +624,7 @@ function WebPlayer({
       itemId,
       selectedAudioIndex,
       selectedSubIndex,
+      selectedQuality,
       webPlaybackInfo,
     ],
   );
@@ -633,6 +646,23 @@ function WebPlayer({
     },
     [rebuildWebStream],
   );
+
+  // Changement de qualité (reconstruit l'URL avec le nouveau bitrate)
+  const handleWebSelectQuality = useCallback(
+    (q: QualityProfile) => {
+      setSelectedQuality(q);
+      rebuildWebStream({ quality: q });
+    },
+    [rebuildWebStream],
+  );
+
+  // Changement de format d'image (applique object-fit sur le <video>)
+  const handleWebSelectAspect = useCallback((a: AspectRatioValue) => {
+    setAspectRatio(a);
+    if (videoRef.current) {
+      videoRef.current.style.objectFit = a;
+    }
+  }, []);
 
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement);
@@ -1031,9 +1061,9 @@ function WebPlayer({
         selectedAudioIndex={selectedAudioIndex}
         onSelectAudio={handleWebSelectAudio}
         selectedQuality={selectedQuality}
-        onSelectQuality={setSelectedQuality}
+        onSelectQuality={handleWebSelectQuality}
         selectedAspect={aspectRatio}
-        onSelectAspect={setAspectRatio}
+        onSelectAspect={handleWebSelectAspect}
       />
     </View>
   );
@@ -1084,11 +1114,18 @@ function NativePlayer({
     "volume" | "brightness" | null
   >(null);
   const [gestureValue, setGestureValue] = useState(0);
+  const [gestureSideState, setGestureSideState] = useState<
+    "left" | "right" | null
+  >(null);
   const gestureStartY = useRef(0);
   const gestureStartVal = useRef(0);
   const gestureActive = useRef(false);
   const gestureSide = useRef<"left" | "right" | null>(null);
   const gestureHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Pinch-to-zoom
+  const pinchActive = useRef(false);
+  const pinchStartDist = useRef(0);
 
   // Refs
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1263,6 +1300,7 @@ function NativePlayer({
       const screenWidth = Dimensions.get("window").width;
       const side = pageX < screenWidth / 2 ? "left" : "right";
       gestureSide.current = side;
+      setGestureSideState(side);
       gestureStartY.current = pageY;
       gestureActive.current = false;
 
@@ -1314,6 +1352,7 @@ function NativePlayer({
     if (gestureHideTimer.current) clearTimeout(gestureHideTimer.current);
     gestureHideTimer.current = setTimeout(() => {
       setGestureType(null);
+      setGestureSideState(null);
     }, 800);
   }, []);
 
@@ -1369,17 +1408,34 @@ function NativePlayer({
   const handleSelectQuality = useCallback(
     (q: QualityProfile) => {
       setSelectedQuality(q);
-      // Reconstruire l'URL avec la nouvelle qualité et remplacer
       const currentPos = player.currentTime;
-      const newUrl = getStreamUrl(serverUrl, itemId, token, {
-        audioStreamIndex: selectedAudioIndex,
-        subtitleStreamIndex: selectedSubIndex,
-        mediaSourceId: mediaSource?.Id,
-      });
+      let newUrl: string;
+
+      if (q.maxBitrate > 0) {
+        // Qualité spécifique → URL transcodée avec bitrate limité
+        const ticks = Math.round(currentPos * 10_000_000);
+        newUrl = getWebTranscodedUrl(serverUrl, itemId, token, {
+          startTimeTicks: ticks,
+          audioStreamIndex: selectedAudioIndex,
+          subtitleStreamIndex: selectedSubIndex,
+          videoBitRate: q.maxBitrate,
+          maxWidth: q.maxWidth,
+        });
+      } else {
+        // Auto → direct play
+        newUrl = getStreamUrl(serverUrl, itemId, token, {
+          audioStreamIndex: selectedAudioIndex,
+          subtitleStreamIndex: selectedSubIndex,
+          mediaSourceId: mediaSource?.Id,
+        });
+      }
+
       player.replace(newUrl);
       const sub = player.addListener("statusChange", ({ status }: any) => {
         if (status === "readyToPlay") {
-          player.currentTime = currentPos;
+          if (q.maxBitrate <= 0) {
+            player.currentTime = currentPos;
+          }
           player.play();
           sub.remove();
         }
@@ -1415,26 +1471,65 @@ function NativePlayer({
   return (
     <View style={s.container}>
       <StatusBar hidden />
-      {/* Zone vidéo avec gestes volume/luminosité */}
+      {/* Zone vidéo avec gestes volume/luminosité/pinch */}
       <View
         style={s.videoWrapper}
         onStartShouldSetResponder={() => true}
         onMoveShouldSetResponder={() => true}
         onResponderGrant={(e) => {
           if (isLocked) {
-            // En mode verrouillé, toggle contrôles
             setShowControls((v) => !v);
             return;
           }
-          handleGestureStart(e.nativeEvent.pageX, e.nativeEvent.pageY);
+          const touches = e.nativeEvent.touches;
+          if (touches && touches.length >= 2) {
+            // Pinch start
+            const dx = touches[1].pageX - touches[0].pageX;
+            const dy = touches[1].pageY - touches[0].pageY;
+            pinchStartDist.current = Math.sqrt(dx * dx + dy * dy);
+            pinchActive.current = true;
+          } else {
+            pinchActive.current = false;
+            handleGestureStart(e.nativeEvent.pageX, e.nativeEvent.pageY);
+          }
         }}
         onResponderMove={(e) => {
           if (isLocked) return;
-          handleGestureMove(e.nativeEvent.pageY);
+          const touches = e.nativeEvent.touches;
+          if (touches && touches.length >= 2) {
+            // Pinch move
+            const dx = touches[1].pageX - touches[0].pageX;
+            const dy = touches[1].pageY - touches[0].pageY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (!pinchActive.current) {
+              pinchStartDist.current = dist;
+              pinchActive.current = true;
+            }
+          } else if (!pinchActive.current) {
+            handleGestureMove(e.nativeEvent.pageY);
+          }
         }}
-        onResponderRelease={() => {
+        onResponderRelease={(e) => {
           if (isLocked) return;
-          if (gestureActive.current) {
+          if (pinchActive.current) {
+            // Pinch end — check final distance vs start
+            const touches = e.nativeEvent.touches;
+            let finalDist = pinchStartDist.current;
+            if (touches && touches.length >= 2) {
+              const dx = touches[1].pageX - touches[0].pageX;
+              const dy = touches[1].pageY - touches[0].pageY;
+              finalDist = Math.sqrt(dx * dx + dy * dy);
+            }
+            const ratio = finalDist / (pinchStartDist.current || 1);
+            if (ratio > 1.15) {
+              // Pinch out → remplir l'écran
+              setAspectRatio("cover");
+            } else if (ratio < 0.85) {
+              // Pinch in → contenir
+              setAspectRatio("contain");
+            }
+            pinchActive.current = false;
+          } else if (gestureActive.current) {
             handleGestureEnd();
           } else {
             // Simple tap : toggle contrôles
@@ -1456,8 +1551,12 @@ function NativePlayer({
         />
       </View>
 
-      {/* Indicateur geste */}
-      <GestureIndicator type={gestureType} value={gestureValue} />
+      {/* Indicateur geste (gauche = luminosité, droite = volume) */}
+      <GestureIndicator
+        type={gestureType}
+        value={gestureValue}
+        side={gestureSideState}
+      />
 
       {isBuffering && (
         <View style={s.bufferingOverlay}>
@@ -2167,12 +2266,13 @@ const gestureStyles = StyleSheet.create({
     marginTop: -60,
     width: 56,
     height: 120,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    borderRadius: 10,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
     zIndex: 100,
+    pointerEvents: "none",
   },
   barBg: {
     width: 4,

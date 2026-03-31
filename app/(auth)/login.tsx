@@ -1,11 +1,12 @@
 // Écran de login JellyStream — style Netflix
 import { useAuthStore } from "@/src/stores/authStore";
 import { getUserApi } from "@jellyfin/sdk/lib/utils/api/user-api";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -107,8 +108,10 @@ export default function LoginScreen() {
   const [rememberMe, setRememberMe] = useState(true);
 
   const passwordRef = useRef<TextInput | null>(null);
-  const { api, serverUrl, login } = useAuthStore();
+  const { api, serverUrl, login, addProfile } = useAuthStore();
   const router = useRouter();
+  const { addProfile: addProfileParam } = useLocalSearchParams();
+  const isAddingProfile = addProfileParam === "1";
 
   const handleLogin = async () => {
     if (!username.trim()) {
@@ -143,8 +146,25 @@ export default function LoginScreen() {
         return;
       }
 
-      login(serverUrl, token, userId, result.data.User?.Name ?? username);
-      router.replace("/(tabs)");
+      const newUserName = result.data.User?.Name ?? username;
+
+      if (isAddingProfile) {
+        // Ajouter le profil sans changer le profil actif
+        addProfile({
+          serverUrl,
+          token,
+          userId,
+          userName: newUserName,
+        });
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace("/(tabs)");
+        }
+      } else {
+        login(serverUrl, token, userId, newUserName);
+        router.replace("/(tabs)");
+      }
     } catch {
       setError("Mot de passe ou nom d'utilisateur incorrect.");
     } finally {
@@ -156,6 +176,11 @@ export default function LoginScreen() {
     <View style={styles.wrapper}>
       {/* Header avec logo */}
       <View style={styles.header}>
+        <Image
+          source={require("@/assets/images/logo.png")}
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
         <Text style={styles.logo}>JELLYSTREAM</Text>
       </View>
 
@@ -243,7 +268,13 @@ export default function LoginScreen() {
                 <Text style={styles.rememberText}>Se souvenir de moi</Text>
               </Pressable>
 
-              <Pressable onPress={() => router.back()}>
+              <Pressable
+                onPress={() =>
+                  router.canGoBack()
+                    ? router.back()
+                    : router.replace("/(auth)/server-select")
+                }
+              >
                 <Text style={styles.helpLink}>Obtenir de l'aide</Text>
               </Pressable>
             </View>
@@ -259,7 +290,11 @@ export default function LoginScreen() {
             {/* Changer de serveur */}
             <Pressable
               style={styles.changeServerButton}
-              onPress={() => router.back()}
+              onPress={() =>
+                router.canGoBack()
+                  ? router.back()
+                  : router.replace("/(auth)/server-select")
+              }
             >
               <Text style={styles.changeServerText}>Changer de serveur</Text>
             </Pressable>
@@ -283,10 +318,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
   },
   header: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingTop: Platform.OS === "ios" ? 60 : 40,
     paddingHorizontal: 24,
     paddingBottom: 12,
     zIndex: 10,
+    gap: 8,
+  },
+  logoImage: {
+    width: 32,
+    height: 32,
   },
   logo: {
     fontSize: 28,

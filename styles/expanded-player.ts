@@ -203,8 +203,8 @@ export const expandedPlayerStyles = StyleSheet.create({
   tabSeparator: {
     position: "absolute",
     top: 0,
-    left: 0,
-    right: 0,
+    left: -16,
+    right: -16,
     height: 1,
     backgroundColor: "rgba(51,51,51,1.00)",
   },

@@ -4,6 +4,7 @@ import useCachedResources from "@/hooks/useCachedResources";
 import { useVisionOS } from "@/hooks/useVisionOS";
 import { JellyQueryProvider } from "@/src/api/queryProvider";
 import { useAuthStore } from "@/src/stores/authStore";
+import { useNotificationStore } from "@/src/stores/notificationStore";
 import {
   DarkTheme,
   DefaultTheme,
@@ -42,6 +43,7 @@ function AnimatedStack() {
   // Restaurer la session au montage (synchrone, une seule fois)
   useEffect(() => {
     restoreSession();
+    useNotificationStore.getState().restore();
     setIsRestoring(false);
   }, []);
 
@@ -56,10 +58,11 @@ function AnimatedStack() {
     prevAuth.current = isAuthenticated;
 
     if (!isAuthenticated) {
-      router.replace("/(auth)/server-select");
+      // Différer pour laisser le navigator s'initialiser (évite GO_BACK warning sur web)
+      requestAnimationFrame(() => router.replace("/(auth)/server-select"));
     } else if (wasAuthenticated === false) {
       // Login : était déconnecté, maintenant connecté
-      router.replace("/(tabs)");
+      requestAnimationFrame(() => router.replace("/(tabs)"));
     }
     // wasAuthenticated === null (premier rendu, déjà auth) → on ne fait rien
   }, [isRestoring, isAuthenticated]);
@@ -134,6 +137,15 @@ function AnimatedStack() {
               headerShown: false,
               contentStyle: {
                 backgroundColor: "transparent",
+              },
+            }}
+          />
+          <Stack.Screen
+            name="notifications"
+            options={{
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: "#000",
               },
             }}
           />

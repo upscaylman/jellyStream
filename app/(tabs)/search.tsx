@@ -3,6 +3,7 @@ import { TabScreenWrapper } from "@/components/TabScreenWrapper";
 import { CastIcon } from "@/icons/CastIcon";
 import { useSearchItems, useTrending } from "@/src/api/queries/useMediaQueries";
 import { useAuthStore } from "@/src/stores/authStore";
+import { useNotificationBadgeCount } from "@/src/stores/notificationStore";
 import { getBackdropUrl, getImageUrl } from "@/src/utils/imageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { BaseItemDto } from "@jellyfin/sdk/lib/generated-client/models";
@@ -47,6 +48,7 @@ export default function SearchTab() {
   const router = useRouter();
   const serverUrl = useAuthStore((s) => s.serverUrl) ?? "";
   const insets = useSafeAreaInsets();
+  const badgeCount = useNotificationBadgeCount();
 
   const { data: searchResults, isLoading: isSearching } =
     useSearchItems(debouncedSearchTerm);
@@ -153,12 +155,38 @@ export default function SearchTab() {
                 />
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.headerIcon}
+                style={[styles.headerIcon, { position: "relative" }]}
                 onPress={() => {
-                  /* TODO: notifications */
+                  router.push("/notifications");
                 }}
               >
                 <Ionicons name="notifications-outline" size={28} color="#fff" />
+                {badgeCount > 0 && (
+                  <View
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      right: 0,
+                      backgroundColor: "#E50914",
+                      borderRadius: 9,
+                      minWidth: 18,
+                      height: 18,
+                      justifyContent: "center",
+                      alignItems: "center",
+                      paddingHorizontal: 4,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: "#fff",
+                        fontSize: 10,
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {badgeCount > 99 ? "99+" : badgeCount}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
           </View>

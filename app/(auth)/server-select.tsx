@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -97,7 +98,14 @@ export default function ServerSelectScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={styles.content}>
-        <Text style={styles.logo}>JellyStream</Text>
+        <View style={styles.logoContainer}>
+          <Image
+            source={require("@/assets/images/logo.png")}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+          <Text style={styles.logo}>JellyStream</Text>
+        </View>
         <Text style={styles.subtitle}>
           Connectez-vous à votre serveur Jellyfin
         </Text>
@@ -146,12 +154,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 32,
   },
+  logoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    marginBottom: 8,
+  },
+  logoImage: {
+    width: 44,
+    height: 44,
+  },
   logo: {
     fontSize: 48,
     fontWeight: "bold",
     color: "#E50914",
-    textAlign: "center",
-    marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,

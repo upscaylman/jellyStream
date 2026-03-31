@@ -13,6 +13,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CastIcon } from "@/icons/CastIcon";
+import { useNotificationBadgeCount } from "@/src/stores/notificationStore";
 import { styles } from "@/styles";
 import { CastModal } from "../CastModal";
 import { CategoriesListModal } from "../CategoriesListModal/CategoriesListModal";
@@ -54,6 +55,7 @@ export function AnimatedHeader({
   const [showCast, setShowCast] = useState(false);
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const badgeCount = useNotificationBadgeCount();
 
   const onCategoryPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -195,7 +197,7 @@ export function AnimatedHeader({
                   <Pressable
                     style={styles.searchButton}
                     onPress={() => {
-                      /* TODO: notifications */
+                      router.push("/notifications");
                     }}
                   >
                     <Ionicons
@@ -203,6 +205,32 @@ export function AnimatedHeader({
                       size={28}
                       color="#fff"
                     />
+                    {badgeCount > 0 && (
+                      <View
+                        style={{
+                          position: "absolute",
+                          top: 0,
+                          right: 0,
+                          backgroundColor: "#E50914",
+                          borderRadius: 9,
+                          minWidth: 18,
+                          height: 18,
+                          justifyContent: "center",
+                          alignItems: "center",
+                          paddingHorizontal: 4,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: "#fff",
+                            fontSize: 10,
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {badgeCount > 99 ? "99+" : badgeCount}
+                        </Text>
+                      </View>
+                    )}
                   </Pressable>
                 </View>
               </>

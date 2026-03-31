@@ -56,7 +56,16 @@ const KEYS = {
   USER_ID: "jellyfin_user_id",
   USER_NAME: "jellyfin_user_name",
   SERVER_NAME: "jellyfin_server_name",
+  SAVED_PROFILES: "jellyfin_saved_profiles",
 } as const;
+
+interface SavedProfile {
+  id: string;
+  serverUrl: string;
+  token: string;
+  userId: string;
+  userName: string;
+}
 
 interface AuthState {
   serverUrl: string | null;
@@ -66,6 +75,7 @@ interface AuthState {
   userName: string | null;
   api: Api | null;
   isAuthenticated: boolean;
+  savedProfiles: SavedProfile[];
 
   // Actions
   setServer: (url: string, serverName?: string) => void;
@@ -77,6 +87,10 @@ interface AuthState {
   ) => void;
   logout: () => void;
   restoreSession: () => boolean;
+  addProfile: (profile: Omit<SavedProfile, "id">) => void;
+  switchProfile: (profileId: string) => void;
+  removeProfile: (profileId: string) => void;
+  loadProfiles: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -87,6 +101,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   userName: null,
   api: null,
   isAuthenticated: false,
+  savedProfiles: [],
 
   setServer: (url: string, serverName?: string) => {
     const cleanUrl = url.replace(/\/+$/, "");
@@ -115,6 +130,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const api = createApiClient(cleanUrl);
     api.accessToken = token;
 
+    // Sauvegarder automatiquement le profil
+    const profiles = get().savedProfiles;
+    const existing = profiles.find(
+      (p) => p.userId === userId && p.serverUrl === cleanUrl,
+    );
+    let updatedProfiles: SavedProfile[];
+    if (existing) {
+      updatedProfiles = profiles.map((p) =>
+        p.id === existing.id ? { ...p, token, userName } : p,
+      );
+    } else {
+      updatedProfiles = [
+        ...profiles,
+        {
+          id: `${userId}_${Date.now()}`,
+          serverUrl: cleanUrl,
+          token,
+          userId,
+          userName,
+        },
+      ];
+    }
+    storage.set(KEYS.SAVED_PROFILES, JSON.stringify(updatedProfiles));
+
     set({
       serverUrl: cleanUrl,
       token,
@@ -122,6 +161,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       userName,
       api,
       isAuthenticated: true,
+      savedProfiles: updatedProfiles,
     });
   },
 
@@ -145,13 +185,39 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const token = storage.getString(KEYS.TOKEN);
     const userId = storage.getString(KEYS.USER_ID);
     const userName = storage.getString(KEYS.USER_NAME);
-
     const serverName = storage.getString(KEYS.SERVER_NAME);
+
+    // Charger les profils sauvegardés
+    let savedProfiles: SavedProfile[] = [];
+    try {
+      const raw = storage.getString(KEYS.SAVED_PROFILES);
+      if (raw) savedProfiles = JSON.parse(raw);
+    } catch {
+      /* noop */
+    }
 
     if (serverUrl && token && userId) {
       const cleanUrl = serverUrl.replace(/\/+$/, "");
       const api = createApiClient(cleanUrl);
       api.accessToken = token;
+
+      // S'assurer que le profil actif est dans la liste
+      const exists = savedProfiles.find(
+        (p) => p.userId === userId && p.serverUrl === cleanUrl,
+      );
+      if (!exists) {
+        savedProfiles = [
+          ...savedProfiles,
+          {
+            id: `${userId}_${Date.now()}`,
+            serverUrl: cleanUrl,
+            token,
+            userId,
+            userName: userName ?? "Utilisateur",
+          },
+        ];
+        storage.set(KEYS.SAVED_PROFILES, JSON.stringify(savedProfiles));
+      }
 
       set({
         serverUrl: cleanUrl,
@@ -161,9 +227,79 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         userName: userName ?? null,
         api,
         isAuthenticated: true,
+        savedProfiles,
       });
       return true;
     }
+
+    set({ savedProfiles });
     return false;
+  },
+
+  addProfile: (profile) => {
+    const profiles = get().savedProfiles;
+    const existing = profiles.find(
+      (p) => p.userId === profile.userId && p.serverUrl === profile.serverUrl,
+    );
+    if (existing) {
+      // Mettre à jour le token du profil existant
+      const updated = profiles.map((p) =>
+        p.id === existing.id
+          ? { ...p, token: profile.token, userName: profile.userName }
+          : p,
+      );
+      storage.set(KEYS.SAVED_PROFILES, JSON.stringify(updated));
+      set({ savedProfiles: updated });
+      return;
+    }
+    const newProfile: SavedProfile = {
+      id: `${profile.userId}_${Date.now()}`,
+      ...profile,
+    };
+    const updated = [...profiles, newProfile];
+    storage.set(KEYS.SAVED_PROFILES, JSON.stringify(updated));
+    set({ savedProfiles: updated });
+  },
+
+  switchProfile: (profileId: string) => {
+    const profiles = get().savedProfiles;
+    const profile = profiles.find((p) => p.id === profileId);
+    if (!profile) return;
+
+    const cleanUrl = profile.serverUrl.replace(/\/+$/, "");
+    storage.set(KEYS.SERVER_URL, cleanUrl);
+    storage.set(KEYS.TOKEN, profile.token);
+    storage.set(KEYS.USER_ID, profile.userId);
+    storage.set(KEYS.USER_NAME, profile.userName);
+
+    const api = createApiClient(cleanUrl);
+    api.accessToken = profile.token;
+
+    set({
+      serverUrl: cleanUrl,
+      token: profile.token,
+      userId: profile.userId,
+      userName: profile.userName,
+      api,
+      isAuthenticated: true,
+    });
+  },
+
+  removeProfile: (profileId: string) => {
+    const profiles = get().savedProfiles.filter((p) => p.id !== profileId);
+    storage.set(KEYS.SAVED_PROFILES, JSON.stringify(profiles));
+    set({ savedProfiles: profiles });
+  },
+
+  loadProfiles: () => {
+    try {
+      const raw = storage.getString(KEYS.SAVED_PROFILES);
+      if (raw) {
+        const profiles: SavedProfile[] = JSON.parse(raw);
+        set({ savedProfiles: profiles });
+      }
+    } catch {
+      /* noop */
+    }
   },
 }));
