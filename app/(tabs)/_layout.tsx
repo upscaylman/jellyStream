@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
-import { Tabs, usePathname } from "expo-router";
+import { Tabs } from "expo-router";
 import React from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
@@ -107,7 +107,6 @@ const styles = StyleSheet.create({
 });
 
 export default function TabLayout() {
-  const pathname = usePathname();
   const handleTabPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };

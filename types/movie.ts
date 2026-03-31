@@ -3,6 +3,7 @@ export interface Movie {
   imageUrl: string;
   mediaType?: string;
   badge?: string;
+  genres?: string[];
 }
 
 export interface MovieRow {

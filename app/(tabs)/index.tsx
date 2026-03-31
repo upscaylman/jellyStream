@@ -36,7 +36,7 @@ const FALLBACK_FEATURED = {
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function HomeScreen() {
-  const { rows, featured, isLoading, isError } = useJellyfinHome();
+  const { rows, featured, genres, isLoading, isError } = useJellyfinHome();
   const serverName = useAuthStore((s) => s.serverName);
   const serverUrl = useAuthStore((s) => s.serverUrl);
   const setServer = useAuthStore((s) => s.setServer);
@@ -58,17 +58,31 @@ export default function HomeScreen() {
   const [activeFilter, setActiveFilter] = useState<"Movie" | "Series" | null>(
     null,
   );
+  const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
 
-  // Filtrer les rows selon le filtre actif
+  // Filtrer les rows selon le filtre actif et le genre sélectionné
   const filteredRows = useMemo(() => {
-    if (!activeFilter) return rows;
-    return rows
-      .map((row) => ({
-        ...row,
-        movies: row.movies.filter((m) => m.mediaType === activeFilter),
-      }))
-      .filter((row) => row.movies.length > 0);
-  }, [rows, activeFilter]);
+    let result = rows;
+    if (activeFilter) {
+      result = result
+        .map((row) => ({
+          ...row,
+          movies: row.movies.filter((m) => m.mediaType === activeFilter),
+        }))
+        .filter((row) => row.movies.length > 0);
+    }
+    if (selectedGenre) {
+      result = result
+        .map((row) => ({
+          ...row,
+          movies: row.movies.filter((m) =>
+            m.genres?.includes(selectedGenre),
+          ),
+        }))
+        .filter((row) => row.movies.length > 0);
+    }
+    return result;
+  }, [rows, activeFilter, selectedGenre]);
 
   const SCROLL_THRESHOLD = 4;
   const SLIDE_ACTIVATION_POINT = 90; // Point at which sliding can start
@@ -154,8 +168,12 @@ export default function HomeScreen() {
           headerAnimatedProps={headerAnimatedProps}
           title={serverName ?? "Accueil"}
           scrollDirection={scrollDirection}
+          scrollY={scrollY}
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
+          genres={genres}
+          selectedGenre={selectedGenre}
+          onGenreSelect={setSelectedGenre}
         />
 
         {isLoading && rows.length === 0 ? (

@@ -93,7 +93,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     storage.set(KEYS.SERVER_URL, cleanUrl);
     if (serverName) storage.set(KEYS.SERVER_NAME, serverName);
     const api = createApiClient(cleanUrl);
-    set({ serverUrl: cleanUrl, serverName: serverName ?? get().serverName, api });
+    set({
+      serverUrl: cleanUrl,
+      serverName: serverName ?? get().serverName,
+      api,
+    });
   },
 
   login: (

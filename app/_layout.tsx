@@ -10,10 +10,10 @@ import {
   ThemeProvider,
 } from "@react-navigation/native";
 import { BlurView } from "expo-blur";
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StyleSheet, useColorScheme, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
@@ -21,7 +21,6 @@ import Animated, { useAnimatedStyle } from "react-native-reanimated";
 function AnimatedStack() {
   const { scale } = useRootScale();
   const router = useRouter();
-  const segments = useSegments();
   const [isModalActive, setIsModalActive] = useState(false);
   const [canBlur, setCanBlur] = useState(false);
   const [isRestoring, setIsRestoring] = useState(true);
@@ -46,18 +45,24 @@ function AnimatedStack() {
     setIsRestoring(false);
   }, []);
 
-  // Rediriger selon l'état d'auth — SANS changer l'arbre de composants
+  // Rediriger selon l'état d'auth
+  // - Pas auth → écran login
+  // - Vient de se connecter (false→true) → /(tabs)
+  // - Déjà auth au démarrage → ne rien faire (route par défaut = tabs)
+  const prevAuth = useRef<boolean | null>(null);
   useEffect(() => {
     if (isRestoring) return;
+    const wasAuthenticated = prevAuth.current;
+    prevAuth.current = isAuthenticated;
 
-    const inAuthGroup = segments[0] === "(auth)";
-
-    if (!isAuthenticated && !inAuthGroup) {
+    if (!isAuthenticated) {
       router.replace("/(auth)/server-select");
-    } else if (isAuthenticated && inAuthGroup) {
+    } else if (wasAuthenticated === false) {
+      // Login : était déconnecté, maintenant connecté
       router.replace("/(tabs)");
     }
-  }, [isRestoring, isAuthenticated, segments]);
+    // wasAuthenticated === null (premier rendu, déjà auth) → on ne fait rien
+  }, [isRestoring, isAuthenticated]);
 
   // Écran de chargement pendant la restauration de session
   if (isRestoring) {

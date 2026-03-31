@@ -24,6 +24,7 @@ interface JellyfinHomeData {
     categories: string[];
     logoUrl?: string;
   } | null;
+  genres: string[];
   isLoading: boolean;
   isError: boolean;
 }
@@ -74,6 +75,7 @@ export function toMovie(item: BaseItemDto, serverUrl: string) {
     description: item.Overview ?? "",
     mediaType: item.Type ?? "",
     badge: computeBadge(item),
+    genres: item.Genres ?? [],
   };
 }
 
@@ -101,13 +103,7 @@ function buildFeatured(
         : "",
     categories: item.Genres ?? [],
     logoUrl: item.ImageTags?.["Logo"]
-      ? getLogoUrl(
-          serverUrl,
-          item.Id ?? "",
-          500,
-          90,
-          item.ImageTags["Logo"],
-        )
+      ? getLogoUrl(serverUrl, item.Id ?? "", 500, 90, item.ImageTags["Logo"])
       : undefined,
   };
 }
@@ -253,5 +249,31 @@ export function useJellyfinHome(): JellyfinHomeData {
     serverUrl,
   ]);
 
-  return { rows, featured, isLoading, isError };
+  // Extraire les genres uniques depuis tous les items
+  const genres = useMemo(() => {
+    const genreSet = new Set<string>();
+    const allRawItems = [
+      ...(latestMovies.data ?? []),
+      ...(latestSeries.data ?? []),
+      ...(trending.data ?? []),
+      ...(recentlyAdded.data ?? []),
+      ...(newlyAdded.data ?? []),
+      ...(favorites.data ?? []),
+    ];
+    for (const item of allRawItems) {
+      for (const genre of item.Genres ?? []) {
+        genreSet.add(genre);
+      }
+    }
+    return [...genreSet].sort((a, b) => a.localeCompare(b));
+  }, [
+    latestMovies.data,
+    latestSeries.data,
+    trending.data,
+    recentlyAdded.data,
+    newlyAdded.data,
+    favorites.data,
+  ]);
+
+  return { rows, featured, genres, isLoading, isError };
 }

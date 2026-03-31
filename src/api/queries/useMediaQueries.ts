@@ -299,8 +299,8 @@ export function useSimilarItems(itemId: string, limit = 12, genres?: string[]) {
       if (items.length > 0) return items;
 
       // Fallback : chercher par genre si aucun résultat similaire
-      const animeGenres = (genres ?? []).filter(
-        (g) => /anime|animation/i.test(g),
+      const animeGenres = (genres ?? []).filter((g) =>
+        /anime|animation/i.test(g),
       );
       if (animeGenres.length > 0) {
         const itemsApi = getItemsApi(api!);

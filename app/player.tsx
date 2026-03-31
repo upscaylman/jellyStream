@@ -289,7 +289,10 @@ function WebPlayer({
 
       {showControls && (
         <View
-          style={[s.controlsOverlay, { paddingTop: 16, paddingBottom: 16, pointerEvents: "box-none" }]}
+          style={[
+            s.controlsOverlay,
+            { paddingTop: 16, paddingBottom: 16, pointerEvents: "box-none" },
+          ]}
         >
           {isLocked ? (
             <View style={s.lockedContainer}>
@@ -601,7 +604,11 @@ function NativePlayer({
         <View
           style={[
             s.controlsOverlay,
-            { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8, pointerEvents: "box-none" },
+            {
+              paddingTop: insets.top + 8,
+              paddingBottom: insets.bottom + 8,
+              pointerEvents: "box-none",
+            },
           ]}
         >
           {isLocked ? (

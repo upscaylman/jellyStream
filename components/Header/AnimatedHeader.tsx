@@ -25,16 +25,30 @@ interface AnimatedHeaderProps {
   headerAnimatedProps: AnimatedProps<any>;
   title: string;
   scrollDirection: Animated.SharedValue<number>;
+  scrollY: Animated.SharedValue<number>;
   activeFilter?: MediaFilter;
   onFilterChange?: (filter: MediaFilter) => void;
+  /** Mode sous-page : affiche un bouton back et un seul tab "Toutes les catégories" */
+  subPage?: boolean;
+  /** Genres disponibles pour le mode subPage */
+  genres?: string[];
+  /** Genre actuellement sélectionné */
+  selectedGenre?: string | null;
+  /** Callback quand un genre est sélectionné */
+  onGenreSelect?: (genre: string | null) => void;
 }
 
 export function AnimatedHeader({
   headerAnimatedProps,
   title,
   scrollDirection,
+  scrollY,
   activeFilter,
   onFilterChange,
+  subPage,
+  genres,
+  selectedGenre,
+  onGenreSelect,
 }: AnimatedHeaderProps) {
   const [showCategories, setShowCategories] = useState(false);
   const [showCast, setShowCast] = useState(false);
@@ -45,6 +59,22 @@ export function AnimatedHeader({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setShowCategories(true);
   };
+
+  const handleGenreSelect = (id: string) => {
+    if (id === "__all__") {
+      onGenreSelect?.(null);
+    } else {
+      onGenreSelect?.(id);
+    }
+  };
+
+  const genreItems = React.useMemo(() => {
+    if (!genres) return undefined;
+    return [
+      { id: "__all__", label: "Toutes les catégories" },
+      ...genres.map((g) => ({ id: g, label: g })),
+    ];
+  }, [genres]);
 
   const headerTitleStyle = useAnimatedStyle(() => {
     return {
@@ -79,113 +109,206 @@ export function AnimatedHeader({
     };
   });
 
+  const blurOpacityStyle = useAnimatedStyle(() => {
+    return {
+      opacity: interpolate(scrollY.value, [0, 90], [0, 1], "clamp"),
+    };
+  });
+
   return (
     <>
       <Animated.View style={[styles.header]}>
-        <AnimatedBlurView
-          tint="systemThickMaterialDark"
-          style={[styles.blurContainer, { paddingTop: insets.top }]}
-          animatedProps={headerAnimatedProps}
-        >
+        <Animated.View style={[{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }, blurOpacityStyle]}>
+          <AnimatedBlurView
+            tint="systemThickMaterialDark"
+            style={{ width: "100%", height: "100%" }}
+            animatedProps={headerAnimatedProps}
+          />
+        </Animated.View>
+        <View style={[styles.blurContainer, { paddingTop: insets.top }]}>
           <Animated.View
             style={[styles.headerTitleContainer, headerTitleStyle]}
           >
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-            >
-              <ExpoImage
-                source={require("../../assets/images/logo.png")}
-                style={{ width: 28, height: 28 }}
-                cachePolicy="memory-disk"
-                contentFit="contain"
-              />
-              <Text style={styles.headerTitle}>{title}</Text>
-            </View>
+            {subPage ? (
+              <>
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                >
+                  <Pressable
+                    onPress={() => {
+                      if (router.canGoBack()) {
+                        router.back();
+                      } else {
+                        router.replace("/");
+                      }
+                    }}
+                    style={{ padding: 4 }}
+                  >
+                    <Ionicons name="arrow-back" size={24} color="white" />
+                  </Pressable>
+                  <Text style={styles.headerTitle}>{title}</Text>
+                </View>
+                <Pressable
+                  style={styles.searchButton}
+                  onPress={() => setShowCast(true)}
+                >
+                  <CastIcon size={28} color="#fff" />
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                >
+                  <ExpoImage
+                    source={require("../../assets/images/logo.png")}
+                    style={{ width: 28, height: 28 }}
+                    cachePolicy="memory-disk"
+                    contentFit="contain"
+                  />
+                  <Text style={styles.headerTitle}>{title}</Text>
+                </View>
 
-            <View style={styles.headerButtons}>
-              <Pressable
-                style={styles.searchButton}
-                onPress={() => setShowCast(true)}
-              >
-                <CastIcon size={28} color="#fff" />
-              </Pressable>
-              <Pressable
-                style={styles.searchButton}
-                onPress={() => router.push("/downloads")}
-              >
-                <ExpoImage
-                  source={require("../../assets/images/replace-these/download-netflix-transparent.png")}
-                  style={{ width: 28, height: 28 }}
-                  cachePolicy="memory-disk"
-                  contentFit="contain"
-                />
-              </Pressable>
-              <Pressable
-                style={styles.searchButton}
-                onPress={() => {
-                  /* TODO: notifications */
-                }}
-              >
-                <Ionicons name="notifications-outline" size={28} color="#fff" />
-              </Pressable>
-            </View>
+                <View style={styles.headerButtons}>
+                  <Pressable
+                    style={styles.searchButton}
+                    onPress={() => setShowCast(true)}
+                  >
+                    <CastIcon size={28} color="#fff" />
+                  </Pressable>
+                  <Pressable
+                    style={styles.searchButton}
+                    onPress={() => router.push("/downloads")}
+                  >
+                    <ExpoImage
+                      source={require("../../assets/images/replace-these/download-netflix-transparent.png")}
+                      style={{ width: 28, height: 28 }}
+                      cachePolicy="memory-disk"
+                      contentFit="contain"
+                    />
+                  </Pressable>
+                  <Pressable
+                    style={styles.searchButton}
+                    onPress={() => {
+                      /* TODO: notifications */
+                    }}
+                  >
+                    <Ionicons
+                      name="notifications-outline"
+                      size={28}
+                      color="#fff"
+                    />
+                  </Pressable>
+                </View>
+              </>
+            )}
           </Animated.View>
           <Animated.View style={[styles.categoryTabs, tabsAnimatedStyle]}>
-            <Pressable
-              style={[
-                styles.categoryTab,
-                activeFilter === "Series" && {
-                  backgroundColor: "rgba(255,255,255,0.15)",
-                  borderRadius: 20,
-                },
-              ]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push("/series-list");
-              }}
-            >
-              <Text
-                style={[
-                  styles.categoryTabText,
-                  activeFilter === "Series" && { fontWeight: "bold" },
-                ]}
-              >
-                TV Shows
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.categoryTab,
-                activeFilter === "Movie" && {
-                  backgroundColor: "rgba(255,255,255,0.15)",
-                  borderRadius: 20,
-                },
-              ]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push("/films");
-              }}
-            >
-              <Text
-                style={[
-                  styles.categoryTabText,
-                  activeFilter === "Movie" && { fontWeight: "bold" },
-                ]}
-              >
-                Movies
-              </Text>
-            </Pressable>
-            <Pressable style={styles.categoryTab} onPress={onCategoryPress}>
-              <Text style={styles.categoryTabTextWithIcon}>Categories</Text>
-              <Ionicons name="chevron-down" size={16} color="#fff" />
-            </Pressable>
+            {subPage ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                {selectedGenre && (
+                  <Pressable
+                    style={[styles.categoryTab, { backgroundColor: "rgba(255,255,255,0.15)" }]}
+                    onPress={() => onGenreSelect?.(null)}
+                  >
+                    <Ionicons name="close" size={14} color="#fff" />
+                    <Text style={[styles.categoryTabText, { fontWeight: "bold" }]}>
+                      {selectedGenre}
+                    </Text>
+                  </Pressable>
+                )}
+                <Pressable style={styles.categoryTab} onPress={onCategoryPress}>
+                  <Text style={styles.categoryTabTextWithIcon}>
+                    {selectedGenre ? "Catégories" : "Toutes les catégories"}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color="#fff" />
+                </Pressable>
+              </View>
+            ) : (
+              <>
+                <Pressable
+                  style={[
+                    styles.categoryTab,
+                    activeFilter === "Series" && {
+                      backgroundColor: "rgba(255,255,255,0.15)",
+                      borderRadius: 20,
+                    },
+                  ]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push("/series-list");
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.categoryTabText,
+                      activeFilter === "Series" && { fontWeight: "bold" },
+                    ]}
+                  >
+                    TV Shows
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.categoryTab,
+                    activeFilter === "Movie" && {
+                      backgroundColor: "rgba(255,255,255,0.15)",
+                      borderRadius: 20,
+                    },
+                  ]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push("/films");
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.categoryTabText,
+                      activeFilter === "Movie" && { fontWeight: "bold" },
+                    ]}
+                  >
+                    Movies
+                  </Text>
+                </Pressable>
+                {selectedGenre ? (
+                  <>
+                    <Pressable
+                      style={[styles.categoryTab, { backgroundColor: "rgba(255,255,255,0.15)" }]}
+                      onPress={() => onGenreSelect?.(null)}
+                    >
+                      <Ionicons name="close" size={14} color="#fff" />
+                      <Text style={[styles.categoryTabText, { fontWeight: "bold" }]}>
+                        {selectedGenre}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.categoryTab}
+                      onPress={onCategoryPress}
+                    >
+                      <Ionicons name="chevron-down" size={16} color="#fff" />
+                    </Pressable>
+                  </>
+                ) : (
+                  <Pressable
+                    style={styles.categoryTab}
+                    onPress={onCategoryPress}
+                  >
+                    <Text style={styles.categoryTabTextWithIcon}>Categories</Text>
+                    <Ionicons name="chevron-down" size={16} color="#fff" />
+                  </Pressable>
+                )}
+              </>
+            )}
           </Animated.View>
-        </AnimatedBlurView>
+        </View>
       </Animated.View>
 
       <CategoriesListModal
         visible={showCategories}
         onClose={() => setShowCategories(false)}
+        items={genreItems}
+        selectedId={selectedGenre ?? "__all__"}
+        onSelect={handleGenreSelect}
       />
 
       <CastModal
