@@ -21,7 +21,6 @@ import {
   Dimensions,
   FlatList,
   LayoutChangeEvent,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,

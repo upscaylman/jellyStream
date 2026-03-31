@@ -170,14 +170,14 @@ export function useSearchItems(searchTerm: string) {
         searchTerm,
         includeItemTypes: [BaseItemKind.Movie, BaseItemKind.Series],
         recursive: true,
-        limit: 30,
+        limit: searchTerm.length >= 3 ? 50 : 30,
         fields: [ItemFields.Overview, ItemFields.Genres],
         imageTypeLimit: 1,
         enableImageTypes: ["Primary", "Backdrop"],
       });
       return result.data.Items ?? [];
     },
-    enabled: !!api && !!userId && searchTerm.length >= 2,
+    enabled: !!api && !!userId && searchTerm.length >= 1,
   });
 }
 
