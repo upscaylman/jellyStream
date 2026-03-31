@@ -510,7 +510,8 @@ function WebPlayer({
     }) => {
       const video = videoRef.current;
       if (!video) return;
-      const seekTo = opts.startTimeSec ?? startOffsetRef.current + video.currentTime;
+      const seekTo =
+        opts.startTimeSec ?? startOffsetRef.current + video.currentTime;
       const audioIdx = opts.audioIndex ?? selectedAudioIndex;
       const subIdx = opts.subIndex ?? selectedSubIndex;
 
@@ -525,13 +526,18 @@ function WebPlayer({
         subtitleStreamIndex: subIdx,
         playSessionId: webPlaybackInfo?.PlaySessionId,
       });
-      // Cache-buster pour forcer Jellyfin à relancer le transcode depuis StartTimeTicks
-      newUrl += `&_t=${Date.now()}`;
       video.src = newUrl;
       video.load();
       video.play().catch(() => {});
     },
-    [serverUrl, token, itemId, selectedAudioIndex, selectedSubIndex, webPlaybackInfo],
+    [
+      serverUrl,
+      token,
+      itemId,
+      selectedAudioIndex,
+      selectedSubIndex,
+      webPlaybackInfo,
+    ],
   );
 
   // Appliquer le changement de sous-titres (burn-in dans le flux vidéo)

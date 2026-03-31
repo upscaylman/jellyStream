@@ -245,7 +245,11 @@ export function ExpandedPlayer({
       >
         <View style={styles.videoContainer}>
           {youtubeEmbedUrl ? (
-            <View style={{ width: "100%", height: "100%", position: "relative" } as any}>
+            <View
+              style={
+                { width: "100%", height: "100%", position: "relative" } as any
+              }
+            >
               <iframe
                 src={youtubeEmbedUrl}
                 style={{ width: "100%", height: "100%", border: "none" } as any}
@@ -253,14 +257,17 @@ export function ExpandedPlayer({
                 allowFullScreen
               />
               <View
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: 60,
-                  background: "linear-gradient(to bottom, rgba(0,0,0,0.9), transparent)",
-                } as any}
+                style={
+                  {
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 60,
+                    background:
+                      "linear-gradient(to bottom, rgba(0,0,0,0.9), transparent)",
+                  } as any
+                }
                 pointerEvents="none"
               />
             </View>

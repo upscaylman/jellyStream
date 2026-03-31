@@ -116,7 +116,7 @@ export function getWebTranscodedUrl(
   const baseUrl = serverUrl.replace(/\/+$/, "");
   const params = new URLSearchParams({
     api_key: token,
-    DeviceId: "jellystream-web",
+    DeviceId: `jellystream-web-${Date.now()}`,
     MediaSourceId: itemId,
     Container: "mp4",
     VideoCodec: "h264",
@@ -135,7 +135,10 @@ export function getWebTranscodedUrl(
   if (options?.audioStreamIndex != null) {
     params.set("AudioStreamIndex", String(options.audioStreamIndex));
   }
-  if (options?.subtitleStreamIndex != null && options.subtitleStreamIndex >= 0) {
+  if (
+    options?.subtitleStreamIndex != null &&
+    options.subtitleStreamIndex >= 0
+  ) {
     params.set("SubtitleStreamIndex", String(options.subtitleStreamIndex));
     params.set("SubtitleMethod", "Encode");
   }
