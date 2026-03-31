@@ -96,6 +96,7 @@ export default function MovieScreen() {
           trailerUrls:
             item.RemoteTrailers?.map((t: any) => t.Url).filter(Boolean) ??
             undefined,
+          genres: item.Genres ?? undefined,
         }}
       />
     </View>

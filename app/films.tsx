@@ -3,7 +3,7 @@ import { MovieList } from "@/components/MovieList/MovieList";
 import { useAllItemsByType } from "@/src/api/queries/useMediaQueries";
 import { toMovie } from "@/src/hooks/useJellyfinHome";
 import { useAuthStore } from "@/src/stores/authStore";
-import { getBackdropUrl } from "@/src/utils/imageUrl";
+import { getBackdropUrl, getLogoUrl } from "@/src/utils/imageUrl";
 import { FeaturedMovie, MovieRow } from "@/types/movie";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -18,7 +18,6 @@ import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -33,8 +32,9 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { CastIcon } from "@/icons/CastIcon";
 import { CastModal } from "@/components/CastModal";
+import { useDominantColor } from "@/hooks/useDominantColor";
+import { CastIcon } from "@/icons/CastIcon";
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
@@ -60,15 +60,22 @@ function groupByGenre(items: BaseItemDto[], serverUrl: string): MovieRow[] {
 }
 
 function pickFeatured(items: BaseItemDto[], serverUrl: string): FeaturedMovie {
+  const withBackdrop = items.filter(
+    (item) => item.BackdropImageTags?.length || item.ImageTags?.["Backdrop"],
+  );
+  const candidates = withBackdrop.length > 0 ? withBackdrop : items;
+  // Index déterministe basé sur le jour — change toutes les 24h
+  const dayIndex = Math.floor(Date.now() / 86_400_000);
   const candidate =
-    items.find(
-      (item) => item.BackdropImageTags?.length || item.ImageTags?.["Backdrop"],
-    ) ?? items[0];
+    candidates.length > 0
+      ? candidates[dayIndex % candidates.length]
+      : undefined;
   if (!candidate) {
     return { id: "", title: "Films", thumbnail: "", categories: [] };
   }
   const backdropTag =
     candidate.BackdropImageTags?.[0] ?? candidate.ImageTags?.["Backdrop"];
+  const logoTag = candidate.ImageTags?.["Logo"];
   return {
     id: candidate.Id ?? "",
     title: candidate.Name ?? "",
@@ -76,6 +83,9 @@ function pickFeatured(items: BaseItemDto[], serverUrl: string): FeaturedMovie {
       ? getBackdropUrl(serverUrl, candidate.Id ?? "", 1280, 80, backdropTag)
       : getBackdropUrl(serverUrl, candidate.Id ?? "", 1280, 80),
     categories: candidate.Genres?.slice(0, 3) ?? [],
+    logoUrl: logoTag
+      ? getLogoUrl(serverUrl, candidate.Id ?? "", 500, 90, logoTag)
+      : undefined,
   };
 }
 
@@ -95,6 +105,8 @@ export default function FilmsScreen() {
     () => pickFeatured(allMovies ?? [], serverUrl),
     [allMovies, serverUrl],
   );
+
+  const dominantColor = useDominantColor(featured?.thumbnail);
 
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler({
@@ -163,7 +175,7 @@ export default function FilmsScreen() {
           contentContainerStyle={s.scrollContent}
         >
           <LinearGradient
-            colors={["#202036", "#11111d", "#07070c"]}
+            colors={[dominantColor, "#11111d", "#07070c"]}
             locations={[0, 0.4, 0.8]}
             style={[s.gradient, { height: SCREEN_HEIGHT * 0.8 }]}
           />
@@ -174,6 +186,7 @@ export default function FilmsScreen() {
             categoriesStyle={dummyAnimStyle}
             buttonsStyle={dummyAnimStyle}
             topMargin={insets.top + 90}
+            dominantColor={dominantColor}
           />
 
           {rows.map((row) => (
@@ -185,7 +198,9 @@ export default function FilmsScreen() {
       <CastModal
         visible={showCast}
         onClose={() => setShowCast(false)}
-        onSelect={() => { /* TODO: action après sélection */ }}
+        onSelect={() => {
+          /* TODO: action après sélection */
+        }}
       />
     </View>
   );

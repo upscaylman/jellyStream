@@ -4,7 +4,7 @@ import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import Animated, {
   AnimatedProps,
   interpolate,
@@ -90,10 +90,23 @@ export function AnimatedHeader({
           <Animated.View
             style={[styles.headerTitleContainer, headerTitleStyle]}
           >
-            <Text style={styles.headerTitle}>{title}</Text>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+            >
+              <ExpoImage
+                source={require("../../assets/images/logo.png")}
+                style={{ width: 28, height: 28 }}
+                cachePolicy="memory-disk"
+                contentFit="contain"
+              />
+              <Text style={styles.headerTitle}>{title}</Text>
+            </View>
 
             <View style={styles.headerButtons}>
-              <Pressable style={styles.searchButton} onPress={() => setShowCast(true)}>
+              <Pressable
+                style={styles.searchButton}
+                onPress={() => setShowCast(true)}
+              >
                 <CastIcon size={28} color="#fff" />
               </Pressable>
               <Pressable
@@ -178,7 +191,9 @@ export function AnimatedHeader({
       <CastModal
         visible={showCast}
         onClose={() => setShowCast(false)}
-        onSelect={() => { /* TODO: action après sélection */ }}
+        onSelect={() => {
+          /* TODO: action après sélection */
+        }}
       />
     </>
   );

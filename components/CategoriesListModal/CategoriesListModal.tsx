@@ -1,9 +1,16 @@
 import * as React from 'react';
-import { View, Text, Pressable, ScrollView, Modal, StyleSheet } from 'react-native';
+import {
+    View, Text, Pressable, Modal, StyleSheet,
+    Animated, Dimensions,
+} from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+
+const ITEM_HEIGHT = 52;
+const VISIBLE_COUNT = 9;
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface CategoriesListModalProps {
     visible: boolean;
@@ -41,22 +48,98 @@ const categories = [
     'Audio Description in English'
 ];
 
+function WheelItem({ item, index, scrollY, onPress }: {
+    item: { id: string; label: string };
+    index: number;
+    scrollY: Animated.Value;
+    onPress: () => void;
+}) {
+    const center = ITEM_HEIGHT * index;
+    const distance = Animated.subtract(scrollY, center);
+
+    const scale = distance.interpolate({
+        inputRange: [-ITEM_HEIGHT * 3, -ITEM_HEIGHT * 2, -ITEM_HEIGHT, 0, ITEM_HEIGHT, ITEM_HEIGHT * 2, ITEM_HEIGHT * 3],
+        outputRange: [0.7, 0.78, 0.88, 1.15, 0.88, 0.78, 0.7],
+        extrapolate: 'clamp',
+    });
+
+    const opacity = distance.interpolate({
+        inputRange: [-ITEM_HEIGHT * 3, -ITEM_HEIGHT * 2, -ITEM_HEIGHT, 0, ITEM_HEIGHT, ITEM_HEIGHT * 2, ITEM_HEIGHT * 3],
+        outputRange: [0.2, 0.3, 0.5, 1, 0.5, 0.3, 0.2],
+        extrapolate: 'clamp',
+    });
+
+    return (
+        <Pressable onPress={onPress}>
+            <Animated.View style={[styles.itemContainer, {
+                transform: [{ scale }],
+                opacity,
+            }]}>
+                <Text style={styles.itemText} numberOfLines={1}>{item.label}</Text>
+            </Animated.View>
+        </Pressable>
+    );
+}
+
 export function CategoriesListModal({ visible, onClose, items, selectedId, onSelect }: CategoriesListModalProps) {
     const insets = useSafeAreaInsets();
+    const scrollRef = React.useRef<Animated.ScrollView>(null);
+    const scrollY = React.useRef(new Animated.Value(0)).current;
+    const currentIndex = React.useRef(0);
+    const lastHapticIndex = React.useRef(-1);
 
-    // Items personnalisés ou catégories par défaut
     const displayItems = items ?? categories.map((c) => ({ id: c, label: c }));
 
-    const handleItemPress = async (item: { id: string; label: string }) => {
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        if (onSelect) {
-            onSelect(item.id);
-            onClose();
+    const listHeight = Math.min(ITEM_HEIGHT * VISIBLE_COUNT, SCREEN_HEIGHT * 0.6);
+    const padV = (listHeight - ITEM_HEIGHT) / 2;
+
+    const initialIndex = React.useMemo(() => {
+        if (!selectedId) return 0;
+        const idx = displayItems.findIndex((i) => i.id === selectedId);
+        return idx >= 0 ? idx : 0;
+    }, [displayItems, selectedId]);
+
+    React.useEffect(() => {
+        if (visible) {
+            currentIndex.current = initialIndex;
+            lastHapticIndex.current = initialIndex;
+            scrollY.setValue(initialIndex * ITEM_HEIGHT);
+            const timer = setTimeout(() => {
+                const node = scrollRef.current as unknown as { scrollTo?: (opts: { y: number; animated: boolean }) => void; getNode?: () => { scrollTo: (opts: { y: number; animated: boolean }) => void } };
+                const scrollable = node?.getNode?.() ?? node;
+                scrollable?.scrollTo?.({ y: initialIndex * ITEM_HEIGHT, animated: false });
+            }, 50);
+            return () => clearTimeout(timer);
         }
+    }, [visible, initialIndex, scrollY]);
+
+    React.useEffect(() => {
+        const id = scrollY.addListener(({ value }) => {
+            const idx = Math.round(value / ITEM_HEIGHT);
+            const clamped = Math.max(0, Math.min(idx, displayItems.length - 1));
+            currentIndex.current = clamped;
+            if (clamped !== lastHapticIndex.current) {
+                lastHapticIndex.current = clamped;
+                Haptics.selectionAsync();
+            }
+        });
+        return () => scrollY.removeListener(id);
+    }, [scrollY, displayItems.length]);
+
+    const handleItemPress = (index: number) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (onSelect && displayItems[index]) {
+            onSelect(displayItems[index].id);
+        }
+        onClose();
     };
 
     const handleClose = async () => {
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        const idx = currentIndex.current;
+        if (onSelect && displayItems[idx]) {
+            onSelect(displayItems[idx].id);
+        }
         onClose();
     };
 
@@ -70,30 +153,37 @@ export function CategoriesListModal({ visible, onClose, items, selectedId, onSel
         >
             <View style={styles.overlay}>
                 <BlurView intensity={96} tint="dark" style={StyleSheet.absoluteFill}>
-                    <ScrollView
-                        style={[styles.content, { paddingTop: insets.top }]}
-                        contentContainerStyle={[
-                            styles.scrollContent,
-
-                            { flexGrow: 1, justifyContent: 'center', paddingBottom: insets.bottom + 80 }
-                        ]}
-                    >
-                        {displayItems.map((item) => {
-                            const isSelected = selectedId != null && item.id === selectedId;
-                            return (
-                                <Pressable
-                                    key={item.id}
-                                    style={styles.categoryItem}
-                                    onPress={() => handleItemPress(item)}
-                                >
-                                    <Text style={[
-                                        styles.categoryText,
-                                        isSelected && styles.categoryTextSelected,
-                                    ]}>{item.label}</Text>
-                                </Pressable>
-                            );
-                        })}
-                    </ScrollView>
+                    <View style={styles.centerContainer}>
+                        <View style={[styles.listWrapper, { height: listHeight }]}>
+                            <Animated.ScrollView
+                                ref={scrollRef}
+                                showsVerticalScrollIndicator={false}
+                                snapToInterval={ITEM_HEIGHT}
+                                decelerationRate="fast"
+                                bounces={true}
+                                overScrollMode="always"
+                                scrollEventThrottle={16}
+                                onScroll={Animated.event(
+                                    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+                                    { useNativeDriver: true },
+                                )}
+                                contentContainerStyle={{
+                                    paddingTop: padV,
+                                    paddingBottom: padV,
+                                }}
+                            >
+                                {displayItems.map((item, index) => (
+                                    <WheelItem
+                                        key={item.id}
+                                        item={item}
+                                        index={index}
+                                        scrollY={scrollY}
+                                        onPress={() => handleItemPress(index)}
+                                    />
+                                ))}
+                            </Animated.ScrollView>
+                        </View>
+                    </View>
 
                     <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + 20 }]}>
                         <Pressable
@@ -114,26 +204,25 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
     },
-    content: {
+    centerContainer: {
         flex: 1,
-    },
-    scrollContent: {
-        paddingHorizontal: 20,
+        justifyContent: 'center',
         alignItems: 'center',
     },
-    categoryItem: {
-        paddingVertical: 18,
+    listWrapper: {
+        width: '100%',
+        overflow: 'hidden',
     },
-    categoryText: {
-        color: 'rgba(255, 255, 255, 0.501)',
-        fontSize: 18,
-        fontWeight: '400',
-        textAlign: 'center',
+    itemContainer: {
+        height: ITEM_HEIGHT,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    categoryTextSelected: {
+    itemText: {
         color: '#fff',
-        fontSize: 24,
-        fontWeight: 'bold',
+        fontSize: 20,
+        fontWeight: '600',
+        textAlign: 'center',
     },
     bottomContainer: {
         position: 'absolute',

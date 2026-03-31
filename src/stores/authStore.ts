@@ -1,8 +1,8 @@
 // Store d'authentification Jellyfin — Zustand + storage persistant
-import { create } from 'zustand';
-import { Platform } from 'react-native';
-import { Api } from '@jellyfin/sdk';
-import { createApiClient } from '@/src/api/client';
+import { createApiClient } from "@/src/api/client";
+import { Api } from "@jellyfin/sdk";
+import { Platform } from "react-native";
+import { create } from "zustand";
 
 // Interface de storage compatible MMKV et localStorage (web fallback)
 interface StorageAdapter {
@@ -14,24 +14,36 @@ interface StorageAdapter {
 // Fallback web via localStorage
 const webStorage: StorageAdapter = {
   getString: (key) => {
-    try { return localStorage.getItem(key) ?? undefined; } catch { return undefined; }
+    try {
+      return localStorage.getItem(key) ?? undefined;
+    } catch {
+      return undefined;
+    }
   },
   set: (key, value) => {
-    try { localStorage.setItem(key, value); } catch { /* noop */ }
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      /* noop */
+    }
   },
   delete: (key) => {
-    try { localStorage.removeItem(key); } catch { /* noop */ }
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* noop */
+    }
   },
 };
 
 let storage: StorageAdapter = webStorage;
 
 // Sur native, utiliser MMKV (chargé dynamiquement pour éviter crash web)
-if (Platform.OS !== 'web') {
+if (Platform.OS !== "web") {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { MMKV } = require('react-native-mmkv');
-    storage = new MMKV({ id: 'jellystream-auth' });
+    const { MMKV } = require("react-native-mmkv");
+    storage = new MMKV({ id: "jellystream-auth" });
   } catch {
     // Fallback au web storage si MMKV non disponible
   }
@@ -39,14 +51,16 @@ if (Platform.OS !== 'web') {
 
 // Clés de persistence MMKV
 const KEYS = {
-  SERVER_URL: 'jellyfin_server_url',
-  TOKEN: 'jellyfin_token',
-  USER_ID: 'jellyfin_user_id',
-  USER_NAME: 'jellyfin_user_name',
+  SERVER_URL: "jellyfin_server_url",
+  TOKEN: "jellyfin_token",
+  USER_ID: "jellyfin_user_id",
+  USER_NAME: "jellyfin_user_name",
+  SERVER_NAME: "jellyfin_server_name",
 } as const;
 
 interface AuthState {
   serverUrl: string | null;
+  serverName: string | null;
   token: string | null;
   userId: string | null;
   userName: string | null;
@@ -54,37 +68,51 @@ interface AuthState {
   isAuthenticated: boolean;
 
   // Actions
-  setServer: (url: string) => void;
-  login: (serverUrl: string, token: string, userId: string, userName: string) => void;
+  setServer: (url: string, serverName?: string) => void;
+  login: (
+    serverUrl: string,
+    token: string,
+    userId: string,
+    userName: string,
+  ) => void;
   logout: () => void;
   restoreSession: () => boolean;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   serverUrl: null,
+  serverName: null,
   token: null,
   userId: null,
   userName: null,
   api: null,
   isAuthenticated: false,
 
-  setServer: (url: string) => {
-    storage.set(KEYS.SERVER_URL, url);
-    const api = createApiClient(url);
-    set({ serverUrl: url, api });
+  setServer: (url: string, serverName?: string) => {
+    const cleanUrl = url.replace(/\/+$/, "");
+    storage.set(KEYS.SERVER_URL, cleanUrl);
+    if (serverName) storage.set(KEYS.SERVER_NAME, serverName);
+    const api = createApiClient(cleanUrl);
+    set({ serverUrl: cleanUrl, serverName: serverName ?? get().serverName, api });
   },
 
-  login: (serverUrl: string, token: string, userId: string, userName: string) => {
-    storage.set(KEYS.SERVER_URL, serverUrl);
+  login: (
+    serverUrl: string,
+    token: string,
+    userId: string,
+    userName: string,
+  ) => {
+    const cleanUrl = serverUrl.replace(/\/+$/, "");
+    storage.set(KEYS.SERVER_URL, cleanUrl);
     storage.set(KEYS.TOKEN, token);
     storage.set(KEYS.USER_ID, userId);
     storage.set(KEYS.USER_NAME, userName);
 
-    const api = createApiClient(serverUrl);
+    const api = createApiClient(cleanUrl);
     api.accessToken = token;
 
     set({
-      serverUrl,
+      serverUrl: cleanUrl,
       token,
       userId,
       userName,
@@ -114,12 +142,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const userId = storage.getString(KEYS.USER_ID);
     const userName = storage.getString(KEYS.USER_NAME);
 
+    const serverName = storage.getString(KEYS.SERVER_NAME);
+
     if (serverUrl && token && userId) {
-      const api = createApiClient(serverUrl);
+      const cleanUrl = serverUrl.replace(/\/+$/, "");
+      const api = createApiClient(cleanUrl);
       api.accessToken = token;
 
       set({
-        serverUrl,
+        serverUrl: cleanUrl,
+        serverName: serverName ?? null,
         token,
         userId,
         userName: userName ?? null,

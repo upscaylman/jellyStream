@@ -13,15 +13,12 @@ import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-
 
 const MAIN_TABS = [{ id: "all", label: "Séries et films" }] as const;
 

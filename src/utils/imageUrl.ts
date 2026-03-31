@@ -1,5 +1,5 @@
 // Helper pour construire les URLs d'images Jellyfin optimisées
-import { ImageType } from '@jellyfin/sdk/lib/generated-client/models';
+import { ImageType } from "@jellyfin/sdk/lib/generated-client/models";
 
 interface ImageUrlOptions {
   serverUrl: string;
@@ -18,14 +18,14 @@ export function getImageUrl({
   quality = 90,
   tag,
 }: ImageUrlOptions): string {
-  if (!serverUrl || !itemId) return '';
-  const baseUrl = serverUrl.replace(/\/+$/, '');
+  if (!serverUrl || !itemId) return "";
+  const baseUrl = serverUrl.replace(/\/+$/, "");
   const params = new URLSearchParams({
     maxWidth: String(maxWidth),
     quality: String(quality),
   });
   if (tag) {
-    params.set('tag', tag);
+    params.set("tag", tag);
   }
   return `${baseUrl}/Items/${itemId}/Images/${imageType}?${params.toString()}`;
 }
@@ -47,14 +47,31 @@ export function getBackdropUrl(
   });
 }
 
+export function getLogoUrl(
+  serverUrl: string,
+  itemId: string,
+  maxWidth = 500,
+  quality = 90,
+  tag?: string,
+): string {
+  return getImageUrl({
+    serverUrl,
+    itemId,
+    imageType: ImageType.Logo,
+    maxWidth,
+    quality,
+    tag,
+  });
+}
+
 // Construit l'URL de streaming direct pour un item Jellyfin
 export function getStreamUrl(
   serverUrl: string,
   itemId: string,
   token: string,
 ): string {
-  if (!serverUrl || !itemId || !token) return '';
-  const baseUrl = serverUrl.replace(/\/+$/, '');
+  if (!serverUrl || !itemId || !token) return "";
+  const baseUrl = serverUrl.replace(/\/+$/, "");
   return `${baseUrl}/Videos/${itemId}/stream?static=true&api_key=${encodeURIComponent(token)}`;
 }
 
@@ -70,22 +87,22 @@ export function getWebTranscodedUrl(
     audioBitRate?: number;
   },
 ): string {
-  if (!serverUrl || !itemId || !token) return '';
-  const baseUrl = serverUrl.replace(/\/+$/, '');
+  if (!serverUrl || !itemId || !token) return "";
+  const baseUrl = serverUrl.replace(/\/+$/, "");
   const params = new URLSearchParams({
     api_key: token,
-    DeviceId: 'jellystream-web',
+    DeviceId: "jellystream-web",
     MediaSourceId: itemId,
-    Container: 'mp4',
-    VideoCodec: 'h264',
-    AudioCodec: 'aac',
+    Container: "mp4",
+    VideoCodec: "h264",
+    AudioCodec: "aac",
     MaxStreamingBitrate: String(options?.videoBitRate ?? 4000000),
     VideoBitrate: String(options?.videoBitRate ?? 4000000),
     AudioBitrate: String(options?.audioBitRate ?? 128000),
-    TranscodingMaxAudioChannels: '2',
+    TranscodingMaxAudioChannels: "2",
   });
   if (options?.maxWidth) {
-    params.set('MaxWidth', String(options.maxWidth));
+    params.set("MaxWidth", String(options.maxWidth));
   }
   return `${baseUrl}/Videos/${itemId}/stream.mp4?${params.toString()}`;
 }
@@ -101,25 +118,25 @@ export function getHlsStreamUrl(
     audioBitRate?: number;
   },
 ): string {
-  if (!serverUrl || !itemId || !token) return '';
-  const baseUrl = serverUrl.replace(/\/+$/, '');
+  if (!serverUrl || !itemId || !token) return "";
+  const baseUrl = serverUrl.replace(/\/+$/, "");
   const params = new URLSearchParams({
     api_key: token,
-    DeviceId: 'jellystream-web',
+    DeviceId: "jellystream-web",
     MediaSourceId: itemId,
-    VideoCodec: 'h264',
-    AudioCodec: 'aac',
+    VideoCodec: "h264",
+    AudioCodec: "aac",
     MaxStreamingBitrate: String(options?.videoBitRate ?? 4000000),
     VideoBitrate: String(options?.videoBitRate ?? 4000000),
     AudioBitrate: String(options?.audioBitRate ?? 128000),
-    TranscodingMaxAudioChannels: '2',
-    SegmentContainer: 'ts',
-    MinSegments: '1',
-    BreakOnNonKeyFrames: 'true',
-    TranscodeReasons: 'ContainerNotSupported',
+    TranscodingMaxAudioChannels: "2",
+    SegmentContainer: "ts",
+    MinSegments: "1",
+    BreakOnNonKeyFrames: "true",
+    TranscodeReasons: "ContainerNotSupported",
   });
   if (options?.maxWidth) {
-    params.set('MaxWidth', String(options.maxWidth));
+    params.set("MaxWidth", String(options.maxWidth));
   }
   return `${baseUrl}/Videos/${itemId}/master.m3u8?${params.toString()}`;
 }

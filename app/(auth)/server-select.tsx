@@ -1,41 +1,43 @@
 // Écran de sélection du serveur Jellyfin
-import React, { useState } from 'react';
+import { jellyfin } from "@/src/api/client";
+import { useAuthStore } from "@/src/stores/authStore";
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  StyleSheet,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { useAuthStore } from '@/src/stores/authStore';
-import { jellyfin } from '@/src/api/client';
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
 export default function ServerSelectScreen() {
   const savedServerUrl = useAuthStore((s) => s.serverUrl);
-  const [serverUrl, setServerUrl] = useState(savedServerUrl ?? '');
+  const [serverUrl, setServerUrl] = useState(savedServerUrl ?? "");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const setServer = useAuthStore((s) => s.setServer);
   const router = useRouter();
 
   const handleConnect = async () => {
-    let trimmed = serverUrl.trim().replace(/\/+$/, '');
+    let trimmed = serverUrl.trim().replace(/\/+$/, "");
     if (!trimmed) {
-      setError('Entrez l\'adresse de votre serveur');
+      setError("Entrez l'adresse de votre serveur");
       return;
     }
 
     // Corriger les typos courantes dans le protocole (;  au lieu de :)
-    trimmed = trimmed.replace(/^https?[;]/i, (match) => match.replace(';', ':'));
+    trimmed = trimmed.replace(/^https?[;]/i, (match) =>
+      match.replace(";", ":"),
+    );
 
     // Ajouter https:// par défaut si pas de protocole valide
     if (!/^https?:\/\//i.test(trimmed)) {
       // Retirer tout protocole malformé résiduel
-      trimmed = trimmed.replace(/^[a-z]+[:;]\/*/i, '');
+      trimmed = trimmed.replace(/^[a-z]+[:;]\/*/i, "");
       trimmed = `https://${trimmed}`;
     }
 
@@ -44,12 +46,24 @@ export default function ServerSelectScreen() {
 
     try {
       // Essayer d'abord la discovery SDK
-      const servers = await jellyfin.discovery.getRecommendedServerCandidates(trimmed);
+      const servers =
+        await jellyfin.discovery.getRecommendedServerCandidates(trimmed);
       const best = jellyfin.discovery.findBestServer(servers);
 
       if (best) {
-        setServer(best.address);
-        router.replace('/(auth)/login');
+        // Récupérer le nom du serveur
+        try {
+          const res = await fetch(`${best.address}/System/Info/Public`);
+          if (res.ok) {
+            const info = await res.json();
+            setServer(best.address, info.ServerName ?? undefined);
+          } else {
+            setServer(best.address);
+          }
+        } catch {
+          setServer(best.address);
+        }
+        router.replace("/(auth)/login");
         return;
       }
     } catch {
@@ -62,14 +76,16 @@ export default function ServerSelectScreen() {
       if (response.ok) {
         const info = await response.json();
         if (info.ServerName || info.Id) {
-          setServer(trimmed);
-          router.replace('/(auth)/login');
+          setServer(trimmed, info.ServerName ?? undefined);
+          router.replace("/(auth)/login");
           return;
         }
       }
-      setError('Serveur Jellyfin introuvable à cette adresse');
+      setError("Serveur Jellyfin introuvable à cette adresse");
     } catch {
-      setError('Impossible de contacter le serveur. Vérifiez l\'adresse et votre connexion.');
+      setError(
+        "Impossible de contacter le serveur. Vérifiez l'adresse et votre connexion.",
+      );
     } finally {
       setLoading(false);
     }
@@ -78,11 +94,13 @@ export default function ServerSelectScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={styles.content}>
         <Text style={styles.logo}>JellyStream</Text>
-        <Text style={styles.subtitle}>Connectez-vous à votre serveur Jellyfin</Text>
+        <Text style={styles.subtitle}>
+          Connectez-vous à votre serveur Jellyfin
+        </Text>
 
         <TextInput
           style={styles.input}
@@ -121,53 +139,53 @@ export default function ServerSelectScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#141414',
+    backgroundColor: "#141414",
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingHorizontal: 32,
   },
   logo: {
     fontSize: 48,
-    fontWeight: 'bold',
-    color: '#E50914',
-    textAlign: 'center',
+    fontWeight: "bold",
+    color: "#E50914",
+    textAlign: "center",
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#B3B3B3',
-    textAlign: 'center',
+    color: "#B3B3B3",
+    textAlign: "center",
     marginBottom: 40,
   },
   input: {
-    backgroundColor: '#333',
+    backgroundColor: "#333",
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: '#fff',
+    color: "#fff",
     marginBottom: 12,
   },
   error: {
-    color: '#E50914',
+    color: "#E50914",
     fontSize: 14,
     marginBottom: 12,
   },
   button: {
-    backgroundColor: '#E50914',
+    backgroundColor: "#E50914",
     borderRadius: 8,
     paddingVertical: 14,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 8,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });

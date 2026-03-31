@@ -43,7 +43,7 @@ export function useLatestMovies(limit = 20) {
           ItemFields.ChildCount,
         ],
         imageTypeLimit: 1,
-        enableImageTypes: ["Primary", "Backdrop", "Thumb"],
+        enableImageTypes: ["Primary", "Backdrop", "Thumb", "Logo"],
       });
       return result.data.Items ?? [];
     },
@@ -75,7 +75,7 @@ export function useLatestSeries(limit = 20) {
           ItemFields.ChildCount,
         ],
         imageTypeLimit: 1,
-        enableImageTypes: ["Primary", "Backdrop"],
+        enableImageTypes: ["Primary", "Backdrop", "Logo"],
       });
       return result.data.Items ?? [];
     },
@@ -96,7 +96,7 @@ export function useResumeItems(limit = 12) {
         limit,
         fields: [ItemFields.Overview, ItemFields.Genres],
         imageTypeLimit: 1,
-        enableImageTypes: ["Primary", "Backdrop", "Thumb"],
+        enableImageTypes: ["Primary", "Backdrop", "Thumb", "Logo"],
       });
       return result.data.Items ?? [];
     },
@@ -117,7 +117,7 @@ export function useRecentlyAdded(limit = 20) {
         limit,
         fields: [ItemFields.Overview, ItemFields.Genres],
         imageTypeLimit: 1,
-        enableImageTypes: ["Primary", "Backdrop"],
+        enableImageTypes: ["Primary", "Backdrop", "Logo"],
       });
       return result.data ?? [];
     },
@@ -149,7 +149,7 @@ export function useTrending(limit = 20) {
           ItemFields.RemoteTrailers,
         ],
         imageTypeLimit: 1,
-        enableImageTypes: ["Primary", "Backdrop"],
+        enableImageTypes: ["Primary", "Backdrop", "Logo"],
       });
       return result.data.Items ?? [];
     },
@@ -230,7 +230,7 @@ export function useAllItemsByType(itemType: BaseItemKind) {
           ItemFields.DateLastMediaAdded,
         ],
         imageTypeLimit: 1,
-        enableImageTypes: ["Primary", "Backdrop"],
+        enableImageTypes: ["Primary", "Backdrop", "Logo"],
       });
       return result.data.Items ?? [];
     },
@@ -282,12 +282,12 @@ export function useItemDetail(itemId: string) {
   });
 }
 
-// Items similaires
-export function useSimilarItems(itemId: string, limit = 12) {
-  const { api } = useJellyfinApi();
+// Items similaires — avec fallback par genre pour les anime/animation
+export function useSimilarItems(itemId: string, limit = 12, genres?: string[]) {
+  const { api, userId } = useJellyfinApi();
 
   return useQuery({
-    queryKey: ["similar", itemId, limit],
+    queryKey: ["similar", itemId, limit, genres],
     queryFn: async () => {
       const libApi = getLibraryApi(api!);
       const result = await libApi.getSimilarItems({
@@ -295,7 +295,29 @@ export function useSimilarItems(itemId: string, limit = 12) {
         limit,
         fields: [ItemFields.Overview, ItemFields.Genres],
       });
-      return result.data.Items ?? [];
+      const items = result.data.Items ?? [];
+      if (items.length > 0) return items;
+
+      // Fallback : chercher par genre si aucun résultat similaire
+      const animeGenres = (genres ?? []).filter(
+        (g) => /anime|animation/i.test(g),
+      );
+      if (animeGenres.length > 0) {
+        const itemsApi = getItemsApi(api!);
+        const fallback = await itemsApi.getItems({
+          userId,
+          includeItemTypes: [BaseItemKind.Series, BaseItemKind.Movie],
+          genres: animeGenres,
+          sortBy: [ItemSortBy.Random],
+          limit,
+          recursive: true,
+          fields: [ItemFields.Overview, ItemFields.Genres],
+          excludeItemIds: [itemId],
+        });
+        return fallback.data.Items ?? [];
+      }
+
+      return items;
     },
     enabled: !!api && !!itemId,
   });
@@ -319,7 +341,7 @@ export function useFavoriteItems(limit = 20) {
         recursive: true,
         fields: [ItemFields.Overview, ItemFields.Genres],
         imageTypeLimit: 1,
-        enableImageTypes: ["Primary", "Backdrop"],
+        enableImageTypes: ["Primary", "Backdrop", "Logo"],
       });
       return result.data.Items ?? [];
     },
@@ -395,7 +417,7 @@ export function useNewlyAdded(limit = 20) {
           ItemFields.RemoteTrailers,
         ],
         imageTypeLimit: 1,
-        enableImageTypes: ["Primary", "Backdrop", "Thumb"],
+        enableImageTypes: ["Primary", "Backdrop", "Thumb", "Logo"],
       });
       return result.data.Items ?? [];
     },
@@ -441,5 +463,73 @@ export function useEpisodes(seriesId: string, seasonId: string) {
       return result.data.Items ?? [];
     },
     enabled: !!api && !!userId && !!seriesId && !!seasonId,
+  });
+}
+
+// Collection (BoxSet) contenant un item donné
+// Stratégie : tenter getAncestors d'abord (1 appel), puis fallback itération BoxSets
+export function useCollectionForItem(itemId: string) {
+  const { api, userId } = useJellyfinApi();
+
+  return useQuery({
+    queryKey: ["collection-for-item", itemId],
+    queryFn: async () => {
+      const itemsApi = getItemsApi(api!);
+      const libApi = getLibraryApi(api!);
+
+      // Stratégie 1 : vérifier les ancêtres de l'item pour trouver un BoxSet parent
+      try {
+        const ancestors = await libApi.getAncestors({ itemId, userId });
+        const boxSetAncestor = (ancestors.data ?? []).find(
+          (a) => a.Type === BaseItemKind.BoxSet,
+        );
+        if (boxSetAncestor?.Id) {
+          const children = await itemsApi.getItems({
+            userId,
+            parentId: boxSetAncestor.Id,
+            sortBy: [ItemSortBy.ProductionYear, ItemSortBy.SortName],
+            sortOrder: [SortOrder.Ascending],
+            fields: [ItemFields.Overview, ItemFields.People],
+          });
+          const items = children.data.Items ?? [];
+          if (items.length > 0) {
+            return { boxSet: boxSetAncestor, items };
+          }
+        }
+      } catch (_e) {
+        // Fallback vers itération
+      }
+
+      // Stratégie 2 : itérer tous les BoxSets et chercher celui qui contient notre item
+      const boxSetsResult = await itemsApi.getItems({
+        userId,
+        includeItemTypes: [BaseItemKind.BoxSet],
+        recursive: true,
+      });
+      const boxSets = boxSetsResult.data.Items ?? [];
+      if (boxSets.length === 0) return null;
+
+      // Pour chaque BoxSet, récupérer ses enfants
+      for (const bs of boxSets) {
+        try {
+          const children = await itemsApi.getItems({
+            userId,
+            parentId: bs.Id!,
+            fields: [ItemFields.Overview, ItemFields.People],
+          });
+          const items = children.data.Items ?? [];
+          const found = items.some((i) => i.Id === itemId);
+          if (found) {
+            return { boxSet: bs, items };
+          }
+        } catch (_e) {
+          // Ignorer les erreurs individuelles
+        }
+      }
+
+      return null;
+    },
+    enabled: !!api && !!userId && !!itemId,
+    staleTime: 10 * 60 * 1000,
   });
 }

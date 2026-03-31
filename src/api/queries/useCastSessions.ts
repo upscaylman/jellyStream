@@ -1,11 +1,11 @@
 // Hook Jellyfin Sessions — casting vers d'autres appareils
-import { useAuthStore } from '@/src/stores/authStore';
-import { useQuery } from '@tanstack/react-query';
-import { getSessionApi } from '@jellyfin/sdk/lib/utils/api/session-api';
-import type { SessionInfoDto } from '@jellyfin/sdk/lib/generated-client/models/session-info-dto';
-import { PlayCommand } from '@jellyfin/sdk/lib/generated-client/models/play-command';
-import { PlaystateCommand } from '@jellyfin/sdk/lib/generated-client/models/playstate-command';
-import { jellyfin } from '@/src/api/client';
+import { jellyfin } from "@/src/api/client";
+import { useAuthStore } from "@/src/stores/authStore";
+import { PlayCommand } from "@jellyfin/sdk/lib/generated-client/models/play-command";
+import { PlaystateCommand } from "@jellyfin/sdk/lib/generated-client/models/playstate-command";
+import type { SessionInfoDto } from "@jellyfin/sdk/lib/generated-client/models/session-info-dto";
+import { getSessionApi } from "@jellyfin/sdk/lib/utils/api/session-api";
+import { useQuery } from "@tanstack/react-query";
 
 /**
  * Récupère les sessions contrôlables par l'utilisateur courant
@@ -16,7 +16,7 @@ export function useCastSessions() {
   const userId = useAuthStore((s) => s.userId);
 
   return useQuery<SessionInfoDto[]>({
-    queryKey: ['jellyfin', 'sessions', userId],
+    queryKey: ["jellyfin", "sessions", userId],
     queryFn: async () => {
       if (!api || !userId) return [];
       const sessionApi = getSessionApi(api);
@@ -40,7 +40,7 @@ export function useCastSessions() {
  * Envoie la lecture d'un item sur une session distante
  */
 export async function castToSession(
-  api: NonNullable<ReturnType<typeof useAuthStore.getState>['api']>,
+  api: NonNullable<ReturnType<typeof useAuthStore.getState>["api"]>,
   sessionId: string,
   itemId: string,
   startPositionTicks = 0,
@@ -58,7 +58,7 @@ export async function castToSession(
  * Envoie une commande de transport (pause, stop, etc.) à une session
  */
 export async function sendPlaystateToSession(
-  api: NonNullable<ReturnType<typeof useAuthStore.getState>['api']>,
+  api: NonNullable<ReturnType<typeof useAuthStore.getState>["api"]>,
   sessionId: string,
   command: PlaystateCommand,
 ) {

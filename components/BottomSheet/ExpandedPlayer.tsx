@@ -1,7 +1,9 @@
-import { CategoriesListModal } from "@/components/CategoriesListModal/CategoriesListModal";
 import { CastModal } from "@/components/CastModal";
+import { CategoriesListModal } from "@/components/CategoriesListModal/CategoriesListModal";
 import { ThemedText } from "@/components/ThemedText";
+import { CastIcon } from "@/icons/CastIcon";
 import {
+  useCollectionForItem,
   useEpisodes,
   useIsFavorite,
   useSeasons,
@@ -16,7 +18,6 @@ import {
 } from "@/src/utils/imageUrl";
 import { expandedPlayerStyles as styles } from "@/styles/expanded-player";
 import { Ionicons } from "@expo/vector-icons";
-import { CastIcon } from "@/icons/CastIcon";
 import { Image as ExpoImage } from "expo-image";
 import { useRouter } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
@@ -59,6 +60,7 @@ interface MovieData {
   seriesId?: string;
   trailerUrl?: string;
   trailerUrls?: string[];
+  genres?: string[];
 }
 
 interface ExpandedPlayerProps {
@@ -84,9 +86,12 @@ export function ExpandedPlayer({
   const token = useAuthStore((s) => s.token) ?? "";
   const { data: similarItems } = useSimilarItems(
     typeof movie.id === "string" ? movie.id : movie.id.toString(),
+    12,
+    movie.genres,
   );
 
   const isSeries = movie.type === "Series" || movie.type === "Episode";
+  const isMovie = movie.type === "Movie" || (!isSeries && !movie.type);
   const itemId = typeof movie.id === "string" ? movie.id : movie.id.toString();
 
   // Favoris / Ma liste
@@ -96,12 +101,17 @@ export function ExpandedPlayer({
   // Pour un épisode, on remonte à la série parente via seriesId
   const seriesId = movie.seriesId ?? (movie.type === "Series" ? itemId : "");
 
+  // Collection (BoxSet) pour les films
+  const { data: collectionData } = useCollectionForItem(isMovie ? itemId : "");
+  const hasCollection = !!collectionData && collectionData.items.length > 1;
+  const hasSimilar = !!similarItems && similarItems.length > 0;
+
   // Saisons & épisodes pour les séries
   const { data: seasons } = useSeasons(isSeries ? seriesId : "");
   const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(null);
   const [showSeasonPicker, setShowSeasonPicker] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    "episodes" | "trailers" | "similar"
+    "episodes" | "trailers" | "similar" | "collection"
   >(isSeries ? "episodes" : "similar");
 
   // Bandes-annonces YouTube (max 6)
@@ -117,6 +127,15 @@ export function ExpandedPlayer({
       .slice(0, 6);
   }, [movie.trailerUrls, movie.trailerUrl]);
   const hasTrailers = trailers.length > 0;
+
+  // Basculer l'onglet actif si celui sélectionné n'est plus disponible
+  useEffect(() => {
+    if (activeTab === "similar" && !hasSimilar) {
+      if (isSeries) setActiveTab("episodes");
+      else if (hasCollection) setActiveTab("collection");
+      else if (hasTrailers) setActiveTab("trailers");
+    }
+  }, [hasSimilar, activeTab, isSeries, hasCollection, hasTrailers]);
 
   // Sélectionner la première saison par défaut
   useEffect(() => {
@@ -232,17 +251,27 @@ export function ExpandedPlayer({
               allow="autoplay; encrypted-media"
               allowFullScreen
             />
+          ) : hasTrailers ? (
+            <>
+              <VideoView
+                ref={videoViewRef}
+                style={styles.video}
+                player={player}
+                nativeControls={false}
+                contentFit="cover"
+              />
+            </>
           ) : (
-            <VideoView
-              ref={videoViewRef}
+            <ExpoImage
+              source={{ uri: movieData.imageUrl }}
               style={styles.video}
-              player={player}
-              nativeControls={false}
               contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={300}
             />
           )}
           <View style={styles.videoOverlay} />
-          {!youtubeEmbedUrl && (
+          {!youtubeEmbedUrl && hasTrailers && (
             <View style={styles.muteOverlay}>
               <Pressable
                 style={styles.soundButton}
@@ -256,7 +285,7 @@ export function ExpandedPlayer({
               </Pressable>
             </View>
           )}
-          {!youtubeEmbedUrl && (
+          {!youtubeEmbedUrl && hasTrailers && (
             <View style={styles.sliderContainer}>
               <Slider
                 style={styles.slider}
@@ -400,6 +429,42 @@ export function ExpandedPlayer({
                 </ThemedText>
               </Pressable>
             )}
+            {hasSimilar && (
+              <Pressable
+                style={[
+                  styles.tabItem,
+                  activeTab === "similar" && styles.tabItemActive,
+                ]}
+                onPress={() => setActiveTab("similar")}
+              >
+                <ThemedText
+                  style={[
+                    styles.tabItemText,
+                    activeTab === "similar" && styles.tabItemTextActive,
+                  ]}
+                >
+                  Titres similaires
+                </ThemedText>
+              </Pressable>
+            )}
+            {hasCollection && (
+              <Pressable
+                style={[
+                  styles.tabItem,
+                  activeTab === "collection" && styles.tabItemActive,
+                ]}
+                onPress={() => setActiveTab("collection")}
+              >
+                <ThemedText
+                  style={[
+                    styles.tabItemText,
+                    activeTab === "collection" && styles.tabItemTextActive,
+                  ]}
+                >
+                  Collection
+                </ThemedText>
+              </Pressable>
+            )}
             {hasTrailers && (
               <Pressable
                 style={[
@@ -418,22 +483,6 @@ export function ExpandedPlayer({
                 </ThemedText>
               </Pressable>
             )}
-            <Pressable
-              style={[
-                styles.tabItem,
-                activeTab === "similar" && styles.tabItemActive,
-              ]}
-              onPress={() => setActiveTab("similar")}
-            >
-              <ThemedText
-                style={[
-                  styles.tabItemText,
-                  activeTab === "similar" && styles.tabItemTextActive,
-                ]}
-              >
-                Titres similaires
-              </ThemedText>
-            </Pressable>
           </View>
         </View>
 
@@ -588,6 +637,110 @@ export function ExpandedPlayer({
           </View>
         )}
 
+        {/* Collection (BoxSet) */}
+        {activeTab === "collection" && hasCollection && (
+          <View style={collectionStyles.container}>
+            <ThemedText style={collectionStyles.collectionName}>
+              {collectionData!.boxSet.Name}
+            </ThemedText>
+            {collectionData!.items
+              .filter((colItem) => colItem.Id !== itemId)
+              .map((colItem) => {
+                const colTag = colItem.ImageTags?.["Primary"];
+                const colThumb = colItem.Id
+                  ? getImageUrl({
+                      serverUrl,
+                      itemId: colItem.Id,
+                      maxWidth: 300,
+                      quality: 80,
+                      tag: colTag ?? undefined,
+                    })
+                  : "";
+                const colYear = colItem.ProductionYear
+                  ? String(colItem.ProductionYear)
+                  : "";
+                const colDuration = colItem.RunTimeTicks
+                  ? (() => {
+                      const totalMin = Math.round(
+                        colItem.RunTimeTicks / 600000000,
+                      );
+                      const h = Math.floor(totalMin / 60);
+                      const m = totalMin % 60;
+                      return h > 0 ? `${h}h ${m}m` : `${m}m`;
+                    })()
+                  : "";
+                return (
+                  <Pressable
+                    key={colItem.Id}
+                    style={collectionStyles.itemRow}
+                    onPress={() => {
+                      if (colItem.Id) {
+                        router.push({
+                          pathname: "/movie/[id]",
+                          params: { id: colItem.Id },
+                        });
+                      }
+                    }}
+                  >
+                    <View style={collectionStyles.thumbContainer}>
+                      {colThumb ? (
+                        <ExpoImage
+                          source={{ uri: colThumb }}
+                          style={collectionStyles.thumb}
+                          cachePolicy="memory-disk"
+                          transition={200}
+                          contentFit="cover"
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            collectionStyles.thumb,
+                            { backgroundColor: "#2a2a2a" },
+                          ]}
+                        />
+                      )}
+                      <View style={collectionStyles.playOverlay}>
+                        <Ionicons
+                          name="play-circle-outline"
+                          size={30}
+                          color="white"
+                        />
+                      </View>
+                    </View>
+                    <View style={collectionStyles.info}>
+                      <ThemedText
+                        style={collectionStyles.title}
+                        numberOfLines={1}
+                      >
+                        {colItem.Name}
+                      </ThemedText>
+                      <View style={collectionStyles.metaRow}>
+                        {colYear ? (
+                          <ThemedText style={collectionStyles.meta}>
+                            {colYear}
+                          </ThemedText>
+                        ) : null}
+                        {colDuration ? (
+                          <ThemedText style={collectionStyles.meta}>
+                            {colDuration}
+                          </ThemedText>
+                        ) : null}
+                      </View>
+                      {colItem.Overview ? (
+                        <ThemedText
+                          style={collectionStyles.overview}
+                          numberOfLines={2}
+                        >
+                          {colItem.Overview}
+                        </ThemedText>
+                      ) : null}
+                    </View>
+                  </Pressable>
+                );
+              })}
+          </View>
+        )}
+
         {activeTab === "similar" && (
           <View style={styles.moreLikeThis}>
             <View style={styles.movieGrid}>
@@ -651,7 +804,9 @@ export function ExpandedPlayer({
       <CastModal
         visible={showCast}
         onClose={() => setShowCast(false)}
-        onSelect={() => { /* TODO: action après sélection */ }}
+        onSelect={() => {
+          /* TODO: action après sélection */
+        }}
       />
     </View>
   );
@@ -772,5 +927,66 @@ const trailerStyles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: "#fff",
+  },
+});
+
+const collectionStyles = StyleSheet.create({
+  container: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  collectionName: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#fff",
+    marginBottom: 12,
+  },
+  itemRow: {
+    flexDirection: "row",
+    marginBottom: 14,
+    gap: 10,
+  },
+  thumbContainer: {
+    position: "relative",
+    width: 110,
+    aspectRatio: 2 / 3,
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  thumb: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 4,
+  },
+  playOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+  info: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  title: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#fff",
+    marginBottom: 2,
+  },
+  metaRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 4,
+  },
+  meta: {
+    fontSize: 12,
+    color: "#999",
+  },
+  overview: {
+    fontSize: 12,
+    lineHeight: 16,
+    color: "#888",
   },
 });

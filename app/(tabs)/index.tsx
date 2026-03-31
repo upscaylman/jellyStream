@@ -1,47 +1,63 @@
-import React, { useRef, useState, useMemo } from 'react';
-import { View, Dimensions, ActivityIndicator, Text } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TAB_SCREENS } from "@/app/(tabs)/_layout";
+import { FeaturedContent } from "@/components/FeaturedContent/FeaturedContent";
+import { AnimatedHeader } from "@/components/Header/AnimatedHeader";
+import { MovieList } from "@/components/MovieList/MovieList";
+import { TabScreenWrapper } from "@/components/TabScreenWrapper";
+import { VisionContainer } from "@/components/ui/VisionContainer";
+import { useDeviceMotion } from "@/hooks/useDeviceMotion";
+import { useDominantColor } from "@/hooks/useDominantColor";
+import { useVisionOS } from "@/hooks/useVisionOS";
+import { useJellyfinHome } from "@/src/hooks/useJellyfinHome";
+import { useAuthStore } from "@/src/stores/authStore";
+import { styles } from "@/styles";
+import { useScrollToTop } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
+import { usePathname } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Dimensions, View } from "react-native";
 import Animated, {
-  useAnimatedScrollHandler,
+  interpolate,
   useAnimatedProps,
+  useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
-  interpolate,
   withTiming,
-} from 'react-native-reanimated';
-import { styles } from '@/styles';
-import { AnimatedHeader } from '@/components/Header/AnimatedHeader';
-import { FeaturedContent } from '@/components/FeaturedContent/FeaturedContent';
-import { MovieList } from '@/components/MovieList/MovieList';
-import { useDeviceMotion } from '@/hooks/useDeviceMotion';
-import { TabScreenWrapper } from '@/components/TabScreenWrapper';
-import { usePathname } from 'expo-router';
-import { TAB_SCREENS } from '@/app/(tabs)/_layout';
-import { GameList } from '@/components/GameList/GameList';
-import { useScrollToTop } from '@react-navigation/native';
-import { useVisionOS } from '@/hooks/useVisionOS';
-import { VisionContainer, HoverableView } from '@/components/ui/VisionContainer';
-import { useJellyfinHome } from '@/src/hooks/useJellyfinHome';
-import { useAuthStore } from '@/src/stores/authStore';
+} from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const FALLBACK_FEATURED = {
-  id: 'placeholder',
-  title: 'JellyStream',
-  thumbnail: '',
-  categories: ['Films', 'Séries', 'Documentaires'],
+  id: "placeholder",
+  title: "JellyStream",
+  thumbnail: "",
+  categories: ["Films", "Séries", "Documentaires"],
 };
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function HomeScreen() {
   const { rows, featured, isLoading, isError } = useJellyfinHome();
-  const userName = useAuthStore((s) => s.userName);
+  const serverName = useAuthStore((s) => s.serverName);
+  const serverUrl = useAuthStore((s) => s.serverUrl);
+  const setServer = useAuthStore((s) => s.setServer);
+
+  // Récupérer le nom du serveur s'il n'est pas encore connu
+  useEffect(() => {
+    if (serverName || !serverUrl) return;
+    fetch(`${serverUrl}/System/Info/Public`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((info) => {
+        if (info?.ServerName) setServer(serverUrl, info.ServerName);
+      })
+      .catch(() => {});
+  }, [serverName, serverUrl]);
   const insets = useSafeAreaInsets();
+  const dominantColor = useDominantColor(featured?.thumbnail);
   const { tiltX, tiltY } = useDeviceMotion();
   const { isVisionOS } = useVisionOS();
-  const [activeFilter, setActiveFilter] = useState<'Movie' | 'Series' | null>(null);
+  const [activeFilter, setActiveFilter] = useState<"Movie" | "Series" | null>(
+    null,
+  );
 
   // Filtrer les rows selon le filtre actif
   const filteredRows = useMemo(() => {
@@ -86,12 +102,7 @@ export default function HomeScreen() {
 
   const headerAnimatedProps = useAnimatedProps(() => {
     return {
-      intensity: interpolate(
-        scrollY.value,
-        [0, 90],
-        [0, 85],
-        'clamp'
-      )
+      intensity: interpolate(scrollY.value, [0, 90], [0, 85], "clamp"),
     };
   });
 
@@ -118,16 +129,18 @@ export default function HomeScreen() {
   }));
 
   const pathname = usePathname();
-  const isActive = pathname === '/' || pathname === '/index';
+  const isActive = pathname === "/" || pathname === "/index";
 
-  const currentTabIndex = TAB_SCREENS.findIndex(screen =>
-    screen.name === 'index'
+  const currentTabIndex = TAB_SCREENS.findIndex(
+    (screen) => screen.name === "index",
   );
-  const activeTabIndex = TAB_SCREENS.findIndex(screen =>
-    pathname === `/${screen.name}` || (screen.name === 'index' && pathname === '/')
+  const activeTabIndex = TAB_SCREENS.findIndex(
+    (screen) =>
+      pathname === `/${screen.name}` ||
+      (screen.name === "index" && pathname === "/"),
   );
 
-  const slideDirection = activeTabIndex > currentTabIndex ? 'right' : 'left';
+  const slideDirection = activeTabIndex > currentTabIndex ? "right" : "left";
 
   const scrollViewRef = useRef(null);
 
@@ -139,23 +152,27 @@ export default function HomeScreen() {
         <StatusBar style="light" />
         <AnimatedHeader
           headerAnimatedProps={headerAnimatedProps}
-          title={userName ? `Pour ${userName}` : 'Accueil'}
+          title={serverName ?? "Accueil"}
           scrollDirection={scrollDirection}
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
         />
 
         {isLoading && rows.length === 0 ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+          <View
+            style={{
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+              backgroundColor: "#000",
+            }}
+          >
             <ActivityIndicator size="large" color="#E50914" />
           </View>
         ) : (
           <Animated.ScrollView
             ref={scrollViewRef}
-            style={[
-              styles.scrollView,
-              isVisionOS && { paddingHorizontal: 20 }
-            ]}
+            style={[styles.scrollView, isVisionOS && { paddingHorizontal: 20 }]}
             onScroll={scrollHandler}
             scrollEventThrottle={16}
             contentContainerStyle={styles.scrollViewContent}
@@ -163,7 +180,7 @@ export default function HomeScreen() {
             bounces={false}
           >
             <LinearGradient
-              colors={['#202036', '#11111d', '#07070c']}
+              colors={[dominantColor, "#11111d", "#07070c"]}
               locations={[0, 0.4, 0.8]}
               style={[styles.gradient, { height: SCREEN_HEIGHT * 0.8 }]}
             />
@@ -174,9 +191,10 @@ export default function HomeScreen() {
               categoriesStyle={categoriesStyle}
               buttonsStyle={buttonsStyle}
               topMargin={insets.top + 90}
+              dominantColor={dominantColor}
             />
 
-            {filteredRows.map(row => (
+            {filteredRows.map((row) => (
               <MovieList key={row.rowTitle} {...row} />
             ))}
           </Animated.ScrollView>
@@ -185,5 +203,3 @@ export default function HomeScreen() {
     </TabScreenWrapper>
   );
 }
-
-

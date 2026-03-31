@@ -84,8 +84,7 @@ function AnimatedStack() {
       {isModalActive && canBlur && (
         <BlurView
           intensity={50}
-          style={StyleSheet.absoluteFill}
-          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
           tint={colorScheme === "dark" ? "dark" : "light"}
         />
       )}

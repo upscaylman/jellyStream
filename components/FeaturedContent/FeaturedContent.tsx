@@ -5,10 +5,11 @@ import {
 import { styles } from "@/styles";
 import { FeaturedMovie } from "@/types/movie";
 import { Ionicons } from "@expo/vector-icons";
+import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 
 interface FeaturedContentProps {
@@ -17,6 +18,7 @@ interface FeaturedContentProps {
   categoriesStyle: any;
   buttonsStyle: any;
   topMargin: number;
+  dominantColor?: string;
 }
 
 export function FeaturedContent({
@@ -25,6 +27,7 @@ export function FeaturedContent({
   categoriesStyle,
   buttonsStyle,
   topMargin,
+  dominantColor,
 }: FeaturedContentProps) {
   const router = useRouter();
   const isValidId = movie.id && movie.id !== "placeholder";
@@ -57,12 +60,29 @@ export function FeaturedContent({
             />
           )}
           <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.8)"]}
+            colors={[
+              "transparent",
+              dominantColor ? `${dominantColor}cc` : "rgba(0,0,0,0.8)",
+            ]}
             style={styles.featuredGradient}
           />
         </View>
 
         <View style={styles.featuredOverlay}>
+          {movie.logoUrl ? (
+            <View style={localStyles.logoContainer}>
+              <ExpoImage
+                source={{ uri: movie.logoUrl }}
+                style={localStyles.logo}
+                contentFit="contain"
+              />
+            </View>
+          ) : movie.title ? (
+            <View style={localStyles.logoContainer}>
+              <Text style={localStyles.titleFallback}>{movie.title}</Text>
+            </View>
+          ) : null}
+
           <Animated.View style={[styles.featuredCategories, categoriesStyle]}>
             <Text style={styles.categoriesText}>
               {movie.categories.join(" • ")}
@@ -117,3 +137,22 @@ export function FeaturedContent({
     </Pressable>
   );
 }
+
+const localStyles = StyleSheet.create({
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: 8,
+    paddingHorizontal: 32,
+  },
+  logo: {
+    width: 220,
+    height: 80,
+  },
+  titleFallback: {
+    color: "#fff",
+    fontSize: 28,
+    fontWeight: "bold",
+    textAlign: "center",
+    textShadow: "0px 2px 6px rgba(0,0,0,0.8)",
+  },
+});

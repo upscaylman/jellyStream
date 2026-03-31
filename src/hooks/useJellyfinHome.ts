@@ -10,9 +10,10 @@ import {
   useTrending,
 } from "@/src/api/queries/useMediaQueries";
 import { useAuthStore } from "@/src/stores/authStore";
-import { getBackdropUrl, getImageUrl } from "@/src/utils/imageUrl";
+import { getBackdropUrl, getImageUrl, getLogoUrl } from "@/src/utils/imageUrl";
 import { MovieRow } from "@/types/movie";
 import { BaseItemDto } from "@jellyfin/sdk/lib/generated-client/models";
+import { useMemo, useRef } from "react";
 
 interface JellyfinHomeData {
   rows: MovieRow[];
@@ -21,6 +22,7 @@ interface JellyfinHomeData {
     title: string;
     thumbnail: string;
     categories: string[];
+    logoUrl?: string;
   } | null;
   isLoading: boolean;
   isError: boolean;
@@ -28,20 +30,20 @@ interface JellyfinHomeData {
 
 // Détermine le badge à afficher sur l'affiche (style Netflix)
 export function computeBadge(item: BaseItemDto): string | undefined {
-  // Nouvelle saison : série avec plus d'une saison dont du contenu a été ajouté récemment
+  // Nouvelle saison : série avec plus d'une saison dont du contenu ajouté il y a ≤ 7 jours
   if (item.Type === "Series" && (item.ChildCount ?? 0) > 1) {
     const lastMedia = item.DateLastMediaAdded;
     if (lastMedia) {
       const daysSince =
         (Date.now() - new Date(lastMedia).getTime()) / 86_400_000;
-      if (daysSince <= 90) return "Nouvelle saison";
+      if (daysSince <= 7) return "Nouvelle saison";
     }
   }
-  // Ajout récent : ajouté il y a moins de 90 jours
+  // Ajout récent : ajouté il y a ≤ 7 jours
   const dateAdded = item.DateCreated;
   if (dateAdded) {
     const daysSince = (Date.now() - new Date(dateAdded).getTime()) / 86_400_000;
-    if (daysSince <= 90) return "Ajout récent";
+    if (daysSince <= 7) return "Ajout récent";
   }
   return undefined;
 }
@@ -72,6 +74,41 @@ export function toMovie(item: BaseItemDto, serverUrl: string) {
     description: item.Overview ?? "",
     mediaType: item.Type ?? "",
     badge: computeBadge(item),
+  };
+}
+
+// Construit l'objet featured à partir d'un BaseItemDto
+function buildFeatured(
+  item: BaseItemDto,
+  serverUrl: string,
+): JellyfinHomeData["featured"] {
+  const backdropTag =
+    item.BackdropImageTags?.[0] ?? item.ImageTags?.["Backdrop"];
+  const primaryTag = item.ImageTags?.["Primary"];
+  return {
+    id: item.Id ?? "",
+    title: item.Name ?? "",
+    thumbnail: backdropTag
+      ? getBackdropUrl(serverUrl, item.Id ?? "", 1280, 80, backdropTag)
+      : primaryTag
+        ? getImageUrl({
+            serverUrl,
+            itemId: item.Id ?? "",
+            maxWidth: 1280,
+            quality: 80,
+            tag: primaryTag,
+          })
+        : "",
+    categories: item.Genres ?? [],
+    logoUrl: item.ImageTags?.["Logo"]
+      ? getLogoUrl(
+          serverUrl,
+          item.Id ?? "",
+          500,
+          90,
+          item.ImageTags["Logo"],
+        )
+      : undefined,
   };
 }
 
@@ -173,47 +210,48 @@ export function useJellyfinHome(): JellyfinHomeData {
     });
   }
 
-  // Featured : prendre le premier item avec un backdrop
-  let featured: JellyfinHomeData["featured"] = null;
-  const allItems = [
-    ...(newlyAdded.data ?? []),
-    ...(trending.data ?? []),
-    ...(latestMovies.data ?? []),
-    ...(recentlyAdded.data ?? []),
-  ];
-  const featuredItem =
-    allItems.find(
-      (item) => item.BackdropImageTags?.length || item.ImageTags?.["Backdrop"],
-    ) ?? allItems[0];
+  // Featured : choisir parmi les derniers ajouts avec backdrop
+  // On fige le choix dès que les données principales sont chargées pour éviter
+  // le changement de poster à chaque arrivée progressive de données
+  const featuredRef = useRef<string | null>(null);
 
-  if (featuredItem) {
-    const backdropTag =
-      featuredItem.BackdropImageTags?.[0] ??
-      featuredItem.ImageTags?.["Backdrop"];
-    const primaryTag = featuredItem.ImageTags?.["Primary"];
-    featured = {
-      id: featuredItem.Id ?? "",
-      title: featuredItem.Name ?? "",
-      thumbnail: backdropTag
-        ? getBackdropUrl(
-            serverUrl,
-            featuredItem.Id ?? "",
-            1280,
-            80,
-            backdropTag,
-          )
-        : primaryTag
-          ? getImageUrl({
-              serverUrl,
-              itemId: featuredItem.Id ?? "",
-              maxWidth: 1280,
-              quality: 80,
-              tag: primaryTag,
-            })
-          : "",
-      categories: featuredItem.Genres ?? [],
-    };
-  }
+  const featured: JellyfinHomeData["featured"] = useMemo(() => {
+    const allItems = [
+      ...(newlyAdded.data ?? []),
+      ...(trending.data ?? []),
+      ...(latestMovies.data ?? []),
+      ...(recentlyAdded.data ?? []),
+    ];
+    if (allItems.length === 0) return null;
+
+    const withBackdrop = allItems.filter(
+      (item) => item.BackdropImageTags?.length || item.ImageTags?.["Backdrop"],
+    );
+    const candidates = withBackdrop.length > 0 ? withBackdrop : allItems;
+
+    // Si un featured a déjà été figé et qu'il est toujours dans les candidats, le garder
+    if (featuredRef.current) {
+      const existing = candidates.find((c) => c.Id === featuredRef.current);
+      if (existing) {
+        return buildFeatured(existing, serverUrl);
+      }
+    }
+
+    // Index déterministe basé sur le jour — change toutes les 24h
+    const dayIndex = Math.floor(Date.now() / 86_400_000);
+    const chosen = candidates[dayIndex % candidates.length];
+    if (chosen) {
+      featuredRef.current = chosen.Id ?? null;
+      return buildFeatured(chosen, serverUrl);
+    }
+    return null;
+  }, [
+    newlyAdded.data,
+    trending.data,
+    latestMovies.data,
+    recentlyAdded.data,
+    serverUrl,
+  ]);
 
   return { rows, featured, isLoading, isError };
 }

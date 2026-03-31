@@ -22,6 +22,7 @@ export interface FeaturedMovie {
   title: string;
   thumbnail: string;
   categories: string[];
+  logoUrl?: string;
 }
 
 export type DeviceMotionData = {
