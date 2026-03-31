@@ -245,12 +245,25 @@ export function ExpandedPlayer({
       >
         <View style={styles.videoContainer}>
           {youtubeEmbedUrl ? (
-            <iframe
-              src={youtubeEmbedUrl}
-              style={{ width: "100%", height: "100%", border: "none" } as any}
-              allow="autoplay; encrypted-media"
-              allowFullScreen
-            />
+            <View style={{ width: "100%", height: "100%", position: "relative" } as any}>
+              <iframe
+                src={youtubeEmbedUrl}
+                style={{ width: "100%", height: "100%", border: "none" } as any}
+                allow="autoplay; encrypted-media"
+                allowFullScreen
+              />
+              <View
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 60,
+                  background: "linear-gradient(to bottom, rgba(0,0,0,0.9), transparent)",
+                } as any}
+                pointerEvents="none"
+              />
+            </View>
           ) : hasTrailers ? (
             <>
               <VideoView
@@ -337,10 +350,21 @@ export function ExpandedPlayer({
               style={styles.playButton}
               onPress={() => {
                 player.pause();
-                router.push({
-                  pathname: "/player",
-                  params: { itemId, title: movieData.title },
-                });
+                // Pour une série, lancer le premier épisode disponible
+                const playId =
+                  isSeries && episodes && episodes.length > 0
+                    ? episodes[0].Id
+                    : itemId;
+                const playTitle =
+                  isSeries && episodes && episodes.length > 0
+                    ? (episodes[0].Name ?? movieData.title)
+                    : movieData.title;
+                if (playId) {
+                  router.push({
+                    pathname: "/player",
+                    params: { itemId: playId, title: playTitle },
+                  });
+                }
               }}
             >
               <Ionicons name="play" size={24} color="black" />

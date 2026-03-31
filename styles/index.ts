@@ -152,9 +152,9 @@ export const styles = StyleSheet.create({
   featuredButtons: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: 16,
-    marginHorizontal: 16,
-    paddingHorizontal: 16,
+    gap: 10,
+    marginHorizontal: 8,
+    paddingHorizontal: 8,
   },
   playButton: {
     flexDirection: "row",
