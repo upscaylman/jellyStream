@@ -84,7 +84,7 @@ export function ExpandedPlayer({
   const [duration, setDuration] = useState(0);
   const serverUrl = useAuthStore((s) => s.serverUrl) ?? "";
   const token = useAuthStore((s) => s.token) ?? "";
-  const { data: similarItems } = useSimilarItems(
+  const { data: similarItems, isLoading: isLoadingSimilar } = useSimilarItems(
     typeof movie.id === "string" ? movie.id : movie.id.toString(),
     12,
     movie.genres,
@@ -130,12 +130,19 @@ export function ExpandedPlayer({
 
   // Basculer l'onglet actif si celui sélectionné n'est plus disponible
   useEffect(() => {
-    if (activeTab === "similar" && !hasSimilar) {
+    if (activeTab === "similar" && !hasSimilar && !isLoadingSimilar) {
       if (isSeries) setActiveTab("episodes");
       else if (hasCollection) setActiveTab("collection");
       else if (hasTrailers) setActiveTab("trailers");
     }
-  }, [hasSimilar, activeTab, isSeries, hasCollection, hasTrailers]);
+  }, [
+    hasSimilar,
+    isLoadingSimilar,
+    activeTab,
+    isSeries,
+    hasCollection,
+    hasTrailers,
+  ]);
 
   // Sélectionner la première saison par défaut
   useEffect(() => {

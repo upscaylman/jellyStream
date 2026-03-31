@@ -590,12 +590,17 @@ function WebPlayer({
 
   const toggleFullscreen = useCallback(() => {
     // Utiliser le container root pour que les contrôles soient visibles en fullscreen
-    const el = (fullscreenRef.current as unknown as HTMLElement) ?? containerRef.current?.parentElement?.parentElement;
+    const el =
+      (fullscreenRef.current as unknown as HTMLElement) ??
+      containerRef.current?.parentElement?.parentElement;
     if (!el) return;
     if (document.fullscreenElement) {
       document.exitFullscreen();
+      (screen.orientation as any)?.unlock?.();
     } else {
-      el.requestFullscreen();
+      el.requestFullscreen().then(() => {
+        (screen.orientation as any)?.lock?.("landscape").catch(() => {});
+      });
     }
   }, []);
 
