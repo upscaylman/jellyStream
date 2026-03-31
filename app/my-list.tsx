@@ -21,9 +21,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const CastButton = Platform.OS !== "web"
-  ? require("react-native-google-cast").CastButton
-  : () => null;
+
 
 const MAIN_TABS = [{ id: "all", label: "Séries et films" }] as const;
 
@@ -198,7 +196,6 @@ export default function MyListScreen() {
         </Text>
         {!isEditing && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <CastButton style={{ width: 22, height: 22, tintColor: "#fff" }} />
             <Pressable style={s.editButton} onPress={() => setIsEditing(true)}>
               <Ionicons name="pencil" size={22} color="white" />
             </Pressable>

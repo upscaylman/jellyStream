@@ -12,11 +12,9 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const CastButton = Platform.OS !== "web"
-  ? require("react-native-google-cast").CastButton
-  : () => null;
-
+import { CastIcon } from "@/icons/CastIcon";
 import { styles } from "@/styles";
+import { CastModal } from "../CastModal";
 import { CategoriesListModal } from "../CategoriesListModal/CategoriesListModal";
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
@@ -39,6 +37,7 @@ export function AnimatedHeader({
   onFilterChange,
 }: AnimatedHeaderProps) {
   const [showCategories, setShowCategories] = useState(false);
+  const [showCast, setShowCast] = useState(false);
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -94,7 +93,9 @@ export function AnimatedHeader({
             <Text style={styles.headerTitle}>{title}</Text>
 
             <View style={styles.headerButtons}>
-              <CastButton style={{ width: 28, height: 28, tintColor: "#fff" }} />
+              <Pressable style={styles.searchButton} onPress={() => setShowCast(true)}>
+                <CastIcon size={28} color="#fff" />
+              </Pressable>
               <Pressable
                 style={styles.searchButton}
                 onPress={() => router.push("/downloads")}
@@ -172,6 +173,12 @@ export function AnimatedHeader({
       <CategoriesListModal
         visible={showCategories}
         onClose={() => setShowCategories(false)}
+      />
+
+      <CastModal
+        visible={showCast}
+        onClose={() => setShowCast(false)}
+        onSelect={() => { /* TODO: action après sélection */ }}
       />
     </>
   );

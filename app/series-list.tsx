@@ -14,7 +14,7 @@ import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -33,9 +33,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const CastButton = Platform.OS !== "web"
-  ? require("react-native-google-cast").CastButton
-  : () => null;
+import { CastIcon } from "@/icons/CastIcon";
+import { CastModal } from "@/components/CastModal";
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
@@ -83,6 +82,7 @@ export default function SeriesListScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const serverUrl = useAuthStore((s) => s.serverUrl) ?? "";
+  const [showCast, setShowCast] = useState(false);
   const { data: allSeries, isLoading } = useAllItemsByType(BaseItemKind.Series);
 
   const rows = useMemo(
@@ -142,7 +142,9 @@ export default function SeriesListScreen() {
             <Ionicons name="arrow-back" size={24} color="white" />
           </Pressable>
           <Text style={s.headerTitle}>Séries</Text>
-          <CastButton style={{ width: 24, height: 24, tintColor: "#fff" }} />
+          <Pressable onPress={() => setShowCast(true)}>
+            <CastIcon size={24} color="#fff" />
+          </Pressable>
         </View>
       </View>
 
@@ -177,6 +179,12 @@ export default function SeriesListScreen() {
           ))}
         </Animated.ScrollView>
       )}
+
+      <CastModal
+        visible={showCast}
+        onClose={() => setShowCast(false)}
+        onSelect={() => { /* TODO: action après sélection */ }}
+      />
     </View>
   );
 }
