@@ -392,6 +392,7 @@ function WebPlayer({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const progressRef = useRef<HTMLDivElement | null>(null);
+  const fullscreenRef = useRef<View | null>(null);
 
   const [showControls, setShowControls] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -588,7 +589,8 @@ function WebPlayer({
   );
 
   const toggleFullscreen = useCallback(() => {
-    const el = containerRef.current?.parentElement;
+    // Utiliser le container root pour que les contrôles soient visibles en fullscreen
+    const el = (fullscreenRef.current as unknown as HTMLElement) ?? containerRef.current?.parentElement?.parentElement;
     if (!el) return;
     if (document.fullscreenElement) {
       document.exitFullscreen();
@@ -698,7 +700,7 @@ function WebPlayer({
   }, [togglePlayPause, seekRelative, toggleFullscreen, onClose]);
 
   return (
-    <View style={s.container}>
+    <View ref={fullscreenRef} style={s.container}>
       <StatusBar hidden />
       <Pressable
         style={s.videoWrapper}
