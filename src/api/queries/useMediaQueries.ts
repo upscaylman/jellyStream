@@ -392,6 +392,117 @@ export function useToggleFavorite() {
   });
 }
 
+// Vérifie si l'utilisateur a liké un item (UserData.Likes)
+export function useIsLiked(itemId: string) {
+  const { api, userId } = useJellyfinApi();
+
+  return useQuery({
+    queryKey: ["isLiked", itemId],
+    queryFn: async () => {
+      const userLibApi = getUserLibraryApi(api!);
+      const result = await userLibApi.getItem({ userId: userId!, itemId });
+      return result.data.UserData?.Likes ?? false;
+    },
+    enabled: !!api && !!userId && !!itemId,
+  });
+}
+
+// Toggle like (évaluer un item)
+export function useToggleLike() {
+  const { api, userId } = useJellyfinApi();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      itemId,
+      isLiked,
+    }: {
+      itemId: string;
+      isLiked: boolean;
+    }) => {
+      const userLibApi = getUserLibraryApi(api!);
+      if (isLiked) {
+        await userLibApi.deleteUserItemRating({ userId: userId!, itemId });
+      } else {
+        await userLibApi.updateUserItemRating({
+          userId: userId!,
+          itemId,
+          likes: true,
+        });
+      }
+      return !isLiked;
+    },
+    onSuccess: (newValue, { itemId }) => {
+      queryClient.setQueryData(["isLiked", itemId], newValue);
+      queryClient.invalidateQueries({ queryKey: ["trending"] });
+    },
+  });
+}
+
+// Items les mieux notés (CommunityRating + CriticRating)
+export function useTopRated(limit = 20) {
+  const { api, userId } = useJellyfinApi();
+
+  return useQuery({
+    queryKey: ["topRated", limit],
+    queryFn: async () => {
+      const itemsApi = getItemsApi(api!);
+      const result = await itemsApi.getItems({
+        userId,
+        includeItemTypes: [BaseItemKind.Movie, BaseItemKind.Series],
+        sortBy: [ItemSortBy.CommunityRating],
+        sortOrder: [SortOrder.Descending],
+        limit,
+        recursive: true,
+        minCommunityRating: 1,
+        fields: [
+          ItemFields.Overview,
+          ItemFields.Genres,
+          ItemFields.DateCreated,
+          ItemFields.DateLastMediaAdded,
+          ItemFields.ChildCount,
+          ItemFields.RemoteTrailers,
+        ],
+        imageTypeLimit: 1,
+        enableImageTypes: ["Primary", "Backdrop", "Logo"],
+      });
+      return result.data.Items ?? [];
+    },
+    enabled: !!api && !!userId,
+  });
+}
+
+// Items likés par l'utilisateur
+export function useLikedItems(limit = 20) {
+  const { api, userId } = useJellyfinApi();
+
+  return useQuery({
+    queryKey: ["liked", limit],
+    queryFn: async () => {
+      const itemsApi = getItemsApi(api!);
+      const result = await itemsApi.getItems({
+        userId,
+        includeItemTypes: [BaseItemKind.Movie, BaseItemKind.Series],
+        filters: ["Likes" as any],
+        sortBy: [ItemSortBy.DatePlayed],
+        sortOrder: [SortOrder.Descending],
+        limit,
+        recursive: true,
+        fields: [
+          ItemFields.Overview,
+          ItemFields.Genres,
+          ItemFields.DateCreated,
+          ItemFields.ChildCount,
+        ],
+        imageTypeLimit: 1,
+        enableImageTypes: ["Primary", "Backdrop", "Logo"],
+      });
+      return result.data.Items ?? [];
+    },
+    enabled: !!api && !!userId,
+  });
+}
+
 // Ajouts récents (pour écran "New & Hot")
 export function useNewlyAdded(limit = 20) {
   const { api, userId } = useJellyfinApi();

@@ -4,9 +4,11 @@ import {
   useFavoriteItems,
   useLatestMovies,
   useLatestSeries,
+  useLikedItems,
   useNewlyAdded,
   useRecentlyAdded,
   useResumeItems,
+  useTopRated,
   useTrending,
 } from "@/src/api/queries/useMediaQueries";
 import { useAuthStore } from "@/src/stores/authStore";
@@ -114,7 +116,9 @@ export function useJellyfinHome(): JellyfinHomeData {
   const resume = useResumeItems(12);
   const latestMovies = useLatestMovies(20);
   const latestSeries = useLatestSeries(20);
-  const trending = useTrending(20);
+  const trending = useTrending(40);
+  const topRated = useTopRated(40);
+  const likedItems = useLikedItems(40);
   const recentlyAdded = useRecentlyAdded(20);
   const newlyAdded = useNewlyAdded(20);
   const favorites = useFavoriteItems(20);
@@ -165,10 +169,48 @@ export function useJellyfinHome(): JellyfinHomeData {
     });
   }
 
-  if (trending.data?.length) {
+  // Algorithme Tendances : combine PlayCount, CommunityRating, CriticRating et likes
+  const trendingRows = useMemo(() => {
+    const allCandidates = [
+      ...(trending.data ?? []),
+      ...(topRated.data ?? []),
+      ...(likedItems.data ?? []),
+    ];
+    // Dédupliquer par Id
+    const seen = new Map<string, BaseItemDto>();
+    for (const item of allCandidates) {
+      if (item.Id && !seen.has(item.Id)) {
+        seen.set(item.Id, item);
+      }
+    }
+    const likedIds = new Set(
+      (likedItems.data ?? []).map((item) => item.Id).filter(Boolean),
+    );
+
+    // Score composite : PlayCount (40%) + CommunityRating (30%) + CriticRating (20%) + Like bonus (10%)
+    const scored = [...seen.values()].map((item) => {
+      const playCount = item.UserData?.PlayCount ?? 0;
+      const communityRating = item.CommunityRating ?? 0;
+      const criticRating = item.CriticRating ?? 0;
+      const isLiked = likedIds.has(item.Id);
+
+      const score =
+        playCount * 0.4 +
+        communityRating * 0.3 +
+        (criticRating / 10) * 0.2 +
+        (isLiked ? 5 : 0);
+
+      return { item, score };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, 20).map((s) => s.item);
+  }, [trending.data, topRated.data, likedItems.data]);
+
+  if (trendingRows.length > 0) {
     rows.push({
       rowTitle: "Tendances",
-      movies: trending.data.map((item) => toMovie(item, serverUrl)),
+      movies: trendingRows.map((item) => toMovie(item, serverUrl)),
       type: "top_10",
     });
   }

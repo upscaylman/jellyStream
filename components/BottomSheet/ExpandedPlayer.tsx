@@ -6,9 +6,11 @@ import {
   useCollectionForItem,
   useEpisodes,
   useIsFavorite,
+  useIsLiked,
   useSeasons,
   useSimilarItems,
   useToggleFavorite,
+  useToggleLike,
 } from "@/src/api/queries/useMediaQueries";
 import { useAuthStore } from "@/src/stores/authStore";
 import {
@@ -98,6 +100,10 @@ export function ExpandedPlayer({
   const { data: isFavorite } = useIsFavorite(itemId);
   const toggleFavorite = useToggleFavorite();
 
+  // Like / Évaluer
+  const { data: isLiked } = useIsLiked(itemId);
+  const toggleLike = useToggleLike();
+
   // Pour un épisode, on remonte à la série parente via seriesId
   const seriesId = movie.seriesId ?? (movie.type === "Series" ? itemId : "");
 
@@ -186,8 +192,10 @@ export function ExpandedPlayer({
     [movie.trailerUrl],
   );
   const youtubeEmbedUrl = youtubeId
-    ? `https://www.youtube.com/embed/${youtubeId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${youtubeId}&modestbranding=1&rel=0&showinfo=0`
+    ? `https://www.youtube.com/embed/${youtubeId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${youtubeId}&modestbranding=1&rel=0&showinfo=0&enablejsapi=1&origin=${Platform.OS === "web" ? window.location.origin : ""}`
     : null;
+
+  const ytIframeRef = useRef<HTMLIFrameElement | null>(null);
 
   const previewUrl = !youtubeEmbedUrl
     ? (Platform.OS === "web"
@@ -258,6 +266,9 @@ export function ExpandedPlayer({
               }
             >
               <iframe
+                ref={(el: HTMLIFrameElement | null) => {
+                  ytIframeRef.current = el;
+                }}
                 src={youtubeEmbedUrl}
                 style={{ width: "100%", height: "100%", border: "none" } as any}
                 allow="autoplay; encrypted-media"
@@ -298,11 +309,21 @@ export function ExpandedPlayer({
             />
           )}
           <View style={styles.videoOverlay} />
-          {!youtubeEmbedUrl && hasTrailers && (
+          {(youtubeEmbedUrl || (!youtubeEmbedUrl && hasTrailers)) && (
             <View style={styles.muteOverlay}>
               <Pressable
                 style={styles.soundButton}
-                onPress={() => setIsMuted(!isMuted)}
+                onPress={() => {
+                  const next = !isMuted;
+                  setIsMuted(next);
+                  if (youtubeEmbedUrl && ytIframeRef.current?.contentWindow) {
+                    const cmd = next ? "mute" : "unMute";
+                    ytIframeRef.current.contentWindow.postMessage(
+                      JSON.stringify({ event: "command", func: cmd, args: [] }),
+                      "*",
+                    );
+                  }
+                }}
               >
                 <Ionicons
                   name={isMuted ? "volume-mute" : "volume-medium"}
@@ -433,12 +454,19 @@ export function ExpandedPlayer({
               />
               <ThemedText style={styles.actionItemText}>Ma liste</ThemedText>
             </Pressable>
-            <Pressable style={styles.actionItem}>
-              <Ionicons name="thumbs-up-outline" size={24} color="white" />
+            <Pressable
+              style={styles.actionItem}
+              onPress={() => toggleLike.mutate({ itemId, isLiked: !!isLiked })}
+            >
+              <Ionicons
+                name={isLiked ? "heart" : "heart-outline"}
+                size={24}
+                color={isLiked ? "#E50914" : "white"}
+              />
               <ThemedText style={styles.actionItemText}>Évaluer</ThemedText>
             </Pressable>
             <Pressable style={styles.actionItem}>
-              <Ionicons name="share-outline" size={24} color="white" />
+              <Ionicons name="share-social-outline" size={24} color="white" />
               <ThemedText style={styles.actionItemText}>Partager</ThemedText>
             </Pressable>
             <Pressable style={styles.actionItem}>

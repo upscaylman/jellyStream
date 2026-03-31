@@ -30,6 +30,48 @@ function extractYouTubeId(url?: string): string | null {
     return match?.[1] ?? null;
 }
 
+// Preview YouTube avec bouton mute/unmute
+function YouTubePreview({ ytId, fallbackUri }: { ytId: string; fallbackUri?: string }) {
+    const [muted, setMuted] = useState(true);
+    const iframeRef = useRef<HTMLIFrameElement | null>(null);
+    const origin = Platform.OS === 'web' ? window.location.origin : '';
+
+    return (
+        <View style={{ width: '100%', height: '100%' } as any}>
+            {fallbackUri && (
+                <ExpoImage
+                    source={{ uri: fallbackUri }}
+                    style={[newStyles.previewImage, { position: 'absolute', top: 0, left: 0, zIndex: 0 }] as any}
+                    cachePolicy="memory-disk"
+                />
+            )}
+            <iframe
+                ref={(el: HTMLIFrameElement | null) => { iframeRef.current = el; }}
+                src={`https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytId}&modestbranding=1&rel=0&showinfo=0&enablejsapi=1&origin=${origin}`}
+                style={{ width: '100%', height: '100%', border: 'none', position: 'relative', zIndex: 1 } as any}
+                allow="autoplay; encrypted-media"
+                allowFullScreen
+            />
+            <Pressable
+                style={{ position: 'absolute', bottom: 10, right: 10, zIndex: 2, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 20, width: 32, height: 32, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' } as any}
+                onPress={() => {
+                    const next = !muted;
+                    setMuted(next);
+                    if (iframeRef.current?.contentWindow) {
+                        const cmd = next ? 'mute' : 'unMute';
+                        iframeRef.current.contentWindow.postMessage(
+                            JSON.stringify({ event: 'command', func: cmd, args: [] }),
+                            '*',
+                        );
+                    }
+                }}
+            >
+                <Ionicons name={muted ? 'volume-mute' : 'volume-medium'} size={16} color="white" />
+            </Pressable>
+        </View>
+    );
+}
+
 const TAB_OPTIONS = [
     { id: 'newly-added', label: 'Nouveautés', icon: 'time-outline' as const },
     { id: 'trending', label: 'Tendances', icon: 'trending-up-outline' as const },
@@ -103,23 +145,7 @@ export default function NewScreen() {
                         {(() => {
                             const ytId = extractYouTubeId(item.RemoteTrailers?.[0]?.Url);
                             if (ytId && Platform.OS === 'web') {
-                                return (
-                                    <View style={{ width: '100%', height: '100%' } as any}>
-                                        {imageUri && (
-                                            <ExpoImage
-                                                source={{ uri: imageUri }}
-                                                style={[newStyles.previewImage, { position: 'absolute', top: 0, left: 0, zIndex: 0 }] as any}
-                                                cachePolicy="memory-disk"
-                                            />
-                                        )}
-                                        <iframe
-                                            src={`https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytId}&modestbranding=1&rel=0&showinfo=0`}
-                                            style={{ width: '100%', height: '100%', border: 'none', position: 'relative', zIndex: 1 } as any}
-                                            allow="autoplay; encrypted-media"
-                                            allowFullScreen
-                                        />
-                                    </View>
-                                );
+                                return <YouTubePreview ytId={ytId} fallbackUri={imageUri} />;
                             }
                             if (imageUri) {
                                 return (
