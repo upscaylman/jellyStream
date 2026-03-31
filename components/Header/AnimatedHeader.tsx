@@ -4,13 +4,17 @@ import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 import Animated, {
   AnimatedProps,
   interpolate,
   useAnimatedStyle,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const CastButton = Platform.OS !== "web"
+  ? require("react-native-google-cast").CastButton
+  : () => null;
 
 import { styles } from "@/styles";
 import { CategoriesListModal } from "../CategoriesListModal/CategoriesListModal";
@@ -90,6 +94,7 @@ export function AnimatedHeader({
             <Text style={styles.headerTitle}>{title}</Text>
 
             <View style={styles.headerButtons}>
+              <CastButton style={{ width: 28, height: 28, tintColor: "#fff" }} />
               <Pressable
                 style={styles.searchButton}
                 onPress={() => router.push("/downloads")}

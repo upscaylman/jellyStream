@@ -18,6 +18,7 @@ import React, { useMemo } from "react";
 import {
   ActivityIndicator,
   Dimensions,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -31,6 +32,10 @@ import Animated, {
   useSharedValue,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const CastButton = Platform.OS !== "web"
+  ? require("react-native-google-cast").CastButton
+  : () => null;
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
@@ -139,6 +144,7 @@ export default function FilmsScreen() {
             <Ionicons name="arrow-back" size={24} color="white" />
           </Pressable>
           <Text style={s.headerTitle}>Films</Text>
+          <CastButton style={{ width: 24, height: 24, tintColor: "#fff" }} />
         </View>
       </View>
 
