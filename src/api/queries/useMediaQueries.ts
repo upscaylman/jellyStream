@@ -1,11 +1,16 @@
 // Queries TanStack pour les films et médias Jellyfin
-import { useQuery } from '@tanstack/react-query';
-import { getItemsApi } from '@jellyfin/sdk/lib/utils/api/items-api';
-import { getUserLibraryApi } from '@jellyfin/sdk/lib/utils/api/user-library-api';
-import { getLibraryApi } from '@jellyfin/sdk/lib/utils/api/library-api';
-import { getTvShowsApi } from '@jellyfin/sdk/lib/utils/api/tv-shows-api';
-import { BaseItemKind, SortOrder, ItemSortBy, ItemFields } from '@jellyfin/sdk/lib/generated-client/models';
-import { useAuthStore } from '@/src/stores/authStore';
+import { useAuthStore } from "@/src/stores/authStore";
+import {
+  BaseItemKind,
+  ItemFields,
+  ItemSortBy,
+  SortOrder,
+} from "@jellyfin/sdk/lib/generated-client/models";
+import { getItemsApi } from "@jellyfin/sdk/lib/utils/api/items-api";
+import { getLibraryApi } from "@jellyfin/sdk/lib/utils/api/library-api";
+import { getTvShowsApi } from "@jellyfin/sdk/lib/utils/api/tv-shows-api";
+import { getUserLibraryApi } from "@jellyfin/sdk/lib/utils/api/user-library-api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 // Hook utilitaire : récupère api + userId depuis le store
 function useJellyfinApi() {
@@ -19,7 +24,7 @@ export function useLatestMovies(limit = 20) {
   const { api, userId } = useJellyfinApi();
 
   return useQuery({
-    queryKey: ['movies', 'latest', limit],
+    queryKey: ["movies", "latest", limit],
     queryFn: async () => {
       const itemsApi = getItemsApi(api!);
       const result = await itemsApi.getItems({
@@ -29,9 +34,16 @@ export function useLatestMovies(limit = 20) {
         sortOrder: [SortOrder.Descending],
         limit,
         recursive: true,
-        fields: [ItemFields.Overview, ItemFields.People, ItemFields.Genres, ItemFields.DateCreated, ItemFields.DateLastMediaAdded, ItemFields.ChildCount],
+        fields: [
+          ItemFields.Overview,
+          ItemFields.People,
+          ItemFields.Genres,
+          ItemFields.DateCreated,
+          ItemFields.DateLastMediaAdded,
+          ItemFields.ChildCount,
+        ],
         imageTypeLimit: 1,
-        enableImageTypes: ['Primary', 'Backdrop', 'Thumb'],
+        enableImageTypes: ["Primary", "Backdrop", "Thumb"],
       });
       return result.data.Items ?? [];
     },
@@ -44,7 +56,7 @@ export function useLatestSeries(limit = 20) {
   const { api, userId } = useJellyfinApi();
 
   return useQuery({
-    queryKey: ['series', 'latest', limit],
+    queryKey: ["series", "latest", limit],
     queryFn: async () => {
       const itemsApi = getItemsApi(api!);
       const result = await itemsApi.getItems({
@@ -54,9 +66,16 @@ export function useLatestSeries(limit = 20) {
         sortOrder: [SortOrder.Descending],
         limit,
         recursive: true,
-        fields: [ItemFields.Overview, ItemFields.People, ItemFields.Genres, ItemFields.DateCreated, ItemFields.DateLastMediaAdded, ItemFields.ChildCount],
+        fields: [
+          ItemFields.Overview,
+          ItemFields.People,
+          ItemFields.Genres,
+          ItemFields.DateCreated,
+          ItemFields.DateLastMediaAdded,
+          ItemFields.ChildCount,
+        ],
         imageTypeLimit: 1,
-        enableImageTypes: ['Primary', 'Backdrop'],
+        enableImageTypes: ["Primary", "Backdrop"],
       });
       return result.data.Items ?? [];
     },
@@ -69,7 +88,7 @@ export function useResumeItems(limit = 12) {
   const { api, userId } = useJellyfinApi();
 
   return useQuery({
-    queryKey: ['resume', limit],
+    queryKey: ["resume", limit],
     queryFn: async () => {
       const itemsApi = getItemsApi(api!);
       const result = await itemsApi.getResumeItems({
@@ -77,7 +96,7 @@ export function useResumeItems(limit = 12) {
         limit,
         fields: [ItemFields.Overview, ItemFields.Genres],
         imageTypeLimit: 1,
-        enableImageTypes: ['Primary', 'Backdrop', 'Thumb'],
+        enableImageTypes: ["Primary", "Backdrop", "Thumb"],
       });
       return result.data.Items ?? [];
     },
@@ -90,7 +109,7 @@ export function useRecentlyAdded(limit = 20) {
   const { api, userId } = useJellyfinApi();
 
   return useQuery({
-    queryKey: ['recent', limit],
+    queryKey: ["recent", limit],
     queryFn: async () => {
       const userLibApi = getUserLibraryApi(api!);
       const result = await userLibApi.getLatestMedia({
@@ -98,7 +117,7 @@ export function useRecentlyAdded(limit = 20) {
         limit,
         fields: [ItemFields.Overview, ItemFields.Genres],
         imageTypeLimit: 1,
-        enableImageTypes: ['Primary', 'Backdrop'],
+        enableImageTypes: ["Primary", "Backdrop"],
       });
       return result.data ?? [];
     },
@@ -111,7 +130,7 @@ export function useTrending(limit = 20) {
   const { api, userId } = useJellyfinApi();
 
   return useQuery({
-    queryKey: ['trending', limit],
+    queryKey: ["trending", limit],
     queryFn: async () => {
       const itemsApi = getItemsApi(api!);
       const result = await itemsApi.getItems({
@@ -121,9 +140,16 @@ export function useTrending(limit = 20) {
         sortOrder: [SortOrder.Descending],
         limit,
         recursive: true,
-        fields: [ItemFields.Overview, ItemFields.Genres, ItemFields.DateCreated, ItemFields.DateLastMediaAdded, ItemFields.ChildCount, ItemFields.RemoteTrailers],
+        fields: [
+          ItemFields.Overview,
+          ItemFields.Genres,
+          ItemFields.DateCreated,
+          ItemFields.DateLastMediaAdded,
+          ItemFields.ChildCount,
+          ItemFields.RemoteTrailers,
+        ],
         imageTypeLimit: 1,
-        enableImageTypes: ['Primary', 'Backdrop'],
+        enableImageTypes: ["Primary", "Backdrop"],
       });
       return result.data.Items ?? [];
     },
@@ -136,7 +162,7 @@ export function useSearchItems(searchTerm: string) {
   const { api, userId } = useJellyfinApi();
 
   return useQuery({
-    queryKey: ['search', searchTerm],
+    queryKey: ["search", searchTerm],
     queryFn: async () => {
       const itemsApi = getItemsApi(api!);
       const result = await itemsApi.getItems({
@@ -147,7 +173,7 @@ export function useSearchItems(searchTerm: string) {
         limit: 30,
         fields: [ItemFields.Overview, ItemFields.Genres],
         imageTypeLimit: 1,
-        enableImageTypes: ['Primary', 'Backdrop'],
+        enableImageTypes: ["Primary", "Backdrop"],
       });
       return result.data.Items ?? [];
     },
@@ -160,7 +186,7 @@ export function useGenres() {
   const { api, userId } = useJellyfinApi();
 
   return useQuery({
-    queryKey: ['genres'],
+    queryKey: ["genres"],
     queryFn: async () => {
       const itemsApi = getItemsApi(api!);
       const result = await itemsApi.getItems({
@@ -184,12 +210,41 @@ export function useGenres() {
   });
 }
 
+// Tous les items d'un type donné (pour écrans Films / Séries par genre)
+export function useAllItemsByType(itemType: BaseItemKind) {
+  const { api, userId } = useJellyfinApi();
+
+  return useQuery({
+    queryKey: ["allItems", itemType],
+    queryFn: async () => {
+      const itemsApi = getItemsApi(api!);
+      const result = await itemsApi.getItems({
+        userId,
+        includeItemTypes: [itemType],
+        sortBy: [ItemSortBy.SortName],
+        sortOrder: [SortOrder.Ascending],
+        recursive: true,
+        fields: [
+          ItemFields.Genres,
+          ItemFields.DateCreated,
+          ItemFields.DateLastMediaAdded,
+        ],
+        imageTypeLimit: 1,
+        enableImageTypes: ["Primary", "Backdrop"],
+      });
+      return result.data.Items ?? [];
+    },
+    enabled: !!api && !!userId,
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
 // Items par genre
 export function useItemsByGenre(genre: string, limit = 20) {
   const { api, userId } = useJellyfinApi();
 
   return useQuery({
-    queryKey: ['genre', genre, limit],
+    queryKey: ["genre", genre, limit],
     queryFn: async () => {
       const itemsApi = getItemsApi(api!);
       const result = await itemsApi.getItems({
@@ -201,7 +256,7 @@ export function useItemsByGenre(genre: string, limit = 20) {
         recursive: true,
         fields: [ItemFields.Overview, ItemFields.Genres],
         imageTypeLimit: 1,
-        enableImageTypes: ['Primary', 'Backdrop'],
+        enableImageTypes: ["Primary", "Backdrop"],
       });
       return result.data.Items ?? [];
     },
@@ -214,7 +269,7 @@ export function useItemDetail(itemId: string) {
   const { api, userId } = useJellyfinApi();
 
   return useQuery({
-    queryKey: ['item', itemId],
+    queryKey: ["item", itemId],
     queryFn: async () => {
       const userLibApi = getUserLibraryApi(api!);
       const result = await userLibApi.getItem({
@@ -232,7 +287,7 @@ export function useSimilarItems(itemId: string, limit = 12) {
   const { api } = useJellyfinApi();
 
   return useQuery({
-    queryKey: ['similar', itemId, limit],
+    queryKey: ["similar", itemId, limit],
     queryFn: async () => {
       const libApi = getLibraryApi(api!);
       const result = await libApi.getSimilarItems({
@@ -251,7 +306,7 @@ export function useFavoriteItems(limit = 20) {
   const { api, userId } = useJellyfinApi();
 
   return useQuery({
-    queryKey: ['favorites', limit],
+    queryKey: ["favorites", limit],
     queryFn: async () => {
       const itemsApi = getItemsApi(api!);
       const result = await itemsApi.getItems({
@@ -264,11 +319,54 @@ export function useFavoriteItems(limit = 20) {
         recursive: true,
         fields: [ItemFields.Overview, ItemFields.Genres],
         imageTypeLimit: 1,
-        enableImageTypes: ['Primary', 'Backdrop'],
+        enableImageTypes: ["Primary", "Backdrop"],
       });
       return result.data.Items ?? [];
     },
     enabled: !!api && !!userId,
+  });
+}
+
+// Vérifier si un item est favori
+export function useIsFavorite(itemId: string) {
+  const { api, userId } = useJellyfinApi();
+
+  return useQuery({
+    queryKey: ["isFavorite", itemId],
+    queryFn: async () => {
+      const userLibApi = getUserLibraryApi(api!);
+      const result = await userLibApi.getItem({ userId: userId!, itemId });
+      return result.data.UserData?.IsFavorite ?? false;
+    },
+    enabled: !!api && !!userId && !!itemId,
+  });
+}
+
+// Toggle favori (ajouter/retirer de Ma liste)
+export function useToggleFavorite() {
+  const { api, userId } = useJellyfinApi();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      itemId,
+      isFavorite,
+    }: {
+      itemId: string;
+      isFavorite: boolean;
+    }) => {
+      const userLibApi = getUserLibraryApi(api!);
+      if (isFavorite) {
+        await userLibApi.unmarkFavoriteItem({ userId: userId!, itemId });
+      } else {
+        await userLibApi.markFavoriteItem({ userId: userId!, itemId });
+      }
+      return !isFavorite;
+    },
+    onSuccess: (newValue, { itemId }) => {
+      queryClient.setQueryData(["isFavorite", itemId], newValue);
+      queryClient.invalidateQueries({ queryKey: ["favorites"] });
+    },
   });
 }
 
@@ -277,7 +375,7 @@ export function useNewlyAdded(limit = 20) {
   const { api, userId } = useJellyfinApi();
 
   return useQuery({
-    queryKey: ['newly-added', limit],
+    queryKey: ["newly-added", limit],
     queryFn: async () => {
       const itemsApi = getItemsApi(api!);
       const result = await itemsApi.getItems({
@@ -287,9 +385,17 @@ export function useNewlyAdded(limit = 20) {
         sortOrder: [SortOrder.Descending],
         limit,
         recursive: true,
-        fields: [ItemFields.Overview, ItemFields.Genres, ItemFields.People, ItemFields.DateCreated, ItemFields.DateLastMediaAdded, ItemFields.ChildCount, ItemFields.RemoteTrailers],
+        fields: [
+          ItemFields.Overview,
+          ItemFields.Genres,
+          ItemFields.People,
+          ItemFields.DateCreated,
+          ItemFields.DateLastMediaAdded,
+          ItemFields.ChildCount,
+          ItemFields.RemoteTrailers,
+        ],
         imageTypeLimit: 1,
-        enableImageTypes: ['Primary', 'Backdrop', 'Thumb'],
+        enableImageTypes: ["Primary", "Backdrop", "Thumb"],
       });
       return result.data.Items ?? [];
     },
@@ -302,7 +408,7 @@ export function useSeasons(seriesId: string) {
   const { api, userId } = useJellyfinApi();
 
   return useQuery({
-    queryKey: ['seasons', seriesId],
+    queryKey: ["seasons", seriesId],
     queryFn: async () => {
       const tvApi = getTvShowsApi(api!);
       const result = await tvApi.getSeasons({
@@ -321,7 +427,7 @@ export function useEpisodes(seriesId: string, seasonId: string) {
   const { api, userId } = useJellyfinApi();
 
   return useQuery({
-    queryKey: ['episodes', seriesId, seasonId],
+    queryKey: ["episodes", seriesId, seasonId],
     queryFn: async () => {
       const tvApi = getTvShowsApi(api!);
       const result = await tvApi.getEpisodes({
@@ -330,7 +436,7 @@ export function useEpisodes(seriesId: string, seasonId: string) {
         userId,
         fields: [ItemFields.Overview, ItemFields.People],
         imageTypeLimit: 1,
-        enableImageTypes: ['Primary', 'Thumb'],
+        enableImageTypes: ["Primary", "Thumb"],
       });
       return result.data.Items ?? [];
     },

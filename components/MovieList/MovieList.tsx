@@ -1,129 +1,193 @@
-import React, { useRef } from 'react';
-import { View, Text, Pressable, FlatList, StyleSheet } from 'react-native';
-import { Image as ExpoImage } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { styles } from '@/styles';
-import { Movie, MovieRow } from '@/types/movie';
-import Svg, { Path } from 'react-native-svg';
-import { useVisionOS } from '@/hooks/useVisionOS';
-import { HoverableView } from '@/components/ui/VisionContainer';
-import { useWebDragScroll } from '@/hooks/useWebDragScroll';
+import { HoverableView } from "@/components/ui/VisionContainer";
+import { useVisionOS } from "@/hooks/useVisionOS";
+import { useWebDragScroll } from "@/hooks/useWebDragScroll";
+import { styles } from "@/styles";
+import { Movie, MovieRow } from "@/types/movie";
+import { Ionicons } from "@expo/vector-icons";
+import { Image as ExpoImage } from "expo-image";
+import { useRouter } from "expo-router";
+import React, { useRef } from "react";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
 const NumberBackground = ({ number }: { number: number }) => {
-    const num = (number).toString().padStart(2, '0');
-
-    return (
-        <View style={styles.numberContainer}>
-            <Text style={[styles.numberText, {
-                color: 'white',
-                opacity: 0.15,
-                fontSize: 200,
-                fontFamily: 'arialic',
-            }]}>{num}</Text>
-        </View>
-    );
+  return (
+    <View style={styles.numberContainer}>
+      <Text
+        style={[
+          styles.numberText,
+          {
+            color: "#595959",
+            opacity: 1,
+            fontSize: 200,
+            fontFamily: "arialic",
+          },
+        ]}
+      >
+        {number}
+      </Text>
+    </View>
+  );
 };
 
-const MovieItem = ({ item, router, index, isTop10 }: {
-    item: Movie;
-    router: any;
-    index: number;
-    isTop10: boolean;
+const MovieItem = ({
+  item,
+  router,
+  index,
+  isTop10,
+}: {
+  item: Movie;
+  router: any;
+  index: number;
+  isTop10: boolean;
 }) => (
-    <Pressable
-        onPress={() => router.push({
-            pathname: '/movie/[id]',
-            params: { id: item.id }
-        })}
-        style={[
-            styles.contentItem,
-            isTop10 && styles.top10Item
-        ]}
-    >
-        {isTop10 && <NumberBackground number={index + 1} />}
-        {item.imageUrl ? (
-            <ExpoImage
-                source={{ uri: item.imageUrl }}
-                style={[
-                    styles.thumbnail,
-                    isTop10 && styles.top10Thumbnail
-                ]}
-                cachePolicy="memory-disk"
-                transition={200}
-                contentFit="cover"
-            />
-        ) : (
-            <View
-                style={[
-                    styles.thumbnail,
-                    isTop10 && styles.top10Thumbnail,
-                    { backgroundColor: '#2a2a2a' }
-                ]}
-            />
-        )}
-        {item.badge && (
-            <View style={badgeStyles.badgeContainer}>
-                <Text style={badgeStyles.badgeText} numberOfLines={1}>{item.badge}</Text>
-            </View>
-        )}
-    </Pressable>
+  <Pressable
+    onPress={() =>
+      router.push({
+        pathname: "/movie/[id]",
+        params: { id: item.id },
+      })
+    }
+    style={[styles.contentItem, isTop10 && styles.top10Item]}
+  >
+    {isTop10 && <NumberBackground number={(index % 10) + 1} />}
+    <View style={{ position: "relative" }}>
+      {item.imageUrl ? (
+        <ExpoImage
+          source={{ uri: item.imageUrl }}
+          style={[styles.thumbnail, isTop10 && styles.top10Thumbnail]}
+          cachePolicy="memory-disk"
+          transition={200}
+          contentFit="cover"
+        />
+      ) : (
+        <View
+          style={[
+            styles.thumbnail,
+            isTop10 && styles.top10Thumbnail,
+            { backgroundColor: "#2a2a2a" },
+          ]}
+        />
+      )}
+      {item.badge && (
+        <View
+          style={[
+            badgeStyles.badgeContainer,
+            isTop10 && badgeStyles.badgeContainerTop10,
+          ]}
+        >
+          <View style={badgeStyles.badge}>
+            <Text style={badgeStyles.badgeText} numberOfLines={1}>
+              {item.badge}
+            </Text>
+          </View>
+        </View>
+      )}
+    </View>
+  </Pressable>
 );
 
-export function MovieList({ rowTitle, movies, type }: MovieRow) {
-    const router = useRouter();
-    const isTop10 = type === 'top_10';
-    const { isVisionOS } = useVisionOS();
-    const flatListRef = useRef<FlatList>(null);
-    useWebDragScroll(flatListRef);
+export function MovieList({
+  rowTitle,
+  movies,
+  type,
+  showAll,
+  showAllRoute,
+}: MovieRow) {
+  const router = useRouter();
+  const isTop10 = type === "top_10";
+  const { isVisionOS } = useVisionOS();
+  const flatListRef = useRef<FlatList>(null);
+  useWebDragScroll(flatListRef);
 
-    const renderItem = ({ item, index }) => (
-        <HoverableView key={`${item.id}-${index}`}>
-            <MovieItem
-                item={item}
-                router={router}
-                index={index}
-                isTop10={isTop10}
-            />
-        </HoverableView>
-    );
+  const renderItem = ({ item, index }) => (
+    <HoverableView key={`${item.id}-${index}`}>
+      <MovieItem item={item} router={router} index={index} isTop10={isTop10} />
+    </HoverableView>
+  );
 
-    return (
-        <View style={isVisionOS ? styles.visionContainer : styles.container}>
-            <Text style={styles.sectionTitle}>{rowTitle}</Text>
-            <FlatList
-                ref={flatListRef}
-                horizontal
-                data={movies}
-                renderItem={renderItem}
-                keyExtractor={(item, index) => `${item.id}-${index}`}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={[
-                    styles.contentList,
-                    isTop10 && styles.top10List
-                ]}
-            />
-        </View>
-    );
+  return (
+    <View style={isVisionOS ? styles.visionContainer : styles.container}>
+      <View style={rowHeaderStyles.header}>
+        <Text style={[styles.sectionTitle, rowHeaderStyles.headerTitle]}>
+          {rowTitle}
+        </Text>
+        {showAll && (
+          <Pressable
+            style={rowHeaderStyles.showAll}
+            onPress={() => router.push(showAllRoute ?? "/my-list")}
+          >
+            <Text style={rowHeaderStyles.showAllText}>Tout voir</Text>
+            <Ionicons name="chevron-forward" size={20} color="#fff" />
+          </Pressable>
+        )}
+      </View>
+      <FlatList
+        ref={flatListRef}
+        horizontal
+        data={movies}
+        renderItem={renderItem}
+        keyExtractor={(item, index) => `${item.id}-${index}`}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.contentList,
+          isTop10 && styles.top10List,
+        ]}
+      />
+    </View>
+  );
 }
 
 const badgeStyles = StyleSheet.create({
-    badgeContainer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: '#E50914',
-        paddingVertical: 3,
-        paddingHorizontal: 6,
-        borderBottomLeftRadius: 6,
-        borderBottomRightRadius: 6,
-        alignItems: 'center',
-    },
-    badgeText: {
-        color: '#fff',
-        fontSize: 9,
-        fontWeight: 'bold',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-    },
+  badgeContainer: {
+    position: "absolute",
+    bottom: 0,
+    alignSelf: "center",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
+  badgeContainerTop10: {
+    bottom: 16,
+  },
+  badge: {
+    backgroundColor: "#E50914",
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 9,
+    fontWeight: "bold",
+  },
+});
+
+const rowHeaderStyles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    paddingRight: 12,
+    marginTop: 18,
+    marginBottom: 10,
+    marginLeft: 16,
+  },
+  headerTitle: {
+    marginTop: 0,
+    marginBottom: 0,
+    marginLeft: 0,
+  },
+  showAll: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  showAllText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
 });

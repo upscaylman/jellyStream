@@ -1,31 +1,33 @@
 export interface Movie {
-    id: string;
-    imageUrl: string;
-    mediaType?: string;
-    badge?: string;
+  id: string;
+  imageUrl: string;
+  mediaType?: string;
+  badge?: string;
 }
 
 export interface MovieRow {
-    rowTitle: string;
-    movies: Movie[];
-    type?: 'normal' | 'top_10' | 'games';
+  rowTitle: string;
+  movies: Movie[];
+  type?: "normal" | "top_10" | "games";
+  showAll?: boolean;
+  showAllRoute?: string;
 }
 
 export interface MoviesData {
-    movies: MovieRow[];
+  movies: MovieRow[];
 }
 
 export interface FeaturedMovie {
-    id: string;
-    title: string;
-    thumbnail: string;
-    categories: string[];
+  id: string;
+  title: string;
+  thumbnail: string;
+  categories: string[];
 }
 
 export type DeviceMotionData = {
-    rotation: {
-        alpha: number;
-        beta: number;
-        gamma: number;
-    };
-}; 
+  rotation: {
+    alpha: number;
+    beta: number;
+    gamma: number;
+  };
+};

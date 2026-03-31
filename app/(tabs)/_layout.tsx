@@ -1,17 +1,22 @@
-import { Tabs, useRouter, usePathname } from 'expo-router';
-import React from 'react';
-import { TabBarIcon } from '@/components/navigation/TabBarIcon';
-import { Platform, StyleSheet, Image, View, Pressable } from 'react-native';
-import * as Haptics from 'expo-haptics';
-import { TabScreenWrapper } from '@/components/TabScreenWrapper';
-import { Home } from '@/icons/Home';
-import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import { Image as ExpoImage } from 'expo-image';
-import { useAuthStore } from '@/src/stores/authStore';
+import { TabBarIcon } from "@/components/navigation/TabBarIcon";
+import { Home } from "@/icons/Home";
+import { useAuthStore } from "@/src/stores/authStore";
+import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
+import * as Haptics from "expo-haptics";
+import { Image as ExpoImage } from "expo-image";
+import { Tabs, usePathname } from "expo-router";
+import React from "react";
+import { Pressable, StyleSheet, View } from "react-native";
 
 // Helper component for cross-platform icons
-function TabIcon({ ionIcon, color }: { ionIcon: 'person' | 'home-sharp' | 'play-square'; color: string }) {
+function TabIcon({
+  ionIcon,
+  color,
+}: {
+  ionIcon: "person" | "home-sharp" | "play-square";
+  color: string;
+}) {
   return <TabBarIcon name={ionIcon} color={color} />;
 }
 
@@ -27,14 +32,16 @@ function ProfileImage({ focused }: { focused: boolean }) {
         borderRadius: 4,
         opacity: focused ? 1 : 0.5,
         borderWidth: 2,
-        borderColor: focused ? 'white' : 'transparent',
-        backgroundColor: '#E50914',
-        justifyContent: 'center',
-        alignItems: 'center',
+        borderColor: focused ? "white" : "transparent",
+        backgroundColor: "#E50914",
+        justifyContent: "center",
+        alignItems: "center",
       }}
     >
       <ExpoImage
-        source={{ uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(userName ?? 'U')}&background=E50914&color=fff&size=48` }}
+        source={{
+          uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(userName ?? "U")}&background=E50914&color=fff&size=48`,
+        }}
         style={{ width: 20, height: 20, borderRadius: 2 }}
         cachePolicy="memory-disk"
       />
@@ -44,25 +51,29 @@ function ProfileImage({ focused }: { focused: boolean }) {
 
 export const TAB_SCREENS = [
   {
-    name: 'index',
-    title: 'Accueil',
+    name: "index",
+    title: "Accueil",
     icon: ({ color, focused }: { color: string; focused: boolean }) => (
       <Home color={color} isActive={focused} />
     ),
   },
   {
-    name: 'direct-tv',
-    title: 'Direct TV',
+    name: "direct-tv",
+    title: "Direct TV",
     icon: ({ color }: { color: string }) => (
       <Ionicons name="tv-outline" size={24} color={color} />
     ),
   },
   {
-    name: 'new',
-    title: 'New & Hot',
+    name: "new",
+    title: "New & Hot",
     icon: ({ color, focused }: { color: string; focused: boolean }) => (
       <ExpoImage
-        source={focused ? require('../../assets/images/replace-these/new-netflix.png') : require('../../assets/images/replace-these/new-netflix-outline.png')}
+        source={
+          focused
+            ? require("../../assets/images/replace-these/new-netflix.png")
+            : require("../../assets/images/replace-these/new-netflix-outline.png")
+        }
         style={{ width: 24, height: 24 }}
         cachePolicy="memory-disk"
         contentFit="contain"
@@ -70,15 +81,15 @@ export const TAB_SCREENS = [
     ),
   },
   {
-    name: 'search',
-    title: 'Rechercher',
+    name: "search",
+    title: "Rechercher",
     icon: ({ color }: { color: string }) => (
       <Ionicons name="search-outline" size={24} color={color} />
     ),
   },
   {
-    name: '(profile)/profile',
-    title: 'Mon JellyStream',
+    name: "(profile)/profile",
+    title: "Mon JellyStream",
     icon: ({ focused }: { focused: boolean }) => (
       <ProfileImage focused={focused} />
     ),
@@ -87,12 +98,12 @@ export const TAB_SCREENS = [
 
 const styles = StyleSheet.create({
   blurView: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     height: 70,
-  }
+  },
 });
 
 export default function TabLayout() {
@@ -104,24 +115,20 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#FFFFFF',
-        tabBarInactiveTintColor: '#ffffff3f',
+        tabBarActiveTintColor: "#FFFFFF",
+        tabBarInactiveTintColor: "#B3B3B3",
         headerShown: false,
         tabBarStyle: {
-          position: 'absolute',
+          position: "absolute",
           borderTopWidth: 0,
           elevation: 0,
           height: 70,
           paddingTop: 8,
           paddingBottom: 10,
-          backgroundColor: 'transparent',
+          backgroundColor: "transparent",
         },
         tabBarBackground: () => (
-          <BlurView
-            tint="dark"
-            intensity={99}
-            style={styles.blurView}
-          />
+          <BlurView tint="dark" intensity={99} style={styles.blurView} />
         ),
         tabBarLabelStyle: {
           fontSize: 10,
@@ -136,7 +143,8 @@ export default function TabLayout() {
             }}
           />
         ),
-      }}>
+      }}
+    >
       {TAB_SCREENS.map((screen) => (
         <Tabs.Screen
           key={screen.name}
@@ -154,7 +162,6 @@ export default function TabLayout() {
           headerShown: false,
         }}
       />
-
     </Tabs>
   );
 }
