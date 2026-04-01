@@ -578,7 +578,8 @@ export function useEpisodes(seriesId: string, seasonId: string) {
 }
 
 // Collection (BoxSet) contenant un item donné
-// Stratégie : tenter getAncestors d'abord (1 appel), puis fallback itération BoxSets
+// Stratégie 0 : l'item EST un BoxSet → récupérer ses enfants directement.
+// Stratégie 1 : getAncestors (rapide). Fallback : itération BoxSets en parallèle.
 export function useCollectionForItem(itemId: string) {
   const { api, userId } = useJellyfinApi();
 
@@ -588,7 +589,29 @@ export function useCollectionForItem(itemId: string) {
       const itemsApi = getItemsApi(api!);
       const libApi = getLibraryApi(api!);
 
-      // Stratégie 1 : vérifier les ancêtres de l'item pour trouver un BoxSet parent
+      // Stratégie 0 : l'item EST un BoxSet → retourner ses enfants
+      try {
+        const selfResult = await itemsApi.getItems({
+          userId,
+          ids: [itemId],
+          fields: [ItemFields.Overview, ItemFields.People],
+        });
+        const selfItem = selfResult.data.Items?.[0];
+        if (selfItem?.Type === BaseItemKind.BoxSet) {
+          const children = await itemsApi.getItems({
+            userId,
+            parentId: itemId,
+            sortBy: [ItemSortBy.ProductionYear, ItemSortBy.SortName],
+            sortOrder: [SortOrder.Ascending],
+            fields: [ItemFields.Overview, ItemFields.People],
+          });
+          return { boxSet: selfItem, items: children.data.Items ?? [] };
+        }
+      } catch (_e) {
+        // Continuer avec les stratégies classiques
+      }
+
+      // Stratégie 1 : ancêtres directs
       try {
         const ancestors = await libApi.getAncestors({ itemId, userId });
         const boxSetAncestor = (ancestors.data ?? []).find(
@@ -603,15 +626,13 @@ export function useCollectionForItem(itemId: string) {
             fields: [ItemFields.Overview, ItemFields.People],
           });
           const items = children.data.Items ?? [];
-          if (items.length > 0) {
-            return { boxSet: boxSetAncestor, items };
-          }
+          if (items.length > 0) return { boxSet: boxSetAncestor, items };
         }
       } catch (_e) {
-        // Fallback vers itération
+        // Fallback
       }
 
-      // Stratégie 2 : itérer tous les BoxSets et chercher celui qui contient notre item
+      // Stratégie 2 : chercher parmi tous les BoxSets en parallèle
       const boxSetsResult = await itemsApi.getItems({
         userId,
         includeItemTypes: [BaseItemKind.BoxSet],
@@ -620,25 +641,28 @@ export function useCollectionForItem(itemId: string) {
       const boxSets = boxSetsResult.data.Items ?? [];
       if (boxSets.length === 0) return null;
 
-      // Pour chaque BoxSet, récupérer ses enfants
-      for (const bs of boxSets) {
-        try {
-          const children = await itemsApi.getItems({
-            userId,
-            parentId: bs.Id!,
-            fields: [ItemFields.Overview, ItemFields.People],
-          });
-          const items = children.data.Items ?? [];
-          const found = items.some((i) => i.Id === itemId);
-          if (found) {
-            return { boxSet: bs, items };
+      const results = await Promise.all(
+        boxSets.map(async (bs) => {
+          try {
+            const children = await itemsApi.getItems({
+              userId,
+              parentId: bs.Id!,
+              sortBy: [ItemSortBy.ProductionYear, ItemSortBy.SortName],
+              sortOrder: [SortOrder.Ascending],
+              fields: [ItemFields.Overview, ItemFields.People],
+            });
+            const items = children.data.Items ?? [];
+            if (items.some((i) => i.Id === itemId)) {
+              return { boxSet: bs, items };
+            }
+          } catch (_e) {
+            // Ignorer
           }
-        } catch (_e) {
-          // Ignorer les erreurs individuelles
-        }
-      }
+          return null;
+        }),
+      );
 
-      return null;
+      return results.find((r) => r !== null) ?? null;
     },
     enabled: !!api && !!userId && !!itemId,
     staleTime: 10 * 60 * 1000,

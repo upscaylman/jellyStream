@@ -96,6 +96,7 @@ export function ExpandedPlayer({
 
   const isSeries = movie.type === "Series" || movie.type === "Episode";
   const isMovie = movie.type === "Movie" || (!isSeries && !movie.type);
+  const isBoxSet = movie.type === "BoxSet";
   const itemId = typeof movie.id === "string" ? movie.id : movie.id.toString();
 
   // Favoris / Ma liste
@@ -109,9 +110,12 @@ export function ExpandedPlayer({
   // Pour un épisode, on remonte à la série parente via seriesId
   const seriesId = movie.seriesId ?? (movie.type === "Series" ? itemId : "");
 
-  // Collection (BoxSet) pour les films
-  const { data: collectionData } = useCollectionForItem(isMovie ? itemId : "");
-  const hasCollection = !!collectionData && collectionData.items.length > 1;
+  // Collection (BoxSet) pour les films et les BoxSets
+  const { data: collectionData } = useCollectionForItem(
+    isMovie || isBoxSet ? itemId : "",
+  );
+  const hasCollection =
+    !!collectionData && collectionData.items.length > (isBoxSet ? 0 : 1);
   const hasSimilar = !!similarItems && similarItems.length > 0;
 
   // Saisons & épisodes pour les séries
@@ -120,7 +124,7 @@ export function ExpandedPlayer({
   const [showSeasonPicker, setShowSeasonPicker] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "episodes" | "trailers" | "similar" | "collection"
-  >(isSeries ? "episodes" : "similar");
+  >(isSeries ? "episodes" : isBoxSet ? "collection" : "similar");
 
   // Bandes-annonces YouTube (max 6)
   const trailers = useMemo(() => {
@@ -415,14 +419,27 @@ export function ExpandedPlayer({
               style={styles.playButton}
               onPress={() => {
                 player.pause();
+                // Pour une BoxSet, lancer le premier film de la collection
                 // Pour une série, lancer le premier épisode disponible
-                const playId =
+                const firstCollectionItem =
+                  isBoxSet &&
+                  collectionData?.items &&
+                  collectionData.items.length > 0
+                    ? collectionData.items[0]
+                    : null;
+                const firstEpisode =
                   isSeries && episodes && episodes.length > 0
-                    ? episodes[0].Id
+                    ? episodes[0]
+                    : null;
+                const playId = firstCollectionItem
+                  ? firstCollectionItem.Id
+                  : firstEpisode
+                    ? firstEpisode.Id
                     : itemId;
-                const playTitle =
-                  isSeries && episodes && episodes.length > 0
-                    ? (episodes[0].Name ?? movieData.title)
+                const playTitle = firstCollectionItem
+                  ? (firstCollectionItem.Name ?? movieData.title)
+                  : firstEpisode
+                    ? (firstEpisode.Name ?? movieData.title)
                     : movieData.title;
                 if (playId) {
                   router.push({
