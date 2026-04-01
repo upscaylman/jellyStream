@@ -37,6 +37,8 @@ interface AnimatedHeaderProps {
   selectedGenre?: string | null;
   /** Callback quand un genre est sélectionné */
   onGenreSelect?: (genre: string | null) => void;
+  /** Nombre d'items à afficher (style Direct TV) */
+  itemCount?: number;
 }
 
 export function AnimatedHeader({
@@ -50,6 +52,7 @@ export function AnimatedHeader({
   genres,
   selectedGenre,
   onGenreSelect,
+  itemCount,
 }: AnimatedHeaderProps) {
   const [showCategories, setShowCategories] = useState(false);
   const [showCast, setShowCast] = useState(false);
@@ -239,7 +242,12 @@ export function AnimatedHeader({
           <Animated.View style={[styles.categoryTabs, tabsAnimatedStyle]}>
             {subPage ? (
               <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                  flex: 1,
+                }}
               >
                 {selectedGenre && (
                   <Pressable
@@ -263,6 +271,13 @@ export function AnimatedHeader({
                   </Text>
                   <Ionicons name="chevron-down" size={16} color="#fff" />
                 </Pressable>
+                {itemCount != null && (
+                  <View style={{ marginLeft: "auto" }}>
+                    <Text style={{ color: "#808080", fontSize: 13 }}>
+                      {itemCount}
+                    </Text>
+                  </View>
+                )}
               </View>
             ) : (
               <>

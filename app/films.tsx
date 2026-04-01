@@ -150,13 +150,14 @@ export default function FilmsScreen() {
       <StatusBar style="light" />
       <AnimatedHeader
         headerAnimatedProps={headerAnimatedProps}
-        title={`Films (${filteredMovies?.length ?? 0})`}
+        title="Films"
         scrollDirection={scrollDirection}
         scrollY={scrollY}
         subPage
         genres={genres}
         selectedGenre={selectedGenre}
         onGenreSelect={setSelectedGenre}
+        itemCount={filteredMovies?.length ?? 0}
       />
 
       {isLoading ? (

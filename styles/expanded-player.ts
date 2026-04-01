@@ -240,7 +240,6 @@ export const expandedPlayerStyles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6,
-    justifyContent: "space-between",
   },
   moviePoster: {
     width: "32%",

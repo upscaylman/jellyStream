@@ -149,13 +149,14 @@ export default function SeriesListScreen() {
       <StatusBar style="light" />
       <AnimatedHeader
         headerAnimatedProps={headerAnimatedProps}
-        title={`Séries (${filteredSeries?.length ?? 0})`}
+        title="Séries"
         scrollDirection={scrollDirection}
         scrollY={scrollY}
         subPage
         genres={genres}
         selectedGenre={selectedGenre}
         onGenreSelect={setSelectedGenre}
+        itemCount={filteredSeries?.length ?? 0}
       />
 
       {isLoading ? (

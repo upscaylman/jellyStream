@@ -573,7 +573,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     paddingHorizontal: 16,
     gap: 6,
-    justifyContent: "space-between",
   },
   posterCard: {
     width: POSTER_WIDTH,

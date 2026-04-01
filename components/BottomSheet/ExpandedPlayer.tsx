@@ -259,20 +259,15 @@ export function ExpandedPlayer({
 
   return (
     <View style={[styles.rootContainer, { paddingTop: insets.top }]}>
-      {showControls && (
-        <View style={styles.backHeader}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </Pressable>
-          <View style={{ flex: 1 }} />
-          <Pressable
-            style={styles.backButton}
-            onPress={() => setShowCast(true)}
-          >
-            <CastIcon size={24} color="#fff" />
-          </Pressable>
-        </View>
-      )}
+      <View style={styles.backHeader}>
+        <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="white" />
+        </Pressable>
+        <View style={{ flex: 1 }} />
+        <Pressable style={styles.backButton} onPress={() => setShowCast(true)}>
+          <CastIcon size={24} color="#fff" />
+        </Pressable>
+      </View>
 
       <ScrollComponentToUse
         style={styles.scrollView}
