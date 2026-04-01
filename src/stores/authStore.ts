@@ -58,6 +58,7 @@ const KEYS = {
   SERVER_NAME: "jellyfin_server_name",
   SAVED_PROFILES: "jellyfin_saved_profiles",
   REMEMBER_ME: "jellyfin_remember_me",
+  AVATAR_VERSION: "jellyfin_avatar_version",
 } as const;
 
 interface SavedProfile {
@@ -278,6 +279,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         storage.set(KEYS.SAVED_PROFILES, JSON.stringify(savedProfiles));
       }
 
+      // Restaurer avatarVersion persisté
+      let avatarVersion = 0;
+      try {
+        const raw = storage.getString(KEYS.AVATAR_VERSION);
+        if (raw) avatarVersion = parseInt(raw, 10) || 0;
+      } catch {
+        /* noop */
+      }
+
       set({
         serverUrl: cleanUrl,
         serverName: serverName ?? null,
@@ -287,6 +297,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         api,
         isAuthenticated: true,
         savedProfiles,
+        avatarVersion,
       });
       return true;
     }
@@ -363,6 +374,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   bumpAvatarVersion: () => {
-    set({ avatarVersion: get().avatarVersion + 1 });
+    const next = get().avatarVersion + 1;
+    storage.set(KEYS.AVATAR_VERSION, String(next));
+    set({ avatarVersion: next });
   },
 }));

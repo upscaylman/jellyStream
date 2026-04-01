@@ -24,7 +24,7 @@ import {
 import { expandedPlayerStyles as styles } from "@/styles/expanded-player";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -132,9 +132,6 @@ export function ExpandedPlayer({
   const { data: seasons } = useSeasons(isSeries ? seriesId : "");
   const [selectedSeasonId, setSelectedSeasonId] = useState<string | null>(null);
   const [showSeasonPicker, setShowSeasonPicker] = useState(false);
-  const [activeTab, setActiveTab] = useState<
-    "episodes" | "trailers" | "similar" | "collection"
-  >(isSeries ? "episodes" : isBoxSet ? "collection" : "collection");
 
   // Bandes-annonces YouTube (max 6)
   const trailers = useMemo(() => {
@@ -150,29 +147,43 @@ export function ExpandedPlayer({
   }, [movie.trailerUrls, movie.trailerUrl]);
   const hasTrailers = trailers.length > 0;
 
-  // Basculer l'onglet actif si celui sélectionné n'est plus disponible
+  // Tab par défaut : collection si dispo, sinon episodes si série, sinon similar
+  const defaultTab = isSeries
+    ? "episodes"
+    : showCollectionTab || isMovie || isBoxSet
+      ? "collection"
+      : "similar";
+  const [activeTab, setActiveTab] = useState<
+    "episodes" | "trailers" | "similar" | "collection"
+  >(defaultTab);
+
+  // Quand les données chargent, corriger le tab initial
   useEffect(() => {
+    // Collection chargée et dispo → forcer collection
+    if (showCollectionTab && !isSeries && activeTab !== "collection") {
+      setActiveTab("collection");
+    }
+    // Collection non dispo (plus en loading) → fallback
     if (
       activeTab === "collection" &&
       !showCollectionTab &&
       !isLoadingCollection
     ) {
-      if (hasSimilar) setActiveTab("similar");
-      else if (isSeries) setActiveTab("episodes");
+      if (isSeries) setActiveTab("episodes");
+      else if (hasSimilar) setActiveTab("similar");
       else if (hasTrailers) setActiveTab("trailers");
     }
     if (activeTab === "similar" && !hasSimilar && !isLoadingSimilar) {
-      if (showCollectionTab) setActiveTab("collection");
-      else if (isSeries) setActiveTab("episodes");
+      if (isSeries) setActiveTab("episodes");
+      else if (showCollectionTab) setActiveTab("collection");
       else if (hasTrailers) setActiveTab("trailers");
     }
   }, [
-    hasSimilar,
-    isLoadingSimilar,
-    activeTab,
-    isSeries,
     showCollectionTab,
     isLoadingCollection,
+    hasSimilar,
+    isLoadingSimilar,
+    isSeries,
     hasTrailers,
   ]);
 
@@ -274,7 +285,7 @@ export function ExpandedPlayer({
             maxWidth: 720,
             videoBitRate: 2000000,
           })) || movieData.video_url
-    : "";
+    : null;
 
   const player = useVideoPlayer(previewUrl, (p) => {
     p.loop = true;
@@ -282,6 +293,34 @@ export function ExpandedPlayer({
     if (previewUrl) p.play();
     p.timeUpdateEventInterval = 0.5;
   });
+
+  // Stopper YouTube iframe + video player quand l'écran perd le focus OU se démonte
+  const [isScreenFocused, setIsScreenFocused] = useState(true);
+
+  const stopAllMedia = useCallback(() => {
+    try {
+      player.pause();
+    } catch (_) {}
+    if (ytIframeRef.current) {
+      try {
+        ytIframeRef.current.contentWindow?.postMessage(
+          JSON.stringify({ event: "command", func: "pauseVideo", args: [] }),
+          "*",
+        );
+        ytIframeRef.current.src = "";
+      } catch (_) {}
+    }
+  }, [player]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setIsScreenFocused(true);
+      return () => {
+        setIsScreenFocused(false);
+        stopAllMedia();
+      };
+    }, [stopAllMedia]),
+  );
 
   useEffect(() => {
     player.muted = isMuted;
@@ -347,7 +386,7 @@ export function ExpandedPlayer({
             ? { onMouseMove: resetControlsTimer }
             : {})}
         >
-          {youtubeEmbedUrl ? (
+          {youtubeEmbedUrl && isScreenFocused ? (
             <View
               pointerEvents="box-none"
               style={

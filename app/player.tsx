@@ -186,6 +186,25 @@ function WebPlayer({
     }, CONTROLS_HIDE_DELAY);
   }, []);
 
+  // Auto-hide les contrôles quand la lecture démarre
+  useEffect(() => {
+    if (isPlaying && !isSeeking) {
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+      hideTimer.current = setTimeout(() => {
+        setShowControls(false);
+      }, CONTROLS_HIDE_DELAY);
+    }
+  }, [isPlaying]);
+
+  // Throttle du mousemove pour ne pas reset le timer en permanence
+  const lastMouseMove = useRef(0);
+  const handleMouseMove = useCallback(() => {
+    const now = Date.now();
+    if (now - lastMouseMove.current < 500) return;
+    lastMouseMove.current = now;
+    resetHideTimer();
+  }, [resetHideTimer]);
+
   // Monter le <video> HTML — avec HLS.js pour les streams .m3u8
   useEffect(() => {
     if (!containerRef.current) return;
@@ -546,8 +565,9 @@ function WebPlayer({
             resetHideTimer();
           }
         }}
-        onTouchStart={resetHideTimer}
-        {...(Platform.OS === "web" ? { onMouseMove: resetHideTimer } : {})}
+        {...(Platform.OS === "web"
+          ? { onMouseMove: handleMouseMove }
+          : { onTouchStart: resetHideTimer })}
       >
         <div
           ref={containerRef as any}
@@ -567,8 +587,9 @@ function WebPlayer({
             s.controlsOverlay,
             { paddingTop: 16, paddingBottom: 16, pointerEvents: "box-none" },
           ]}
-          onTouchStart={resetHideTimer}
-          {...(Platform.OS === "web" ? { onMouseMove: resetHideTimer } : {})}
+          {...(Platform.OS === "web"
+            ? { onMouseMove: handleMouseMove }
+            : { onTouchStart: resetHideTimer })}
         >
           {isLocked ? (
             <View style={s.lockedContainer}>

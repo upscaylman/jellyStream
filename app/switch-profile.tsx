@@ -584,13 +584,62 @@ export default function SwitchProfileScreen() {
               <View style={styles.menuItem}>
                 <Ionicons name="speedometer-outline" size={24} color="#fff" />
                 <View style={styles.menuTextContainer}>
-                  <ThemedText style={styles.menuText}>Transcodage</ThemedText>
+                  <ThemedText style={styles.menuText}>
+                    Transcodage vidéo
+                  </ThemedText>
                   <ThemedText style={styles.menuSubtext}>
-                    {systemInfo.TranscodingTempPath
+                    {userData?.Policy?.EnableVideoPlaybackTranscoding
                       ? "Activé"
-                      : "Non configuré"}
+                      : "Désactivé (Direct Play)"}
                   </ThemedText>
                 </View>
+                {userData?.Policy?.IsAdministrator ? (
+                  <Switch
+                    value={
+                      userData?.Policy?.EnableVideoPlaybackTranscoding ?? true
+                    }
+                    onValueChange={async (val) => {
+                      if (!api || !userId || !userData?.Policy) return;
+                      setSaving(true);
+                      try {
+                        await getUserApi(api).updateUserPolicy({
+                          userId,
+                          userPolicy: {
+                            ...userData.Policy,
+                            EnableVideoPlaybackTranscoding: val,
+                            EnableAudioPlaybackTranscoding: val,
+                          },
+                        });
+                        queryClient.invalidateQueries({
+                          queryKey: ["server", "currentUser"],
+                        });
+                      } catch {
+                        if (Platform.OS === "web")
+                          alert("Erreur lors de la sauvegarde");
+                        else
+                          Alert.alert(
+                            "Erreur",
+                            "Impossible de modifier le transcodage",
+                          );
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                    trackColor={{ false: "#555", true: "#fff" }}
+                    thumbColor={
+                      (userData?.Policy?.EnableVideoPlaybackTranscoding ?? true)
+                        ? "#E50914"
+                        : "#fff"
+                    }
+                    {...(Platform.OS === "web"
+                      ? ({ activeThumbColor: "#E50914" } as Record<
+                          string,
+                          string
+                        >)
+                      : {})}
+                    disabled={!userData?.Policy || saving}
+                  />
+                ) : null}
               </View>
 
               {systemInfo.HasPendingRestart && (
