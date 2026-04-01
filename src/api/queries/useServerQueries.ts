@@ -1,5 +1,6 @@
 // Queries TanStack pour les données serveur Jellyfin (utilisateurs, sessions, infos système)
 import { useAuthStore } from "@/src/stores/authStore";
+import { getActivityLogApi } from "@jellyfin/sdk/lib/utils/api/activity-log-api";
 import { getSessionApi } from "@jellyfin/sdk/lib/utils/api/session-api";
 import { getSystemApi } from "@jellyfin/sdk/lib/utils/api/system-api";
 import { getUserApi } from "@jellyfin/sdk/lib/utils/api/user-api";
@@ -95,5 +96,21 @@ export function useCurrentUser() {
     },
     enabled: !!api,
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+// Journal d'activité serveur (connexions, lectures, mises à jour, etc.)
+export function useActivityLog(limit = 30) {
+  const { api } = useJellyfinApi();
+
+  return useQuery({
+    queryKey: ["server", "activityLog", limit],
+    queryFn: async () => {
+      const activityApi = getActivityLogApi(api!);
+      const result = await activityApi.getLogEntries({ limit });
+      return result.data.Items ?? [];
+    },
+    enabled: !!api,
+    staleTime: 60 * 1000,
   });
 }

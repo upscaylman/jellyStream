@@ -120,6 +120,7 @@ export function ExpandedPlayer({
   // Collection (BoxSet) pour les films et les BoxSets
   const { data: collectionData } = useCollectionForItem(
     isMovie || isBoxSet ? itemId : "",
+    movie.type,
   );
   const hasCollection =
     !!collectionData && collectionData.items.length > (isBoxSet ? 0 : 1);
@@ -246,7 +247,7 @@ export function ExpandedPlayer({
     [movie.trailerUrl],
   );
   const youtubeEmbedUrl = youtubeId
-    ? `https://www.youtube.com/embed/${youtubeId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${youtubeId}&modestbranding=1&rel=0&showinfo=0&enablejsapi=1&origin=${Platform.OS === "web" ? window.location.origin : ""}`
+    ? `https://www.youtube.com/embed/${youtubeId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${youtubeId}&modestbranding=1&rel=0&showinfo=0&enablejsapi=1&playsinline=1&iv_load_policy=3&origin=${Platform.OS === "web" ? window.location.origin : ""}`
     : null;
 
   const ytIframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -336,8 +337,14 @@ export function ExpandedPlayer({
         >
           {youtubeEmbedUrl ? (
             <View
+              pointerEvents="box-none"
               style={
-                { width: "100%", height: "100%", position: "relative" } as any
+                {
+                  width: "100%",
+                  height: "100%",
+                  position: "relative",
+                  overflow: "hidden",
+                } as any
               }
             >
               <iframe
@@ -345,26 +352,32 @@ export function ExpandedPlayer({
                   ytIframeRef.current = el;
                 }}
                 src={youtubeEmbedUrl}
-                style={{ width: "100%", height: "100%", border: "none" } as any}
+                style={
+                  {
+                    width: "300%",
+                    height: "300%",
+                    border: "none",
+                    position: "absolute",
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%)",
+                  } as any
+                }
                 allow="autoplay; encrypted-media"
                 allowFullScreen
               />
-              {showControls && (
-                <View
-                  style={
-                    {
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: 60,
-                      background:
-                        "linear-gradient(to bottom, rgba(0,0,0,0.9), transparent)",
-                      pointerEvents: "none",
-                    } as any
-                  }
-                />
-              )}
+              <View
+                style={
+                  {
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    zIndex: 2,
+                  } as any
+                }
+              />
             </View>
           ) : hasTrailers ? (
             <>
@@ -385,36 +398,34 @@ export function ExpandedPlayer({
               transition={300}
             />
           )}
-          {showControls && <View style={styles.videoOverlay} />}
-          {showControls &&
-            (youtubeEmbedUrl || (!youtubeEmbedUrl && hasTrailers)) && (
-              <View style={styles.muteOverlay}>
-                <Pressable
-                  style={styles.soundButton}
-                  onPress={() => {
-                    const next = !isMuted;
-                    setIsMuted(next);
-                    if (youtubeEmbedUrl && ytIframeRef.current?.contentWindow) {
-                      const cmd = next ? "mute" : "unMute";
-                      ytIframeRef.current.contentWindow.postMessage(
-                        JSON.stringify({
-                          event: "command",
-                          func: cmd,
-                          args: [],
-                        }),
-                        "*",
-                      );
-                    }
-                  }}
-                >
-                  <Ionicons
-                    name={isMuted ? "volume-mute" : "volume-medium"}
-                    size={18}
-                    color="white"
-                  />
-                </Pressable>
-              </View>
-            )}
+          {(youtubeEmbedUrl || (!youtubeEmbedUrl && hasTrailers)) && (
+            <View style={[styles.muteOverlay, { zIndex: 10 }]}>
+              <Pressable
+                style={styles.soundButton}
+                onPress={() => {
+                  const next = !isMuted;
+                  setIsMuted(next);
+                  if (youtubeEmbedUrl && ytIframeRef.current?.contentWindow) {
+                    const cmd = next ? "mute" : "unMute";
+                    ytIframeRef.current.contentWindow.postMessage(
+                      JSON.stringify({
+                        event: "command",
+                        func: cmd,
+                        args: [],
+                      }),
+                      "*",
+                    );
+                  }
+                }}
+              >
+                <Ionicons
+                  name={isMuted ? "volume-mute" : "volume-medium"}
+                  size={18}
+                  color="white"
+                />
+              </Pressable>
+            </View>
+          )}
           {showControls && !youtubeEmbedUrl && hasTrailers && (
             <View style={styles.sliderContainer}>
               <Slider

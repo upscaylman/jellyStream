@@ -1,6 +1,7 @@
 // Hook qui agrège les données Jellyfin en rows pour la Home
 // Convertit les BaseItemDto[] en MovieRow[] compatibles avec les composants existants
 import {
+  useBoxSetIndex,
   useFavoriteItems,
   useLatestMovies,
   useLatestSeries,
@@ -131,6 +132,9 @@ export function useJellyfinHome(): JellyfinHomeData {
   const recentlyAdded = useRecentlyAdded(20);
   const newlyAdded = useNewlyAdded(20);
   const favorites = useFavoriteItems(20);
+
+  // Précharger l'index des collections (BoxSets) pour que les pages film soient instantanées
+  useBoxSetIndex();
 
   const isLoading =
     resume.isLoading ||

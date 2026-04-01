@@ -1,6 +1,7 @@
 // Queries TanStack pour les films et médias Jellyfin
 import { useAuthStore } from "@/src/stores/authStore";
 import {
+  BaseItemDto,
   BaseItemKind,
   ItemFields,
   ItemFilter,
@@ -691,39 +692,54 @@ export function useEpisodes(seriesId: string, seasonId: string) {
 
 // Collection (BoxSet) contenant un item donné
 // Stratégie 0 : l'item EST un BoxSet → récupérer ses enfants directement.
-// Stratégie 1 : getAncestors (rapide). Fallback : itération BoxSets en parallèle.
-export function useCollectionForItem(itemId: string) {
+// Stratégie : index préchargé → ancêtres → itération BoxSets séquentielle.
+export function useCollectionForItem(itemId: string, itemType?: string) {
   const { api, userId } = useJellyfinApi();
+  const queryClient = useQueryClient();
+
+  // Lecture synchrone de l'index pour placeholderData (rendu instantané)
+  const cachedIndex = queryClient.getQueryData<
+    Record<string, { boxSet: BaseItemDto; items: BaseItemDto[] }>
+  >(["boxset-index"]);
+  const placeholder = cachedIndex?.[itemId] ?? undefined;
 
   return useQuery({
     queryKey: ["collection-for-item", itemId],
     queryFn: async () => {
+      // Vérifier d'abord l'index préchargé
+      const idx = queryClient.getQueryData<
+        Record<string, { boxSet: BaseItemDto; items: BaseItemDto[] }>
+      >(["boxset-index"]);
+      if (idx?.[itemId]) {
+        return idx[itemId];
+      }
+
       const itemsApi = getItemsApi(api!);
       const libApi = getLibraryApi(api!);
 
-      // Stratégie 0 : l'item EST un BoxSet → retourner ses enfants
-      try {
-        const selfResult = await itemsApi.getItems({
-          userId,
-          ids: [itemId],
-          fields: [ItemFields.Overview, ItemFields.People],
-        });
-        const selfItem = selfResult.data.Items?.[0];
-        if (selfItem?.Type === BaseItemKind.BoxSet) {
-          const children = await itemsApi.getItems({
+      // Si l'item EST un BoxSet → retourner ses enfants directement
+      if (itemType === "BoxSet") {
+        const [selfResult, children] = await Promise.all([
+          itemsApi.getItems({
+            userId,
+            ids: [itemId],
+            fields: [ItemFields.Overview, ItemFields.People],
+          }),
+          itemsApi.getItems({
             userId,
             parentId: itemId,
             sortBy: [ItemSortBy.ProductionYear, ItemSortBy.SortName],
             sortOrder: [SortOrder.Ascending],
             fields: [ItemFields.Overview, ItemFields.People],
-          });
+          }),
+        ]);
+        const selfItem = selfResult.data.Items?.[0];
+        if (selfItem) {
           return { boxSet: selfItem, items: children.data.Items ?? [] };
         }
-      } catch (_e) {
-        // Continuer avec les stratégies classiques
       }
 
-      // Stratégie 1 : ancêtres directs
+      // Stratégie 1 : ancêtres directs (rapide, 1 seule requête)
       try {
         const ancestors = await libApi.getAncestors({ itemId, userId });
         const boxSetAncestor = (ancestors.data ?? []).find(
@@ -744,17 +760,15 @@ export function useCollectionForItem(itemId: string) {
         // Fallback
       }
 
-      // Stratégie 2 : chercher parmi tous les BoxSets en parallèle
-      const boxSetsResult = await itemsApi.getItems({
-        userId,
-        includeItemTypes: [BaseItemKind.BoxSet],
-        recursive: true,
-      });
-      const boxSets = boxSetsResult.data.Items ?? [];
-      if (boxSets.length === 0) return null;
-
-      const results = await Promise.all(
-        boxSets.map(async (bs) => {
+      // Stratégie 2 : itérer les BoxSets séquentiellement, s'arrêter au premier match
+      try {
+        const boxSetsResult = await itemsApi.getItems({
+          userId,
+          includeItemTypes: [BaseItemKind.BoxSet],
+          recursive: true,
+        });
+        const boxSets = boxSetsResult.data.Items ?? [];
+        for (const bs of boxSets) {
           try {
             const children = await itemsApi.getItems({
               userId,
@@ -770,14 +784,74 @@ export function useCollectionForItem(itemId: string) {
           } catch (_e) {
             // Ignorer
           }
-          return null;
-        }),
-      );
+        }
+      } catch (_e) {
+        // Ignorer
+      }
 
-      return results.find((r) => r !== null) ?? null;
+      return null;
     },
     enabled: !!api && !!userId && !!itemId,
-    staleTime: 10 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    placeholderData: placeholder,
+  });
+}
+
+/**
+ * Index global des BoxSets : précharge toutes les collections et leurs enfants.
+ * Appelé une seule fois au démarrage (home), le cache est partagé par toutes les pages film.
+ */
+export function useBoxSetIndex() {
+  const { api, userId } = useJellyfinApi();
+
+  return useQuery({
+    queryKey: ["boxset-index"],
+    queryFn: async () => {
+      const itemsApi = getItemsApi(api!);
+      const boxSetsResult = await itemsApi.getItems({
+        userId,
+        includeItemTypes: [BaseItemKind.BoxSet],
+        recursive: true,
+      });
+      const boxSets = boxSetsResult.data.Items ?? [];
+      // Index : itemId → { boxSet, items }
+      const index: Record<
+        string,
+        { boxSet: BaseItemDto; items: BaseItemDto[] }
+      > = {};
+
+      // Charger les enfants de chaque BoxSet en parallèle (une seule fois, pas à chaque film)
+      await Promise.all(
+        boxSets.map(async (bs) => {
+          try {
+            const children = await itemsApi.getItems({
+              userId,
+              parentId: bs.Id!,
+              sortBy: [ItemSortBy.ProductionYear, ItemSortBy.SortName],
+              sortOrder: [SortOrder.Ascending],
+              fields: [ItemFields.Overview, ItemFields.People],
+            });
+            const items = children.data.Items ?? [];
+            for (const item of items) {
+              if (item.Id) {
+                index[item.Id] = { boxSet: bs, items };
+              }
+            }
+            // Le BoxSet lui-même pointe vers ses enfants
+            if (bs.Id) {
+              index[bs.Id] = { boxSet: bs, items };
+            }
+          } catch (_e) {
+            // Ignorer
+          }
+        }),
+      );
+      return index;
+    },
+    enabled: !!api && !!userId,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
   });
 }
 

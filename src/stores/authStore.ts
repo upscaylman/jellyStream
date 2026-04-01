@@ -77,6 +77,7 @@ interface AuthState {
   api: Api | null;
   isAuthenticated: boolean;
   savedProfiles: SavedProfile[];
+  avatarVersion: number;
 
   // Actions
   setServer: (url: string, serverName?: string) => void;
@@ -93,6 +94,7 @@ interface AuthState {
   switchProfile: (profileId: string) => void;
   removeProfile: (profileId: string) => void;
   loadProfiles: () => void;
+  bumpAvatarVersion: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -104,6 +106,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   api: null,
   isAuthenticated: false,
   savedProfiles: [],
+  avatarVersion: 0,
 
   setServer: (url: string, serverName?: string) => {
     const cleanUrl = url.replace(/\/+$/, "");
@@ -357,5 +360,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch {
       /* noop */
     }
+  },
+
+  bumpAvatarVersion: () => {
+    set({ avatarVersion: get().avatarVersion + 1 });
   },
 }));

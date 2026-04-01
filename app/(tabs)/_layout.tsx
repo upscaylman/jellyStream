@@ -25,11 +25,12 @@ function ProfileImage({ focused }: { focused: boolean }) {
   const userName = useAuthStore((s) => s.userName);
   const userId = useAuthStore((s) => s.userId);
   const serverUrl = useAuthStore((s) => s.serverUrl);
+  const avatarVersion = useAuthStore((s) => s.avatarVersion);
 
   // URL de l'avatar Jellyfin, fallback sur ui-avatars si pas d'image
   const jellyfinAvatar =
     serverUrl && userId
-      ? `${serverUrl.replace(/\/+$/, "")}/Users/${userId}/Images/Primary?maxWidth=48&quality=90`
+      ? `${serverUrl.replace(/\/+$/, "")}/Users/${userId}/Images/Primary?maxWidth=48&quality=90${avatarVersion ? `&_r=${avatarVersion}` : ""}`
       : null;
   const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName ?? "U")}&background=E50914&color=fff&size=48`;
 

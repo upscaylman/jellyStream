@@ -6,6 +6,7 @@ import {
   useSystemInfo,
 } from "@/src/api/queries/useServerQueries";
 import { useAuthStore } from "@/src/stores/authStore";
+import { usePreferencesStore } from "@/src/stores/preferencesStore";
 import { Ionicons } from "@expo/vector-icons";
 import type { UserConfiguration } from "@jellyfin/sdk/lib/generated-client/models";
 import { SubtitlePlaybackMode } from "@jellyfin/sdk/lib/generated-client/models";
@@ -72,6 +73,9 @@ export default function SwitchProfileScreen() {
 
   const token = useAuthStore((s) => s.token);
 
+  const showServerName = usePreferencesStore((s) => s.showServerName);
+  const setShowServerName = usePreferencesStore((s) => s.setShowServerName);
+
   // Données serveur via TanStack Query
   const { data: userData } = useCurrentUser();
   const { data: publicSystemInfo } = usePublicSystemInfo();
@@ -92,7 +96,8 @@ export default function SwitchProfileScreen() {
   const [availableAvatars, setAvailableAvatars] = useState<AvatarItem[]>([]);
   const [loadingAvatars, setLoadingAvatars] = useState(false);
   const [settingAvatar, setSettingAvatar] = useState(false);
-  const [avatarRefreshKey, setAvatarRefreshKey] = useState(0);
+  const avatarVersion = useAuthStore((s) => s.avatarVersion);
+  const bumpAvatarVersion = useAuthStore((s) => s.bumpAvatarVersion);
 
   // Sauvegarder la config utilisateur sur le serveur
   const saveConfig = useCallback(
@@ -173,8 +178,8 @@ export default function SwitchProfileScreen() {
         });
         if (res.ok) {
           setAvatarPickerVisible(false);
-          // Forcer le refresh des images de profil
-          setAvatarRefreshKey((k) => k + 1);
+          // Forcer le refresh des images de profil partout
+          bumpAvatarVersion();
         } else {
           const msg =
             Platform.OS === "web"
@@ -207,7 +212,7 @@ export default function SwitchProfileScreen() {
     name: p.userName || "Utilisateur",
     avatar:
       getUserImageUrl(p.serverUrl, p.userId, p.userName, p.token) +
-      (avatarRefreshKey ? `&_r=${avatarRefreshKey}` : ""),
+      (avatarVersion ? `&_r=${avatarVersion}` : ""),
   }));
 
   // Profils serveur Jellyfin (tous les utilisateurs publics sauf le courant)
@@ -222,7 +227,7 @@ export default function SwitchProfileScreen() {
           u.Id ?? "",
           u.Name ?? "",
           token ?? undefined,
-        ) + (avatarRefreshKey ? `&_r=${avatarRefreshKey}` : ""),
+        ) + (avatarVersion ? `&_r=${avatarVersion}` : ""),
       hasSavedProfile: savedProfiles.some((p) => p.userId === u.Id),
       savedProfileId: savedProfiles.find((p) => p.userId === u.Id)?.id,
     }));
@@ -601,6 +606,29 @@ export default function SwitchProfileScreen() {
 
           {/* === AUTRES === */}
           <ThemedText style={styles.sectionTitle}>Autres</ThemedText>
+
+          <View style={styles.menuItem}>
+            <Ionicons name="server-outline" size={24} color="#fff" />
+            <View style={styles.menuTextContainer}>
+              <ThemedText style={styles.menuText}>
+                Nom du serveur sur l&apos;accueil
+              </ThemedText>
+              <ThemedText style={styles.menuSubtext}>
+                {showServerName
+                  ? "Affiche le nom du serveur"
+                  : 'Affiche "Accueil"'}
+              </ThemedText>
+            </View>
+            <Switch
+              value={showServerName}
+              onValueChange={(val) => setShowServerName(val)}
+              trackColor={{ false: "#555", true: "#fff" }}
+              thumbColor={showServerName ? "#E50914" : "#fff"}
+              {...(Platform.OS === "web"
+                ? { activeThumbColor: "#E50914" }
+                : {})}
+            />
+          </View>
 
           <TouchableOpacity
             style={styles.menuItem}

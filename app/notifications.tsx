@@ -4,12 +4,16 @@ import {
   useLatestMovies,
   useLatestSeries,
 } from "@/src/api/queries/useMediaQueries";
-import { useActiveSessions } from "@/src/api/queries/useServerQueries";
+import {
+  useActiveSessions,
+  useActivityLog,
+} from "@/src/api/queries/useServerQueries";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useNotificationStore } from "@/src/stores/notificationStore";
 import { getImageUrl } from "@/src/utils/imageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import {
+  ActivityLogEntry,
   BaseItemDto,
   SessionInfoDto,
 } from "@jellyfin/sdk/lib/generated-client/models";
@@ -53,9 +57,9 @@ export default function NotificationsScreen() {
   const serverUrl = useAuthStore((s) => s.serverUrl) ?? "";
   const openCast = useCastSheet();
   const markAsSeen = useNotificationStore((s) => s.markAsSeen);
-  const [activeTab, setActiveTab] = useState<"notifications" | "activity">(
-    "notifications",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "notifications" | "activity" | "server"
+  >("notifications");
 
   // Marquer les notifications comme lues à l'ouverture
   useEffect(() => {
@@ -65,6 +69,7 @@ export default function NotificationsScreen() {
   const { data: latestMovies, isLoading: loadingMovies } = useLatestMovies(15);
   const { data: latestSeries, isLoading: loadingSeries } = useLatestSeries(15);
   const { data: sessions, isLoading: loadingSessions } = useActiveSessions();
+  const { data: activityLog, isLoading: loadingLog } = useActivityLog(40);
 
   const notifications = useMemo<NotificationItem[]>(() => {
     const items: NotificationItem[] = [];
@@ -208,6 +213,69 @@ export default function NotificationsScreen() {
     );
   };
 
+  // Icône et couleur par type d'activité serveur
+  const getLogIcon = (
+    type?: string,
+  ): { icon: string; color: string; bg: string } => {
+    const t = (type ?? "").toLowerCase();
+    if (t.includes("authentication") || t.includes("login"))
+      return { icon: "key-outline", color: "#4CAF50", bg: "#1b3a1b" };
+    if (t.includes("failed") || t.includes("error"))
+      return { icon: "alert-circle-outline", color: "#F44336", bg: "#3a1b1b" };
+    if (t.includes("playback") || t.includes("video"))
+      return { icon: "play-circle-outline", color: "#2196F3", bg: "#1b2a3a" };
+    if (t.includes("user"))
+      return { icon: "person-outline", color: "#9C27B0", bg: "#2a1b3a" };
+    if (t.includes("library") || t.includes("scan"))
+      return { icon: "library-outline", color: "#FF9800", bg: "#3a2a1b" };
+    if (t.includes("plugin") || t.includes("package"))
+      return {
+        icon: "extension-puzzle-outline",
+        color: "#00BCD4",
+        bg: "#1b3a3a",
+      };
+    if (t.includes("update") || t.includes("install"))
+      return { icon: "download-outline", color: "#8BC34A", bg: "#2a3a1b" };
+    if (t.includes("task") || t.includes("scheduled"))
+      return { icon: "timer-outline", color: "#FFC107", bg: "#3a3a1b" };
+    if (t.includes("subtitle"))
+      return { icon: "text-outline", color: "#E91E63", bg: "#3a1b2a" };
+    if (t.includes("session"))
+      return { icon: "laptop-outline", color: "#607D8B", bg: "#1b2a2a" };
+    return { icon: "server-outline", color: "#9E9E9E", bg: "#2a2a2a" };
+  };
+
+  const renderLogEntry = ({ item }: { item: ActivityLogEntry }) => {
+    const { icon, color, bg } = getLogIcon(item.Type);
+    return (
+      <View style={styles.notificationRow}>
+        <View style={[styles.logIconContainer, { backgroundColor: bg }]}>
+          <Ionicons
+            name={icon as keyof typeof Ionicons.glyphMap}
+            size={22}
+            color={color}
+          />
+        </View>
+        <View style={styles.notificationContent}>
+          <Text style={[styles.notificationLabel, { color }]}>
+            {item.Type?.replace(/([A-Z])/g, " $1").trim() ?? "Événement"}
+          </Text>
+          <Text style={styles.notificationTitle} numberOfLines={2}>
+            {item.Name ?? "—"}
+          </Text>
+          {item.ShortOverview ? (
+            <Text style={styles.notificationSubtitle} numberOfLines={2}>
+              {item.ShortOverview}
+            </Text>
+          ) : null}
+          <Text style={styles.notificationTime}>
+            {formatTimeAgo(item.Date)}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -261,6 +329,19 @@ export default function NotificationsScreen() {
             </View>
           )}
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === "server" && styles.tabActive]}
+          onPress={() => setActiveTab("server")}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "server" && styles.tabTextActive,
+            ]}
+          >
+            Serveur
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {activeTab === "notifications" ? (
@@ -283,25 +364,47 @@ export default function NotificationsScreen() {
             ItemSeparatorComponent={() => <View style={styles.separator} />}
           />
         )
-      ) : loadingSessions ? (
+      ) : activeTab === "activity" ? (
+        loadingSessions ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color="#E50914" />
+          </View>
+        ) : activeSessions.length === 0 ? (
+          <View style={styles.center}>
+            <Ionicons name="people-outline" size={60} color="#444" />
+            <Text style={styles.emptyText}>Aucune session active</Text>
+            <Text style={styles.emptySubtext}>
+              Personne ne regarde en ce moment
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={activeSessions}
+            keyExtractor={(item: SessionInfoDto) => item.Id ?? ""}
+            renderItem={({ item }: { item: SessionInfoDto }) =>
+              renderSession(item)
+            }
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+          />
+        )
+      ) : loadingLog ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#E50914" />
         </View>
-      ) : activeSessions.length === 0 ? (
+      ) : !activityLog || activityLog.length === 0 ? (
         <View style={styles.center}>
-          <Ionicons name="people-outline" size={60} color="#444" />
-          <Text style={styles.emptyText}>Aucune session active</Text>
-          <Text style={styles.emptySubtext}>
-            Personne ne regarde en ce moment
-          </Text>
+          <Ionicons name="server-outline" size={60} color="#444" />
+          <Text style={styles.emptyText}>Aucun événement serveur</Text>
         </View>
       ) : (
         <FlatList
-          data={activeSessions}
-          keyExtractor={(item: SessionInfoDto) => item.Id ?? ""}
-          renderItem={({ item }: { item: SessionInfoDto }) =>
-            renderSession(item)
+          data={activityLog}
+          keyExtractor={(item: ActivityLogEntry) =>
+            String(item.Id ?? Math.random())
           }
+          renderItem={renderLogEntry}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -361,6 +464,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#1a1a1a",
   },
   placeholderImage: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  logIconContainer: {
+    width: 68,
+    height: 68,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
   },

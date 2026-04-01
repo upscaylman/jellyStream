@@ -7,6 +7,7 @@ import { useDominantColor } from "@/hooks/useDominantColor";
 import { useVisionOS } from "@/hooks/useVisionOS";
 import { useJellyfinHome } from "@/src/hooks/useJellyfinHome";
 import { useAuthStore } from "@/src/stores/authStore";
+import { usePreferencesStore } from "@/src/stores/preferencesStore";
 import { styles } from "@/styles";
 import { useScrollToTop } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -37,6 +38,7 @@ export default function HomeScreen() {
   const serverName = useAuthStore((s) => s.serverName);
   const serverUrl = useAuthStore((s) => s.serverUrl);
   const setServer = useAuthStore((s) => s.setServer);
+  const showServerName = usePreferencesStore((s) => s.showServerName);
 
   // Récupérer le nom du serveur s'il n'est pas encore connu
   useEffect(() => {
@@ -146,7 +148,7 @@ export default function HomeScreen() {
       <StatusBar style="light" />
       <AnimatedHeader
         headerAnimatedProps={headerAnimatedProps}
-        title={serverName ?? "Accueil"}
+        title={showServerName && serverName ? serverName : "Accueil"}
         scrollDirection={scrollDirection}
         scrollY={scrollY}
         activeFilter={activeFilter}

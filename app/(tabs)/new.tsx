@@ -1,11 +1,13 @@
+import { useCastSheet } from "@/hooks/useCastSheet";
+import { CastIcon } from "@/icons/CastIcon";
 import {
   useNewlyAdded,
   useTop10Movies,
   useTop10Series,
   useTrending,
 } from "@/src/api/queries/useMediaQueries";
-import { computeBadge } from "@/src/hooks/useJellyfinHome";
 import { useAuthStore } from "@/src/stores/authStore";
+import { useNotificationBadgeCount } from "@/src/stores/notificationStore";
 import { getBackdropUrl, getImageUrl, getLogoUrl } from "@/src/utils/imageUrl";
 import { newStyles } from "@/styles/new";
 import { Ionicons } from "@expo/vector-icons";
@@ -65,23 +67,49 @@ function YouTubePreview({
           cachePolicy="memory-disk"
         />
       )}
-      <iframe
-        ref={(el: HTMLIFrameElement | null) => {
-          iframeRef.current = el;
-        }}
-        src={`https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytId}&modestbranding=1&rel=0&showinfo=0&enablejsapi=1&origin=${origin}`}
+      <View
         style={
           {
             width: "100%",
             height: "100%",
-            border: "none",
+            overflow: "hidden",
             position: "relative",
             zIndex: 1,
           } as any
         }
-        allow="autoplay; encrypted-media"
-        allowFullScreen
-      />
+      >
+        <iframe
+          ref={(el: HTMLIFrameElement | null) => {
+            iframeRef.current = el;
+          }}
+          src={`https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytId}&modestbranding=1&rel=0&showinfo=0&enablejsapi=1&playsinline=1&iv_load_policy=3&origin=${origin}`}
+          style={
+            {
+              width: "300%",
+              height: "300%",
+              border: "none",
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+            } as any
+          }
+          allow="autoplay; encrypted-media"
+          allowFullScreen
+        />
+        <View
+          style={
+            {
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 2,
+            } as any
+          }
+        />
+      </View>
       <Pressable
         style={
           {
@@ -138,6 +166,8 @@ export default function NewScreen() {
   const scrollY = useSharedValue(0);
   const [activeTab, setActiveTab] = useState("newly-added");
   const serverUrl = useAuthStore((s) => s.serverUrl) ?? "";
+  const openCast = useCastSheet();
+  const badgeCount = useNotificationBadgeCount();
 
   const { data: newlyAdded, isLoading: isLoadingNew } = useNewlyAdded(30);
   const { data: trending, isLoading: isLoadingTrending } = useTrending(30);
@@ -245,19 +275,6 @@ export default function NewScreen() {
                   ]}
                 >
                   <Ionicons name="film-outline" size={32} color="#555" />
-                </View>
-              );
-            })()}
-            {(() => {
-              const badge = computeBadge(item);
-              if (!badge) return null;
-              return (
-                <View style={newBadgeStyles.container}>
-                  <View style={newBadgeStyles.badge}>
-                    <Text style={newBadgeStyles.text} numberOfLines={1}>
-                      {badge}
-                    </Text>
-                  </View>
                 </View>
               );
             })()}
@@ -372,19 +389,6 @@ export default function NewScreen() {
               <Ionicons name="film-outline" size={28} color="#555" />
             </View>
           )}
-          {(() => {
-            const badge = computeBadge(item);
-            if (!badge) return null;
-            return (
-              <View style={newBadgeStyles.container}>
-                <View style={newBadgeStyles.badge}>
-                  <Text style={newBadgeStyles.text} numberOfLines={1}>
-                    {badge}
-                  </Text>
-                </View>
-              </View>
-            );
-          })()}
         </View>
         <View style={newStyles.top10Info}>
           <Text style={newStyles.top10Title} numberOfLines={2}>
@@ -437,10 +441,29 @@ export default function NewScreen() {
       <SafeAreaView style={{ flex: 1 }}>
         <View style={[newStyles.header]}>
           <View style={newStyles.headerContent}>
-            <Text style={newStyles.headerTitle}>Nouveautés</Text>
+            <Text style={newStyles.headerTitle}>Tout nouveau</Text>
             <View style={newStyles.headerRight}>
-              <Pressable onPress={() => router.push("/search")}>
-                <Ionicons name="search" size={24} color="#fff" />
+              <Pressable onPress={openCast}>
+                <CastIcon size={28} color="#fff" />
+              </Pressable>
+              <Pressable onPress={() => router.push("/downloads")}>
+                <ExpoImage
+                  source={require("../../assets/images/replace-these/download-netflix-transparent.png")}
+                  style={{ width: 28, height: 28 }}
+                  cachePolicy="memory-disk"
+                  contentFit="contain"
+                />
+              </Pressable>
+              <Pressable
+                style={{ position: "relative" }}
+                onPress={() => router.push("/notifications")}
+              >
+                <Ionicons name="notifications-outline" size={28} color="#fff" />
+                {badgeCount > 0 && (
+                  <View style={localStyles.badge}>
+                    <Text style={localStyles.badgeText}>{badgeCount}</Text>
+                  </View>
+                )}
               </Pressable>
             </View>
           </View>
@@ -549,24 +572,22 @@ const itemStyles = StyleSheet.create({
   },
 });
 
-const newBadgeStyles = StyleSheet.create({
-  container: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-  },
+const localStyles = StyleSheet.create({
   badge: {
+    position: "absolute",
+    top: -2,
+    right: -4,
     backgroundColor: "#E50914",
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
   },
-  text: {
+  badgeText: {
     color: "#fff",
-    fontSize: 9,
-    fontWeight: "bold",
+    fontSize: 10,
+    fontWeight: "700",
   },
 });

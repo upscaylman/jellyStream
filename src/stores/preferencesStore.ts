@@ -51,6 +51,7 @@ const KEYS = {
   AUTO_NEXT_EPISODE: "pref_auto_next_episode",
   DEFAULT_AUDIO_LANG: "pref_default_audio_lang",
   DEFAULT_SUB_LANG: "pref_default_sub_lang",
+  SHOW_SERVER_NAME: "pref_show_server_name",
 } as const;
 
 export const QUALITY_OPTIONS = [
@@ -72,6 +73,7 @@ interface PreferencesState {
   autoNextEpisode: boolean;
   defaultAudioLang: string;
   defaultSubLang: string;
+  showServerName: boolean;
 
   // Actions
   setDefaultQuality: (label: string, bitrate: number) => void;
@@ -79,6 +81,7 @@ interface PreferencesState {
   setAutoNextEpisode: (value: boolean) => void;
   setDefaultAudioLang: (lang: string) => void;
   setDefaultSubLang: (lang: string) => void;
+  setShowServerName: (value: boolean) => void;
   restore: () => void;
 }
 
@@ -89,6 +92,7 @@ export const usePreferencesStore = create<PreferencesState>((set) => ({
   autoNextEpisode: true,
   defaultAudioLang: "",
   defaultSubLang: "",
+  showServerName: true,
 
   setDefaultQuality: (label, bitrate) => {
     storage.set(KEYS.DEFAULT_QUALITY, label);
@@ -116,6 +120,11 @@ export const usePreferencesStore = create<PreferencesState>((set) => ({
     set({ defaultSubLang: lang });
   },
 
+  setShowServerName: (value) => {
+    storage.set(KEYS.SHOW_SERVER_NAME, value ? "1" : "0");
+    set({ showServerName: value });
+  },
+
   restore: () => {
     const qualityLabel = storage.getString(KEYS.DEFAULT_QUALITY) ?? "Auto";
     const bitrate = parseInt(storage.getString(KEYS.MAX_BITRATE) ?? "0", 10);
@@ -123,6 +132,7 @@ export const usePreferencesStore = create<PreferencesState>((set) => ({
     const autoNext = storage.getString(KEYS.AUTO_NEXT_EPISODE) !== "0";
     const audioLang = storage.getString(KEYS.DEFAULT_AUDIO_LANG) ?? "";
     const subLang = storage.getString(KEYS.DEFAULT_SUB_LANG) ?? "";
+    const showServerName = storage.getString(KEYS.SHOW_SERVER_NAME) !== "0";
 
     set({
       defaultQualityLabel: qualityLabel,
@@ -131,6 +141,7 @@ export const usePreferencesStore = create<PreferencesState>((set) => ({
       autoNextEpisode: autoNext,
       defaultAudioLang: audioLang,
       defaultSubLang: subLang,
+      showServerName,
     });
   },
 }));
