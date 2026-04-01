@@ -52,7 +52,9 @@ function AnimatedStack() {
 
   // Rediriger selon l'état d'auth
   // - Pas auth → écran login
-  // - Auth (login ou session restaurée) → sélection profil
+  // - Login (false→true) → sélection profil
+  // - Session restaurée + première ouverture → sélection profil
+  // - Simple refresh (sessionStorage a le flag) → ne rien faire
   const prevAuth = useRef<boolean | null>(null);
   useEffect(() => {
     if (isRestoring) return;
@@ -60,11 +62,26 @@ function AnimatedStack() {
     prevAuth.current = isAuthenticated;
 
     if (!isAuthenticated) {
-      // Différer pour laisser le navigator s'initialiser (évite GO_BACK warning sur web)
+      try {
+        sessionStorage.removeItem("profileSelected");
+      } catch {
+        /* native */
+      }
       requestAnimationFrame(() => router.replace("/(auth)/server-select"));
-    } else if (wasAuthenticated === null || wasAuthenticated === false) {
-      // Session restaurée (null→true) ou login (false→true) → sélection profil
+    } else if (wasAuthenticated === false) {
+      // Login : était déconnecté, maintenant connecté → sélection profil
       requestAnimationFrame(() => router.replace("/(auth)/profile-select"));
+    } else if (wasAuthenticated === null) {
+      // Session restaurée au démarrage — vérifier si c'est un refresh ou un cold start
+      let alreadySelected = false;
+      try {
+        alreadySelected = sessionStorage.getItem("profileSelected") === "1";
+      } catch {
+        /* native : pas de sessionStorage → toujours montrer profile-select */
+      }
+      if (!alreadySelected) {
+        requestAnimationFrame(() => router.replace("/(auth)/profile-select"));
+      }
     }
   }, [isRestoring, isAuthenticated]);
 

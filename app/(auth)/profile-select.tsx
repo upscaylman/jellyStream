@@ -169,6 +169,13 @@ export default function ProfileSelectScreen() {
       if (!user.Id) return;
       setLoadingProfile(user.Id);
 
+      // Marquer le profil comme sélectionné (évite redirect au refresh)
+      try {
+        sessionStorage.setItem("profileSelected", "1");
+      } catch {
+        /* native */
+      }
+
       // Chercher dans les savedProfiles
       const saved = savedProfiles.find((p) => p.userId === user.Id);
       if (saved) {
