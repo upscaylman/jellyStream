@@ -4,6 +4,7 @@ import {
   useTop10Series,
   useTrending,
 } from "@/src/api/queries/useMediaQueries";
+import { computeBadge } from "@/src/hooks/useJellyfinHome";
 import { useAuthStore } from "@/src/stores/authStore";
 import { getBackdropUrl, getImageUrl, getLogoUrl } from "@/src/utils/imageUrl";
 import { newStyles } from "@/styles/new";
@@ -247,6 +248,19 @@ export default function NewScreen() {
                 </View>
               );
             })()}
+            {(() => {
+              const badge = computeBadge(item);
+              if (!badge) return null;
+              return (
+                <View style={newBadgeStyles.container}>
+                  <View style={newBadgeStyles.badge}>
+                    <Text style={newBadgeStyles.text} numberOfLines={1}>
+                      {badge}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })()}
           </View>
 
           <View style={newStyles.titleContainer}>
@@ -358,6 +372,19 @@ export default function NewScreen() {
               <Ionicons name="film-outline" size={28} color="#555" />
             </View>
           )}
+          {(() => {
+            const badge = computeBadge(item);
+            if (!badge) return null;
+            return (
+              <View style={newBadgeStyles.container}>
+                <View style={newBadgeStyles.badge}>
+                  <Text style={newBadgeStyles.text} numberOfLines={1}>
+                    {badge}
+                  </Text>
+                </View>
+              </View>
+            );
+          })()}
         </View>
         <View style={newStyles.top10Info}>
           <Text style={newStyles.top10Title} numberOfLines={2}>
@@ -519,5 +546,27 @@ const itemStyles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "600",
+  },
+});
+
+const newBadgeStyles = StyleSheet.create({
+  container: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
+  badge: {
+    backgroundColor: "#E50914",
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+  },
+  text: {
+    color: "#fff",
+    fontSize: 9,
+    fontWeight: "bold",
   },
 });

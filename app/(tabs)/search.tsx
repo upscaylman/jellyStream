@@ -1,6 +1,7 @@
 import { useCastSheet } from "@/hooks/useCastSheet";
 import { CastIcon } from "@/icons/CastIcon";
 import { useSearchItems, useTrending } from "@/src/api/queries/useMediaQueries";
+import { computeBadge } from "@/src/hooks/useJellyfinHome";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useNotificationBadgeCount } from "@/src/stores/notificationStore";
 import { getBackdropUrl, getImageUrl } from "@/src/utils/imageUrl";
@@ -27,6 +28,20 @@ import { useDebounce } from "use-debounce";
 
 const { width } = Dimensions.get("window");
 const POSTER_WIDTH = (width - 16 * 2 - 6 * 2) / 3;
+
+function BadgeOverlay({ item }: { item: BaseItemDto }) {
+  const badge = computeBadge(item);
+  if (!badge) return null;
+  return (
+    <View style={searchBadgeStyles.container}>
+      <View style={searchBadgeStyles.badge}>
+        <Text style={searchBadgeStyles.text} numberOfLines={1}>
+          {badge}
+        </Text>
+      </View>
+    </View>
+  );
+}
 
 export default function SearchTab() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -267,6 +282,7 @@ export default function SearchTab() {
                         <Ionicons name="film-outline" size={20} color="#555" />
                       </View>
                     )}
+                    <BadgeOverlay item={item} />
                   </TouchableOpacity>
                 );
               })}
@@ -332,6 +348,7 @@ export default function SearchTab() {
                         <Ionicons name="film-outline" size={20} color="#555" />
                       </View>
                     )}
+                    <BadgeOverlay item={item} />
                   </TouchableOpacity>
                 );
               }}
@@ -395,6 +412,7 @@ export default function SearchTab() {
                           />
                         </View>
                       )}
+                      <BadgeOverlay item={item} />
                     </TouchableOpacity>
                   );
                 }}
@@ -456,6 +474,7 @@ export default function SearchTab() {
                           />
                         </View>
                       )}
+                      <BadgeOverlay item={item} />
                     </View>
                     <View style={styles.itemInfo}>
                       <Text style={styles.itemTitle} numberOfLines={2}>
@@ -630,5 +649,27 @@ const styles = StyleSheet.create({
     fontSize: 18,
     textAlign: "center",
     letterSpacing: 0.5,
+  },
+});
+
+const searchBadgeStyles = StyleSheet.create({
+  container: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
+  badge: {
+    backgroundColor: "#E50914",
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+  },
+  text: {
+    color: "#fff",
+    fontSize: 9,
+    fontWeight: "bold",
   },
 });
