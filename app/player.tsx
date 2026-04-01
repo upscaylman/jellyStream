@@ -1,9 +1,9 @@
-import { CastModal } from "@/components/CastModal";
+import { useBottomSheet } from "@/components/BottomSheet/BottomSheetContext";
+import { SettingsSheet } from "@/components/BottomSheet/SettingsSheet";
+import { useCastSheet } from "@/hooks/useCastSheet";
 import { CastIcon } from "@/icons/CastIcon";
 import { SkipBackIcon, SkipForwardIcon } from "@/icons/SkipIcons";
 import {
-  getAudioStreams,
-  getSubtitleStreams,
   QUALITY_PROFILES,
   usePlaybackInfo,
   type MediaSource,
@@ -19,7 +19,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
-  FlatList,
   LayoutChangeEvent,
   Platform,
   Pressable,
@@ -45,14 +44,6 @@ if (Platform.OS !== "web") {
 // ═══════════════════════════════════════════
 // Types panneau Paramètres
 // ═══════════════════════════════════════════
-type SettingsPanel =
-  | "none"
-  | "main"
-  | "subtitles"
-  | "audio"
-  | "quality"
-  | "aspectRatio";
-
 const ASPECT_RATIOS = [
   { label: "Auto", value: "contain" as const },
   { label: "Remplir", value: "cover" as const },
@@ -73,277 +64,6 @@ function formatTime(seconds: number): string {
 
 const CONTROLS_HIDE_DELAY = 4000;
 const GESTURE_THRESHOLD = 10; // pixels min pour déclencher un geste vertical
-
-// ═══════════════════════════════════════════
-// PANNEAU PARAMÈTRES (sous-titres, audio, qualité, aspect ratio)
-// ═══════════════════════════════════════════
-function SettingsModal({
-  visible,
-  onClose,
-  panel,
-  setPanel,
-  mediaSource,
-  serverUrl,
-  itemId,
-  token,
-  selectedSubIndex,
-  onSelectSubtitle,
-  selectedAudioIndex,
-  onSelectAudio,
-  selectedQuality,
-  onSelectQuality,
-  selectedAspect,
-  onSelectAspect,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  panel: SettingsPanel;
-  setPanel: (p: SettingsPanel) => void;
-  mediaSource: MediaSource | null;
-  serverUrl: string;
-  itemId: string;
-  token: string;
-  selectedSubIndex: number;
-  onSelectSubtitle: (index: number) => void;
-  selectedAudioIndex: number;
-  onSelectAudio: (index: number) => void;
-  selectedQuality: QualityProfile;
-  onSelectQuality: (q: QualityProfile) => void;
-  selectedAspect: AspectRatioValue;
-  onSelectAspect: (a: AspectRatioValue) => void;
-}) {
-  const subtitles = mediaSource ? getSubtitleStreams(mediaSource) : [];
-  const audioTracks = mediaSource ? getAudioStreams(mediaSource) : [];
-
-  const renderMainMenu = () => (
-    <View style={settingsStyles.menu}>
-      <Text style={settingsStyles.title}>Paramètres</Text>
-      {!mediaSource && (
-        <Text style={settingsStyles.menuValue}>Chargement des pistes...</Text>
-      )}
-      <Pressable
-        style={settingsStyles.menuItem}
-        onPress={() => setPanel("subtitles")}
-      >
-        <Ionicons name="text-outline" size={20} color="#fff" />
-        <Text style={settingsStyles.menuText}>Sous-titres</Text>
-        <Text style={settingsStyles.menuValue}>
-          {selectedSubIndex === -1
-            ? "Désactivés"
-            : (subtitles.find((s) => s.Index === selectedSubIndex)
-                ?.DisplayTitle ?? "?")}
-        </Text>
-        <Ionicons name="chevron-forward" size={18} color="#888" />
-      </Pressable>
-      <Pressable
-        style={settingsStyles.menuItem}
-        onPress={() => setPanel("audio")}
-      >
-        <Ionicons name="volume-high-outline" size={20} color="#fff" />
-        <Text style={settingsStyles.menuText}>Audio</Text>
-        <Text style={settingsStyles.menuValue}>
-          {audioTracks.find((a) => a.Index === selectedAudioIndex)
-            ?.DisplayTitle ?? "?"}
-        </Text>
-        <Ionicons name="chevron-forward" size={18} color="#888" />
-      </Pressable>
-      <Pressable
-        style={settingsStyles.menuItem}
-        onPress={() => setPanel("quality")}
-      >
-        <Ionicons name="speedometer-outline" size={20} color="#fff" />
-        <Text style={settingsStyles.menuText}>Qualité</Text>
-        <Text style={settingsStyles.menuValue}>{selectedQuality.label}</Text>
-        <Ionicons name="chevron-forward" size={18} color="#888" />
-      </Pressable>
-      <Pressable
-        style={settingsStyles.menuItem}
-        onPress={() => setPanel("aspectRatio")}
-      >
-        <Ionicons name="resize-outline" size={20} color="#fff" />
-        <Text style={settingsStyles.menuText}>Format d'image</Text>
-        <Text style={settingsStyles.menuValue}>
-          {ASPECT_RATIOS.find((a) => a.value === selectedAspect)?.label}
-        </Text>
-        <Ionicons name="chevron-forward" size={18} color="#888" />
-      </Pressable>
-    </View>
-  );
-
-  const renderSubtitleList = () => (
-    <View style={settingsStyles.menu}>
-      <Pressable
-        style={settingsStyles.backRow}
-        onPress={() => setPanel("main")}
-      >
-        <Ionicons name="arrow-back" size={20} color="#fff" />
-        <Text style={settingsStyles.title}>Sous-titres</Text>
-      </Pressable>
-      <Pressable
-        style={[
-          settingsStyles.optionItem,
-          selectedSubIndex === -1 && settingsStyles.optionSelected,
-        ]}
-        onPress={() => {
-          onSelectSubtitle(-1);
-          onClose();
-        }}
-      >
-        <Text style={settingsStyles.optionText}>Désactivés</Text>
-        {selectedSubIndex === -1 && (
-          <Ionicons name="checkmark" size={18} color="#E50914" />
-        )}
-      </Pressable>
-      <FlatList
-        data={subtitles}
-        keyExtractor={(item) => String(item.Index)}
-        renderItem={({ item }) => (
-          <Pressable
-            style={[
-              settingsStyles.optionItem,
-              selectedSubIndex === item.Index && settingsStyles.optionSelected,
-            ]}
-            onPress={() => {
-              onSelectSubtitle(item.Index);
-              onClose();
-            }}
-          >
-            <Text style={settingsStyles.optionText}>
-              {item.DisplayTitle ?? item.Language ?? `Piste ${item.Index}`}
-            </Text>
-            <Text style={settingsStyles.optionSub}>
-              {item.Codec?.toUpperCase()}
-              {item.IsForced ? " · Forcé" : ""}
-            </Text>
-            {selectedSubIndex === item.Index && (
-              <Ionicons name="checkmark" size={18} color="#E50914" />
-            )}
-          </Pressable>
-        )}
-      />
-    </View>
-  );
-
-  const renderAudioList = () => (
-    <View style={settingsStyles.menu}>
-      <Pressable
-        style={settingsStyles.backRow}
-        onPress={() => setPanel("main")}
-      >
-        <Ionicons name="arrow-back" size={20} color="#fff" />
-        <Text style={settingsStyles.title}>Audio</Text>
-      </Pressable>
-      <FlatList
-        data={audioTracks}
-        keyExtractor={(item) => String(item.Index)}
-        renderItem={({ item }) => (
-          <Pressable
-            style={[
-              settingsStyles.optionItem,
-              selectedAudioIndex === item.Index &&
-                settingsStyles.optionSelected,
-            ]}
-            onPress={() => {
-              onSelectAudio(item.Index);
-              onClose();
-            }}
-          >
-            <Text style={settingsStyles.optionText}>
-              {item.DisplayTitle ?? item.Language ?? `Piste ${item.Index}`}
-            </Text>
-            <Text style={settingsStyles.optionSub}>
-              {item.Codec?.toUpperCase()} · {item.Channels}ch
-            </Text>
-            {selectedAudioIndex === item.Index && (
-              <Ionicons name="checkmark" size={18} color="#E50914" />
-            )}
-          </Pressable>
-        )}
-      />
-    </View>
-  );
-
-  const renderQualityList = () => (
-    <View style={settingsStyles.menu}>
-      <Pressable
-        style={settingsStyles.backRow}
-        onPress={() => setPanel("main")}
-      >
-        <Ionicons name="arrow-back" size={20} color="#fff" />
-        <Text style={settingsStyles.title}>Qualité</Text>
-      </Pressable>
-      <FlatList
-        data={QUALITY_PROFILES}
-        keyExtractor={(item) => item.label}
-        renderItem={({ item }) => (
-          <Pressable
-            style={[
-              settingsStyles.optionItem,
-              selectedQuality.label === item.label &&
-                settingsStyles.optionSelected,
-            ]}
-            onPress={() => {
-              onSelectQuality(item);
-              onClose();
-            }}
-          >
-            <Text style={settingsStyles.optionText}>{item.label}</Text>
-            {selectedQuality.label === item.label && (
-              <Ionicons name="checkmark" size={18} color="#E50914" />
-            )}
-          </Pressable>
-        )}
-      />
-    </View>
-  );
-
-  const renderAspectList = () => (
-    <View style={settingsStyles.menu}>
-      <Pressable
-        style={settingsStyles.backRow}
-        onPress={() => setPanel("main")}
-      >
-        <Ionicons name="arrow-back" size={20} color="#fff" />
-        <Text style={settingsStyles.title}>Format d'image</Text>
-      </Pressable>
-      {ASPECT_RATIOS.map((item) => (
-        <Pressable
-          key={item.value}
-          style={[
-            settingsStyles.optionItem,
-            selectedAspect === item.value && settingsStyles.optionSelected,
-          ]}
-          onPress={() => {
-            onSelectAspect(item.value);
-            onClose();
-          }}
-        >
-          <Text style={settingsStyles.optionText}>{item.label}</Text>
-          {selectedAspect === item.value && (
-            <Ionicons name="checkmark" size={18} color="#E50914" />
-          )}
-        </Pressable>
-      ))}
-    </View>
-  );
-
-  if (!visible) return null;
-
-  return (
-    <Pressable style={settingsStyles.backdrop} onPress={onClose}>
-      <Pressable
-        style={settingsStyles.container}
-        onPress={(e) => e.stopPropagation()}
-      >
-        {panel === "main" && renderMainMenu()}
-        {panel === "subtitles" && renderSubtitleList()}
-        {panel === "audio" && renderAudioList()}
-        {panel === "quality" && renderQualityList()}
-        {panel === "aspectRatio" && renderAspectList()}
-      </Pressable>
-    </Pressable>
-  );
-}
 
 // ═══════════════════════════════════════════
 // INDICATEUR GESTE VOLUME / LUMINOSITÉ
@@ -406,7 +126,7 @@ function WebPlayer({
   const [currentTimeSec, setCurrentTimeSec] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekValue, setSeekValue] = useState(0);
-  const [showCast, setShowCast] = useState(false);
+  const openCast = useCastSheet();
   const [isLocked, setIsLocked] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -426,7 +146,7 @@ function WebPlayer({
     QUALITY_PROFILES[0],
   );
   const [aspectRatio, setAspectRatio] = useState<AspectRatioValue>("contain");
-  const [settingsPanel, setSettingsPanel] = useState<SettingsPanel>("none");
+  const { openSheet } = useBottomSheet();
 
   // Initialiser depuis les defaults Jellyfin
   useEffect(() => {
@@ -874,14 +594,28 @@ function WebPlayer({
                   </Text>
                 </View>
                 <View style={s.topBarRight}>
-                  <Pressable
-                    onPress={() => setShowCast(true)}
-                    style={s.iconButton}
-                  >
+                  <Pressable onPress={openCast} style={s.iconButton}>
                     <CastIcon size={22} color="#fff" />
                   </Pressable>
                   <Pressable
-                    onPress={() => setSettingsPanel("main")}
+                    onPress={() =>
+                      openSheet({
+                        content: (
+                          <SettingsSheet
+                            mediaSource={webMediaSource}
+                            selectedSubIndex={selectedSubIndex}
+                            onSelectSubtitle={handleWebSelectSubtitle}
+                            selectedAudioIndex={selectedAudioIndex}
+                            onSelectAudio={handleWebSelectAudio}
+                            selectedQuality={selectedQuality}
+                            onSelectQuality={handleWebSelectQuality}
+                            selectedAspect={aspectRatio}
+                            onSelectAspect={handleWebSelectAspect}
+                          />
+                        ),
+                        maxHeight: 450,
+                      })
+                    }
                     style={s.iconButton}
                   >
                     <Ionicons name="settings-outline" size={22} color="#fff" />
@@ -1039,32 +773,6 @@ function WebPlayer({
           )}
         </View>
       )}
-
-      <CastModal
-        visible={showCast}
-        onClose={() => setShowCast(false)}
-        onSelect={() => {}}
-      />
-
-      {/* Modal Paramètres web */}
-      <SettingsModal
-        visible={settingsPanel !== "none"}
-        onClose={() => setSettingsPanel("none")}
-        panel={settingsPanel === "none" ? "main" : settingsPanel}
-        setPanel={setSettingsPanel}
-        mediaSource={webMediaSource}
-        serverUrl={serverUrl}
-        itemId={itemId}
-        token={token}
-        selectedSubIndex={selectedSubIndex}
-        onSelectSubtitle={handleWebSelectSubtitle}
-        selectedAudioIndex={selectedAudioIndex}
-        onSelectAudio={handleWebSelectAudio}
-        selectedQuality={selectedQuality}
-        onSelectQuality={handleWebSelectQuality}
-        selectedAspect={aspectRatio}
-        onSelectAspect={handleWebSelectAspect}
-      />
     </View>
   );
 }
@@ -1097,11 +805,11 @@ function NativePlayer({
   const [currentTimeSec, setCurrentTimeSec] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekValue, setSeekValue] = useState(0);
-  const [showCast, setShowCast] = useState(false);
+  const openCast = useCastSheet();
   const [isLocked, setIsLocked] = useState(false);
 
   // State paramètres
-  const [settingsPanel, setSettingsPanel] = useState<SettingsPanel>("none");
+  const { openSheet: openNativeSheet } = useBottomSheet();
   const [selectedSubIndex, setSelectedSubIndex] = useState(-1);
   const [selectedAudioIndex, setSelectedAudioIndex] = useState(0);
   const [selectedQuality, setSelectedQuality] = useState<QualityProfile>(
@@ -1594,16 +1302,28 @@ function NativePlayer({
                   </Text>
                 </View>
                 <View style={s.topBarRight}>
-                  <Pressable
-                    onPress={() => setShowCast(true)}
-                    style={s.iconButton}
-                  >
+                  <Pressable onPress={openCast} style={s.iconButton}>
                     <CastIcon size={22} color="#fff" />
                   </Pressable>
                   <Pressable
-                    onPress={() => {
-                      setSettingsPanel("main");
-                    }}
+                    onPress={() =>
+                      openNativeSheet({
+                        content: (
+                          <SettingsSheet
+                            mediaSource={mediaSource}
+                            selectedSubIndex={selectedSubIndex}
+                            onSelectSubtitle={handleSelectSubtitle}
+                            selectedAudioIndex={selectedAudioIndex}
+                            onSelectAudio={handleSelectAudio}
+                            selectedQuality={selectedQuality}
+                            onSelectQuality={handleSelectQuality}
+                            selectedAspect={aspectRatio}
+                            onSelectAspect={setAspectRatio}
+                          />
+                        ),
+                        maxHeight: 450,
+                      })
+                    }
                     style={s.iconButton}
                   >
                     <Ionicons name="settings-outline" size={22} color="#fff" />
@@ -1680,32 +1400,6 @@ function NativePlayer({
           )}
         </View>
       )}
-
-      {/* Modal Paramètres */}
-      <SettingsModal
-        visible={settingsPanel !== "none"}
-        onClose={() => setSettingsPanel("none")}
-        panel={settingsPanel === "none" ? "main" : settingsPanel}
-        setPanel={setSettingsPanel}
-        mediaSource={mediaSource}
-        serverUrl={serverUrl}
-        itemId={itemId}
-        token={token}
-        selectedSubIndex={selectedSubIndex}
-        onSelectSubtitle={handleSelectSubtitle}
-        selectedAudioIndex={selectedAudioIndex}
-        onSelectAudio={handleSelectAudio}
-        selectedQuality={selectedQuality}
-        onSelectQuality={handleSelectQuality}
-        selectedAspect={aspectRatio}
-        onSelectAspect={setAspectRatio}
-      />
-
-      <CastModal
-        visible={showCast}
-        onClose={() => setShowCast(false)}
-        onSelect={() => {}}
-      />
     </View>
   );
 }
@@ -2181,78 +1875,6 @@ const s = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.15)",
     justifyContent: "center",
     alignItems: "center",
-  },
-});
-
-// Styles panneau paramètres
-const settingsStyles = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    alignItems: "flex-end",
-    zIndex: 9999,
-  },
-  container: {
-    width: 320,
-    maxHeight: "85%",
-    backgroundColor: "#1a1a1a",
-    borderTopLeftRadius: 12,
-    borderBottomLeftRadius: 12,
-    padding: 16,
-  },
-  menu: {
-    gap: 4,
-  },
-  title: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 12,
-  },
-  menuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(255,255,255,0.1)",
-    gap: 12,
-  },
-  menuText: {
-    color: "#fff",
-    fontSize: 15,
-    flex: 1,
-  },
-  menuValue: {
-    color: "#999",
-    fontSize: 13,
-  },
-  backRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 8,
-  },
-  optionItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    gap: 8,
-  },
-  optionSelected: {
-    backgroundColor: "rgba(229,9,20,0.15)",
-  },
-  optionText: {
-    color: "#fff",
-    fontSize: 14,
-    flex: 1,
-  },
-  optionSub: {
-    color: "#888",
-    fontSize: 11,
   },
 });
 

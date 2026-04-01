@@ -1,6 +1,6 @@
-import { CastModal } from "@/components/CastModal";
 import { CategoriesListModal } from "@/components/CategoriesListModal/CategoriesListModal";
 import { ThemedText } from "@/components/ThemedText";
+import { useCastSheet } from "@/hooks/useCastSheet";
 import { CastIcon } from "@/icons/CastIcon";
 import {
   useCollectionForItem,
@@ -80,7 +80,7 @@ export function ExpandedPlayer({
   const videoViewRef = useRef<VideoView>(null);
   const router = useRouter();
   const [isMuted, setIsMuted] = useState(true);
-  const [showCast, setShowCast] = useState(false);
+  const openCast = useCastSheet();
   const [showControls, setShowControls] = useState(true);
   const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progress = useSharedValue(0);
@@ -269,7 +269,7 @@ export function ExpandedPlayer({
           <Ionicons name="arrow-back" size={24} color="white" />
         </Pressable>
         <View style={{ flex: 1 }} />
-        <Pressable style={styles.backButton} onPress={() => setShowCast(true)}>
+        <Pressable style={styles.backButton} onPress={openCast}>
           <CastIcon size={24} color="#fff" />
         </Pressable>
       </View>
@@ -960,14 +960,6 @@ export function ExpandedPlayer({
           </View>
         )}
       </ScrollComponentToUse>
-
-      <CastModal
-        visible={showCast}
-        onClose={() => setShowCast(false)}
-        onSelect={() => {
-          /* TODO: action après sélection */
-        }}
-      />
     </View>
   );
 }

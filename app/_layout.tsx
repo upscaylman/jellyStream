@@ -1,3 +1,4 @@
+import { BottomSheetProvider } from "@/components/BottomSheet/BottomSheetContext";
 import { OverlayProvider } from "@/components/Overlay/OverlayProvider";
 import { RootScaleProvider, useRootScale } from "@/contexts/RootScaleContext";
 import useCachedResources from "@/hooks/useCachedResources";
@@ -213,7 +214,9 @@ export default function RootLayout() {
         >
           <RootScaleProvider>
             <OverlayProvider>
-              <AnimatedStack />
+              <BottomSheetProvider>
+                <AnimatedStack />
+              </BottomSheetProvider>
             </OverlayProvider>
           </RootScaleProvider>
         </ThemeProvider>

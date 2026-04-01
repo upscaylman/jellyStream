@@ -1,3 +1,5 @@
+import { useBottomSheet } from "@/components/BottomSheet/BottomSheetContext";
+import { ItemPreviewSheet } from "@/components/BottomSheet/ItemPreviewSheet";
 import { HoverableView } from "@/components/ui/VisionContainer";
 import { useVisionOS } from "@/hooks/useVisionOS";
 import { useWebDragScroll } from "@/hooks/useWebDragScroll";
@@ -34,11 +36,13 @@ const MovieItem = ({
   router,
   index,
   isTop10,
+  onLongPress,
 }: {
   item: Movie;
   router: any;
   index: number;
   isTop10: boolean;
+  onLongPress?: () => void;
 }) => (
   <Pressable
     onPress={() =>
@@ -47,6 +51,8 @@ const MovieItem = ({
         params: { id: item.id },
       })
     }
+    onLongPress={onLongPress}
+    delayLongPress={400}
     style={[styles.contentItem, isTop10 && styles.top10Item]}
   >
     {isTop10 && <NumberBackground number={(index % 10) + 1} />}
@@ -119,11 +125,25 @@ export function MovieList({
   const isTop10 = type === "top_10";
   const { isVisionOS } = useVisionOS();
   const flatListRef = useRef<FlatList>(null);
+  const { openSheet } = useBottomSheet();
   useWebDragScroll(flatListRef);
+
+  const handleLongPress = (itemId: string) => {
+    openSheet({
+      content: <ItemPreviewSheet itemId={itemId} />,
+      maxHeight: 480,
+    });
+  };
 
   const renderItem = ({ item, index }) => (
     <HoverableView key={`${item.id}-${index}`}>
-      <MovieItem item={item} router={router} index={index} isTop10={isTop10} />
+      <MovieItem
+        item={item}
+        router={router}
+        index={index}
+        isTop10={isTop10}
+        onLongPress={() => handleLongPress(item.id)}
+      />
     </HoverableView>
   );
 

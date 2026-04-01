@@ -12,10 +12,10 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useCastSheet } from "@/hooks/useCastSheet";
 import { CastIcon } from "@/icons/CastIcon";
 import { useNotificationBadgeCount } from "@/src/stores/notificationStore";
 import { styles } from "@/styles";
-import { CastModal } from "../CastModal";
 import { CategoriesListModal } from "../CategoriesListModal/CategoriesListModal";
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
@@ -55,7 +55,7 @@ export function AnimatedHeader({
   itemCount,
 }: AnimatedHeaderProps) {
   const [showCategories, setShowCategories] = useState(false);
-  const [showCast, setShowCast] = useState(false);
+  const openCast = useCastSheet();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const badgeCount = useNotificationBadgeCount();
@@ -158,10 +158,7 @@ export function AnimatedHeader({
                   </Pressable>
                   <Text style={styles.headerTitle}>{title}</Text>
                 </View>
-                <Pressable
-                  style={styles.searchButton}
-                  onPress={() => setShowCast(true)}
-                >
+                <Pressable style={styles.searchButton} onPress={openCast}>
                   <CastIcon size={28} color="#fff" />
                 </Pressable>
               </>
@@ -180,10 +177,7 @@ export function AnimatedHeader({
                 </View>
 
                 <View style={styles.headerButtons}>
-                  <Pressable
-                    style={styles.searchButton}
-                    onPress={() => setShowCast(true)}
-                  >
+                  <Pressable style={styles.searchButton} onPress={openCast}>
                     <CastIcon size={28} color="#fff" />
                   </Pressable>
                   <Pressable
@@ -390,14 +384,6 @@ export function AnimatedHeader({
         items={genreItems}
         selectedId={selectedGenre ?? "__all__"}
         onSelect={handleGenreSelect}
-      />
-
-      <CastModal
-        visible={showCast}
-        onClose={() => setShowCast(false)}
-        onSelect={() => {
-          /* TODO: action après sélection */
-        }}
       />
     </>
   );
