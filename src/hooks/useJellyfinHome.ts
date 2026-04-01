@@ -52,11 +52,20 @@ export function computeBadge(item: BaseItemDto): string | undefined {
 }
 
 // Convertit un BaseItemDto en Movie pour les composants existants
-export function toMovie(item: BaseItemDto, serverUrl: string) {
+export function toMovie(
+  item: BaseItemDto,
+  serverUrl: string,
+  badgeMap?: Map<string, string>,
+) {
   const imageTag = item.ImageTags?.["Primary"];
   // Toujours construire une URL d'image si on a un itemId — Jellyfin servira
   // l'image même sans tag (le tag est optionnel, juste pour le cache)
   const itemId = item.Id ?? "";
+  // Badge : d'abord le badge direct, sinon chercher via badgeMap (par ID ou SeriesId)
+  const directBadge = computeBadge(item);
+  const inheritedBadge =
+    badgeMap?.get(itemId) ??
+    (item.SeriesId ? badgeMap?.get(item.SeriesId) : undefined);
   return {
     id: itemId,
     imageUrl: itemId
@@ -76,7 +85,7 @@ export function toMovie(item: BaseItemDto, serverUrl: string) {
     rating: item.OfficialRating ?? "",
     description: item.Overview ?? "",
     mediaType: item.Type ?? "",
-    badge: computeBadge(item),
+    badge: directBadge ?? inheritedBadge,
     genres: item.Genres ?? [],
   };
 }
@@ -223,11 +232,28 @@ export function useJellyfinHome(): JellyfinHomeData {
   const rows = useMemo(() => {
     const result: MovieRow[] = [];
 
+    // Badge map global : associe chaque ID à son badge calculé depuis toutes les sources
+    const badgeMap = new Map<string, string>();
+    const allSources = [
+      ...(latestMovies.data ?? []),
+      ...(latestSeries.data ?? []),
+      ...(recentlyAdded.data ?? []),
+      ...(newlyAdded.data ?? []),
+      ...(favorites.data ?? []),
+      ...(trendingRows ?? []),
+    ];
+    for (const item of allSources) {
+      const badge = computeBadge(item);
+      if (badge && item.Id) {
+        badgeMap.set(item.Id, badge);
+      }
+    }
+
     if (resume.data?.length) {
       result.push({
         rowTitle: "Reprendre la lecture",
         movies: resume.data.map((item) => {
-          const m = toMovie(item, serverUrl);
+          const m = toMovie(item, serverUrl, badgeMap);
           m.isTopRated = topRatedIds.has(item.Id ?? "");
           return m;
         }),
@@ -238,7 +264,7 @@ export function useJellyfinHome(): JellyfinHomeData {
       result.push({
         rowTitle: "Ma liste",
         movies: favorites.data.map((item) => {
-          const m = toMovie(item, serverUrl);
+          const m = toMovie(item, serverUrl, badgeMap);
           m.isTopRated = topRatedIds.has(item.Id ?? "");
           return m;
         }),
@@ -250,7 +276,7 @@ export function useJellyfinHome(): JellyfinHomeData {
       result.push({
         rowTitle: "Tendances",
         movies: trendingRows.map((item) => {
-          const m = toMovie(item, serverUrl);
+          const m = toMovie(item, serverUrl, badgeMap);
           m.isTopRated = topRatedIds.has(item.Id ?? "");
           return m;
         }),
@@ -262,7 +288,7 @@ export function useJellyfinHome(): JellyfinHomeData {
       result.push({
         rowTitle: "Films récents",
         movies: latestMovies.data.map((item) => {
-          const m = toMovie(item, serverUrl);
+          const m = toMovie(item, serverUrl, badgeMap);
           m.isTopRated = topRatedIds.has(item.Id ?? "");
           return m;
         }),
@@ -275,7 +301,7 @@ export function useJellyfinHome(): JellyfinHomeData {
       result.push({
         rowTitle: "Séries récentes",
         movies: latestSeries.data.map((item) => {
-          const m = toMovie(item, serverUrl);
+          const m = toMovie(item, serverUrl, badgeMap);
           m.isTopRated = topRatedIds.has(item.Id ?? "");
           return m;
         }),
@@ -288,7 +314,7 @@ export function useJellyfinHome(): JellyfinHomeData {
       result.push({
         rowTitle: "Ajoutés récemment",
         movies: recentlyAdded.data.map((item) => {
-          const m = toMovie(item, serverUrl);
+          const m = toMovie(item, serverUrl, badgeMap);
           m.isTopRated = topRatedIds.has(item.Id ?? "");
           return m;
         }),
@@ -300,7 +326,7 @@ export function useJellyfinHome(): JellyfinHomeData {
       result.push({
         rowTitle: "Votre bibliothèque",
         movies: newlyAdded.data.map((item) => {
-          const m = toMovie(item, serverUrl);
+          const m = toMovie(item, serverUrl, badgeMap);
           m.isTopRated = topRatedIds.has(item.Id ?? "");
           return m;
         }),

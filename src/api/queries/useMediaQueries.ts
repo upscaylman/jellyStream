@@ -96,7 +96,12 @@ export function useResumeItems(limit = 12) {
       const result = await itemsApi.getResumeItems({
         userId,
         limit,
-        fields: [ItemFields.Overview, ItemFields.Genres],
+        fields: [
+          ItemFields.Overview,
+          ItemFields.Genres,
+          ItemFields.DateCreated,
+          ItemFields.DateLastMediaAdded,
+        ],
         imageTypeLimit: 1,
         enableImageTypes: ["Primary", "Backdrop", "Thumb", "Logo"],
       });
@@ -341,7 +346,12 @@ export function useFavoriteItems(limit = 20) {
         sortOrder: [SortOrder.Descending],
         limit,
         recursive: true,
-        fields: [ItemFields.Overview, ItemFields.Genres],
+        fields: [
+          ItemFields.Overview,
+          ItemFields.Genres,
+          ItemFields.DateCreated,
+          ItemFields.DateLastMediaAdded,
+        ],
         imageTypeLimit: 1,
         enableImageTypes: ["Primary", "Backdrop", "Logo"],
       });
@@ -554,6 +564,7 @@ export function useLikedItems(limit = 20) {
           ItemFields.Overview,
           ItemFields.Genres,
           ItemFields.DateCreated,
+          ItemFields.DateLastMediaAdded,
           ItemFields.ChildCount,
         ],
         imageTypeLimit: 1,
@@ -585,6 +596,7 @@ export function useRecentlyPlayed(limit = 20) {
           ItemFields.Overview,
           ItemFields.Genres,
           ItemFields.DateCreated,
+          ItemFields.DateLastMediaAdded,
         ],
         imageTypeLimit: 1,
         enableImageTypes: ["Primary", "Backdrop", "Logo"],

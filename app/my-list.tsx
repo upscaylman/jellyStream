@@ -2,6 +2,7 @@ import {
   useFavoriteItems,
   useToggleFavorite,
 } from "@/src/api/queries/useMediaQueries";
+import { computeBadge } from "@/src/hooks/useJellyfinHome";
 import { useAuthStore } from "@/src/stores/authStore";
 import { getBackdropUrl, getImageUrl } from "@/src/utils/imageUrl";
 import { Ionicons } from "@expo/vector-icons";
@@ -129,6 +130,19 @@ export default function MyListScreen() {
                 <Ionicons name="film-outline" size={24} color="#555" />
               </View>
             )}
+            {(() => {
+              const badge = computeBadge(item);
+              if (!badge) return null;
+              return (
+                <View style={s.badgeContainer}>
+                  <View style={s.badge}>
+                    <Text style={s.badgeText} numberOfLines={1}>
+                      {badge}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })()}
           </View>
           <View style={s.itemInfo}>
             <Text style={s.itemTitle} numberOfLines={2}>
@@ -430,5 +444,24 @@ const s = StyleSheet.create({
   },
   playButton: {
     padding: 8,
+  },
+  badgeContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
+  badge: {
+    backgroundColor: "#E50914",
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 8,
+    fontWeight: "bold",
   },
 });

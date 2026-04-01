@@ -7,7 +7,7 @@ import {
   useRecentlyPlayed,
   useResumeItems,
 } from "@/src/api/queries/useMediaQueries";
-import { toMovie } from "@/src/hooks/useJellyfinHome";
+import { computeBadge, toMovie } from "@/src/hooks/useJellyfinHome";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useNotificationBadgeCount } from "@/src/stores/notificationStore";
 import { getBackdropUrl, getImageUrl, getLogoUrl } from "@/src/utils/imageUrl";
@@ -17,7 +17,7 @@ import { useScrollToTop } from "@react-navigation/native";
 import { BlurView } from "expo-blur";
 import { Image as ExpoImage } from "expo-image";
 import { useRouter } from "expo-router";
-import React, { useCallback, useRef } from "react";
+import React, { useCallback, useMemo, useRef } from "react";
 import {
   FlatList,
   Pressable,
@@ -114,11 +114,33 @@ export default function ProfileScreen() {
     );
   }
 
-  const likedRow = (likedItems ?? []).map((item) => toMovie(item, serverUrl));
-  const favoritesRow = (favorites ?? []).map((item) =>
-    toMovie(item, serverUrl),
+  // Badge map : propager les badges entre toutes les sources du profil
+  const badgeMap = useMemo(() => {
+    const map = new Map<string, string>();
+    const allItems = [
+      ...(likedItems ?? []),
+      ...(favorites ?? []),
+      ...(resumeItems ?? []),
+      ...(recentlyPlayed ?? []),
+    ];
+    for (const item of allItems) {
+      const badge = computeBadge(item);
+      if (badge && item.Id) {
+        map.set(item.Id, badge);
+      }
+    }
+    return map;
+  }, [likedItems, favorites, resumeItems, recentlyPlayed]);
+
+  const likedRow = (likedItems ?? []).map((item) =>
+    toMovie(item, serverUrl, badgeMap),
   );
-  const resumeRow = (resumeItems ?? []).map((item) => toMovie(item, serverUrl));
+  const favoritesRow = (favorites ?? []).map((item) =>
+    toMovie(item, serverUrl, badgeMap),
+  );
+  const resumeRow = (resumeItems ?? []).map((item) =>
+    toMovie(item, serverUrl, badgeMap),
+  );
 
   const getBackdrop = useCallback(
     (item: BaseItemDto) => {
