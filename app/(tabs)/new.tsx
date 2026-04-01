@@ -7,7 +7,7 @@ import {
   useTrending,
 } from "@/src/api/queries/useMediaQueries";
 import { useAuthStore } from "@/src/stores/authStore";
-import { getBackdropUrl, getImageUrl } from "@/src/utils/imageUrl";
+import { getBackdropUrl, getImageUrl, getLogoUrl } from "@/src/utils/imageUrl";
 import { newStyles } from "@/styles/new";
 import { Ionicons } from "@expo/vector-icons";
 import { BaseItemDto } from "@jellyfin/sdk/lib/generated-client/models";
@@ -21,6 +21,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -212,6 +213,10 @@ export default function NewScreen() {
       ? new Date(item.PremiereDate).getFullYear().toString()
       : (item.ProductionYear?.toString() ?? "");
     const genres = item.Genres?.slice(0, 3).join(" • ") ?? "";
+    const logoTag = item.ImageTags?.["Logo"];
+    const logoUri = logoTag
+      ? getLogoUrl(serverUrl, item.Id ?? "", 400, 90, logoTag)
+      : null;
 
     return (
       <Pressable
@@ -259,9 +264,19 @@ export default function NewScreen() {
           </View>
 
           <View style={newStyles.titleContainer}>
-            <Text style={newStyles.title} numberOfLines={2}>
-              {item.Name}
-            </Text>
+            {logoUri ? (
+              <ExpoImage
+                source={{ uri: logoUri }}
+                style={itemStyles.logo}
+                cachePolicy="memory-disk"
+                contentFit="contain"
+                transition={200}
+              />
+            ) : (
+              <Text style={newStyles.title} numberOfLines={2}>
+                {item.Name}
+              </Text>
+            )}
             {year ? (
               <Text style={newStyles.eventDate}>
                 {year}
@@ -273,6 +288,33 @@ export default function NewScreen() {
                 {item.Overview}
               </Text>
             ) : null}
+            <View style={itemStyles.buttonsRow}>
+              <Pressable
+                style={itemStyles.playBtn}
+                onPress={() => {
+                  if (item.Id) {
+                    router.push({
+                      pathname: "/player",
+                      params: { itemId: item.Id, title: item.Name ?? "" },
+                    });
+                  }
+                }}
+              >
+                <Ionicons name="play" size={20} color="#000" />
+                <Text style={itemStyles.playBtnText}>Lecture</Text>
+              </Pressable>
+              <Pressable
+                style={itemStyles.myListBtn}
+                onPress={() => {
+                  if (item.Id) {
+                    router.push(`/movie/${item.Id}`);
+                  }
+                }}
+              >
+                <Ionicons name="add" size={20} color="#fff" />
+                <Text style={itemStyles.myListBtnText}>Ma liste</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Pressable>
@@ -450,3 +492,48 @@ export default function NewScreen() {
     </TabScreenWrapper>
   );
 }
+
+const itemStyles = StyleSheet.create({
+  logo: {
+    width: 180,
+    height: 60,
+    alignSelf: "flex-start",
+    marginBottom: 4,
+  },
+  buttonsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  playBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 4,
+    gap: 6,
+  },
+  playBtnText: {
+    color: "#000",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  myListBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(51, 51, 51, 0.5)",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 4,
+    gap: 6,
+  },
+  myListBtnText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+});
