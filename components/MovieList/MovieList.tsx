@@ -50,11 +50,23 @@ const MovieItem = ({
     style={[styles.contentItem, isTop10 && styles.top10Item]}
   >
     {isTop10 && <NumberBackground number={(index % 10) + 1} />}
-    <View style={{ position: "relative" }}>
+    <View
+      style={[
+        {
+          position: "relative",
+          borderRadius: isTop10 ? 4 : 6,
+          overflow: "hidden",
+        },
+      ]}
+    >
       {item.imageUrl ? (
         <ExpoImage
           source={{ uri: item.imageUrl }}
-          style={[styles.thumbnail, isTop10 && styles.top10Thumbnail]}
+          style={[
+            styles.thumbnail,
+            isTop10 && styles.top10Thumbnail,
+            { borderRadius: 0 },
+          ]}
           cachePolicy="memory-disk"
           transition={200}
           contentFit="cover"
@@ -64,25 +76,35 @@ const MovieItem = ({
           style={[
             styles.thumbnail,
             isTop10 && styles.top10Thumbnail,
-            { backgroundColor: "#2a2a2a" },
+            { backgroundColor: "#2a2a2a", borderRadius: 0 },
           ]}
         />
       )}
-      {item.badge && (
-        <View
-          style={[
-            badgeStyles.badgeContainer,
-            isTop10 && badgeStyles.badgeContainerTop10,
-          ]}
-        >
-          <View style={badgeStyles.badge}>
-            <Text style={badgeStyles.badgeText} numberOfLines={1}>
-              {item.badge}
-            </Text>
-          </View>
+      {item.isTopRated && (
+        <View style={topRatedStyles.iconContainer}>
+          <ExpoImage
+            source={require("../../assets/images/top.png")}
+            style={topRatedStyles.icon}
+            cachePolicy="memory-disk"
+            contentFit="contain"
+          />
         </View>
       )}
     </View>
+    {item.badge && (
+      <View
+        style={[
+          badgeStyles.badgeContainer,
+          isTop10 && badgeStyles.badgeContainerTop10,
+        ]}
+      >
+        <View style={badgeStyles.badge}>
+          <Text style={badgeStyles.badgeText} numberOfLines={1}>
+            {item.badge}
+          </Text>
+        </View>
+      </View>
+    )}
   </Pressable>
 );
 
@@ -162,6 +184,19 @@ const badgeStyles = StyleSheet.create({
     color: "#fff",
     fontSize: 9,
     fontWeight: "bold",
+  },
+});
+
+const topRatedStyles = StyleSheet.create({
+  iconContainer: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    zIndex: 1,
+  },
+  icon: {
+    width: 28,
+    height: 28,
   },
 });
 

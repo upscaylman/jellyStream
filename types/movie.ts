@@ -4,6 +4,7 @@ export interface Movie {
   mediaType?: string;
   badge?: string;
   genres?: string[];
+  isTopRated?: boolean;
 }
 
 export interface MovieRow {

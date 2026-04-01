@@ -122,10 +122,15 @@ function YouTubePreview({
 }
 
 const TAB_OPTIONS = [
-  { id: "newly-added", label: "Nouveautés", emoji: "🍿" },
-  { id: "trending", label: "Les plus regardés", emoji: "🔥" },
-  { id: "top10-tv", label: "Top 10 séries", emoji: "🔟" },
-  { id: "top10-movies", label: "Top 10 films", emoji: "🔟" },
+  { id: "newly-added", label: "Nouveautés", emoji: "🍿", icon: null },
+  { id: "trending", label: "Les plus regardés", emoji: "🔥", icon: null },
+  { id: "top10-tv", label: "Top 10 séries", emoji: null, icon: "top" as const },
+  {
+    id: "top10-movies",
+    label: "Top 10 films",
+    emoji: null,
+    icon: "top" as const,
+  },
 ];
 
 export default function NewScreen() {
@@ -350,7 +355,16 @@ export default function NewScreen() {
       ]}
       onPress={() => setActiveTab(tab.id)}
     >
-      <Text style={{ fontSize: 16, marginRight: 6 }}>{tab.emoji}</Text>
+      {tab.icon ? (
+        <ExpoImage
+          source={require("../../assets/images/top.png")}
+          style={{ width: 20, height: 20, marginRight: 6 }}
+          cachePolicy="memory-disk"
+          contentFit="contain"
+        />
+      ) : (
+        <Text style={{ fontSize: 16, marginRight: 6 }}>{tab.emoji}</Text>
+      )}
       <Text
         style={[
           newStyles.categoryTabText,

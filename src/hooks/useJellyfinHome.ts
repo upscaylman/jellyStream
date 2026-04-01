@@ -154,17 +154,55 @@ export function useJellyfinHome(): JellyfinHomeData {
   // Construire les rows à partir des résultats
   const rows: MovieRow[] = [];
 
+  // Top 10 films + 10 séries : les mieux notés, rotation mensuelle
+  const topRatedIds = useMemo(() => {
+    const items = topRated.data ?? [];
+    if (items.length === 0) return new Set<string>();
+    const movies = items.filter((i) => i.Type === "Movie");
+    const series = items.filter((i) => i.Type === "Series");
+
+    // Score : CommunityRating (60%) + CriticRating (40%)
+    const score = (i: BaseItemDto) =>
+      (i.CommunityRating ?? 0) * 0.6 + ((i.CriticRating ?? 0) / 10) * 0.4;
+    movies.sort((a, b) => score(b) - score(a));
+    series.sort((a, b) => score(b) - score(a));
+
+    // Seed mensuel pour rotation
+    const now = new Date();
+    const monthSeed = now.getFullYear() * 12 + now.getMonth();
+    const rotate = <T>(arr: T[], seed: number, count: number): T[] => {
+      if (arr.length === 0) return [];
+      const offset = seed % Math.max(arr.length, 1);
+      const rotated = [...arr.slice(offset), ...arr.slice(0, offset)];
+      return rotated.slice(0, count);
+    };
+
+    const top10Movies = rotate(movies, monthSeed, 10);
+    const top10Series = rotate(series, monthSeed, 10);
+    return new Set(
+      [...top10Movies, ...top10Series].map((i) => i.Id!).filter(Boolean),
+    );
+  }, [topRated.data]);
+
   if (resume.data?.length) {
     rows.push({
       rowTitle: "Reprendre la lecture",
-      movies: resume.data.map((item) => toMovie(item, serverUrl)),
+      movies: resume.data.map((item) => {
+        const m = toMovie(item, serverUrl);
+        m.isTopRated = topRatedIds.has(item.Id ?? "");
+        return m;
+      }),
     });
   }
 
   if (favorites.data?.length) {
     rows.push({
       rowTitle: "Ma liste",
-      movies: favorites.data.map((item) => toMovie(item, serverUrl)),
+      movies: favorites.data.map((item) => {
+        const m = toMovie(item, serverUrl);
+        m.isTopRated = topRatedIds.has(item.Id ?? "");
+        return m;
+      }),
       showAll: true,
     });
   }
@@ -210,7 +248,11 @@ export function useJellyfinHome(): JellyfinHomeData {
   if (trendingRows.length > 0) {
     rows.push({
       rowTitle: "Tendances",
-      movies: trendingRows.map((item) => toMovie(item, serverUrl)),
+      movies: trendingRows.map((item) => {
+        const m = toMovie(item, serverUrl);
+        m.isTopRated = topRatedIds.has(item.Id ?? "");
+        return m;
+      }),
       type: "top_10",
     });
   }
@@ -218,7 +260,11 @@ export function useJellyfinHome(): JellyfinHomeData {
   if (latestMovies.data?.length) {
     rows.push({
       rowTitle: "Films récents",
-      movies: latestMovies.data.map((item) => toMovie(item, serverUrl)),
+      movies: latestMovies.data.map((item) => {
+        const m = toMovie(item, serverUrl);
+        m.isTopRated = topRatedIds.has(item.Id ?? "");
+        return m;
+      }),
       showAll: true,
       showAllRoute: "/films",
     });
@@ -227,7 +273,11 @@ export function useJellyfinHome(): JellyfinHomeData {
   if (latestSeries.data?.length) {
     rows.push({
       rowTitle: "Séries récentes",
-      movies: latestSeries.data.map((item) => toMovie(item, serverUrl)),
+      movies: latestSeries.data.map((item) => {
+        const m = toMovie(item, serverUrl);
+        m.isTopRated = topRatedIds.has(item.Id ?? "");
+        return m;
+      }),
       showAll: true,
       showAllRoute: "/series-list",
     });
@@ -236,7 +286,11 @@ export function useJellyfinHome(): JellyfinHomeData {
   if (recentlyAdded.data?.length) {
     rows.push({
       rowTitle: "Ajoutés récemment",
-      movies: recentlyAdded.data.map((item) => toMovie(item, serverUrl)),
+      movies: recentlyAdded.data.map((item) => {
+        const m = toMovie(item, serverUrl);
+        m.isTopRated = topRatedIds.has(item.Id ?? "");
+        return m;
+      }),
     });
   }
 
@@ -244,7 +298,11 @@ export function useJellyfinHome(): JellyfinHomeData {
   if (rows.length === 0 && newlyAdded.data?.length) {
     rows.push({
       rowTitle: "Votre bibliothèque",
-      movies: newlyAdded.data.map((item) => toMovie(item, serverUrl)),
+      movies: newlyAdded.data.map((item) => {
+        const m = toMovie(item, serverUrl);
+        m.isTopRated = topRatedIds.has(item.Id ?? "");
+        return m;
+      }),
     });
   }
 

@@ -518,7 +518,12 @@ export function ExpandedPlayer({
               <ThemedText style={styles.actionItemText}>Partager</ThemedText>
             </Pressable>
             <Pressable style={styles.actionItem}>
-              <Ionicons name="download-outline" size={24} color="white" />
+              <ExpoImage
+                source={require("../../assets/images/replace-these/download-netflix-transparent.png")}
+                style={{ width: 24, height: 24 }}
+                cachePolicy="memory-disk"
+                contentFit="contain"
+              />
               <ThemedText style={styles.actionItemText}>Télécharger</ThemedText>
             </Pressable>
           </View>
@@ -688,6 +693,13 @@ export function ExpandedPlayer({
                             />
                           </View>
                         )}
+                        <View style={episodeStyles.playOverlay}>
+                          <Ionicons
+                            name="play-circle-outline"
+                            size={30}
+                            color="white"
+                          />
+                        </View>
                       </View>
                       <View style={episodeStyles.itemInfo}>
                         <ThemedText
@@ -704,10 +716,11 @@ export function ExpandedPlayer({
                         ) : null}
                       </View>
                       <View style={episodeStyles.downloadButton}>
-                        <Ionicons
-                          name="download-outline"
-                          size={24}
-                          color="white"
+                        <ExpoImage
+                          source={require("../../assets/images/replace-these/download-netflix-transparent.png")}
+                          style={{ width: 24, height: 24 }}
+                          cachePolicy="memory-disk"
+                          contentFit="contain"
                         />
                       </View>
                     </Pressable>
@@ -845,6 +858,13 @@ export function ExpandedPlayer({
                             />
                           </View>
                         )}
+                        <View style={collectionStyles.playOverlay}>
+                          <Ionicons
+                            name="play-circle-outline"
+                            size={30}
+                            color="white"
+                          />
+                        </View>
                       </View>
                       <View style={collectionStyles.itemInfo}>
                         <ThemedText
@@ -859,10 +879,11 @@ export function ExpandedPlayer({
                         </ThemedText>
                       </View>
                       <View style={collectionStyles.downloadButton}>
-                        <Ionicons
-                          name="download-outline"
-                          size={24}
-                          color="white"
+                        <ExpoImage
+                          source={require("../../assets/images/replace-these/download-netflix-transparent.png")}
+                          style={{ width: 24, height: 24 }}
+                          cachePolicy="memory-disk"
+                          contentFit="contain"
                         />
                       </View>
                     </Pressable>
@@ -986,7 +1007,7 @@ const episodeStyles = StyleSheet.create({
     marginBottom: 12,
   },
   itemContainer: {
-    marginBottom: 14,
+    marginBottom: 20,
   },
   itemRow: {
     flexDirection: "row",
@@ -994,6 +1015,7 @@ const episodeStyles = StyleSheet.create({
     gap: 12,
   },
   itemThumbContainer: {
+    position: "relative",
     width: 130,
     aspectRatio: 16 / 9,
     borderRadius: 4,
@@ -1002,6 +1024,12 @@ const episodeStyles = StyleSheet.create({
   itemThumb: {
     width: "100%",
     height: "100%",
+  },
+  playOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.3)",
   },
   itemInfo: {
     flex: 1,
@@ -1024,7 +1052,7 @@ const episodeStyles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     color: "#888",
-    marginTop: 6,
+    marginTop: 8,
     width: "75%",
   },
 });
@@ -1081,7 +1109,7 @@ const collectionStyles = StyleSheet.create({
     marginBottom: 12,
   },
   itemContainer: {
-    marginBottom: 14,
+    marginBottom: 20,
   },
   itemRow: {
     flexDirection: "row",
@@ -1089,6 +1117,7 @@ const collectionStyles = StyleSheet.create({
     gap: 12,
   },
   itemThumbContainer: {
+    position: "relative",
     width: 130,
     aspectRatio: 16 / 9,
     borderRadius: 4,
@@ -1097,6 +1126,12 @@ const collectionStyles = StyleSheet.create({
   itemThumb: {
     width: "100%",
     height: "100%",
+  },
+  playOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.3)",
   },
   itemInfo: {
     flex: 1,
@@ -1119,7 +1154,7 @@ const collectionStyles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     color: "#888",
-    marginTop: 6,
+    marginTop: 8,
     width: "75%",
   },
 });
