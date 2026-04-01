@@ -269,9 +269,14 @@ export function AnimatedHeader({
                 <Pressable
                   style={[
                     styles.categoryTab,
+                    {
+                      borderTopRightRadius: 12,
+                      borderBottomRightRadius: 12,
+                      borderTopLeftRadius: 20,
+                      borderBottomLeftRadius: 20,
+                    },
                     activeFilter === "Series" && {
                       backgroundColor: "rgba(255,255,255,0.15)",
-                      borderRadius: 20,
                     },
                   ]}
                   onPress={() => {
@@ -291,9 +296,9 @@ export function AnimatedHeader({
                 <Pressable
                   style={[
                     styles.categoryTab,
+                    { borderRadius: 12 },
                     activeFilter === "Movie" && {
                       backgroundColor: "rgba(255,255,255,0.15)",
-                      borderRadius: 20,
                     },
                   ]}
                   onPress={() => {
@@ -315,7 +320,13 @@ export function AnimatedHeader({
                     <Pressable
                       style={[
                         styles.categoryTab,
-                        { backgroundColor: "rgba(255,255,255,0.15)" },
+                        {
+                          backgroundColor: "rgba(255,255,255,0.15)",
+                          borderTopLeftRadius: 12,
+                          borderBottomLeftRadius: 12,
+                          borderTopRightRadius: 20,
+                          borderBottomRightRadius: 20,
+                        },
                       ]}
                       onPress={() => onGenreSelect?.(null)}
                     >
@@ -335,7 +346,15 @@ export function AnimatedHeader({
                   </>
                 ) : (
                   <Pressable
-                    style={styles.categoryTab}
+                    style={[
+                      styles.categoryTab,
+                      {
+                        borderTopLeftRadius: 12,
+                        borderBottomLeftRadius: 12,
+                        borderTopRightRadius: 20,
+                        borderBottomRightRadius: 20,
+                      },
+                    ]}
                     onPress={onCategoryPress}
                   >
                     <Text style={styles.categoryTabTextWithIcon}>
