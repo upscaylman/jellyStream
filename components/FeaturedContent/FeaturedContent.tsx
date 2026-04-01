@@ -39,7 +39,10 @@ export function FeaturedContent({
       style={[styles.featuredContent, { marginTop: topMargin }]}
       onPress={() => {
         if (isValidId) {
-          router.push({ pathname: "/movie/[id]", params: { id: movie.id } });
+          router.push({
+            pathname: "/(tabs)/movie/[id]",
+            params: { id: movie.id },
+          });
         }
       }}
     >

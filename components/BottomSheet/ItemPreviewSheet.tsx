@@ -55,7 +55,7 @@ export function ItemPreviewSheet({ itemId }: IItemPreviewSheetProps) {
   const navigateToDetail = () => {
     closeSheet();
     router.push({
-      pathname: "/movie/[id]",
+      pathname: "/(tabs)/movie/[id]",
       params: { id: item.Id! },
     });
   };

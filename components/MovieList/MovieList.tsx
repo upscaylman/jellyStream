@@ -38,7 +38,7 @@ const MovieItem = ({
   <Pressable
     onPress={() =>
       router.push({
-        pathname: "/movie/[id]",
+        pathname: "/(tabs)/movie/[id]",
         params: { id: item.id },
       })
     }
@@ -217,7 +217,7 @@ const rowHeaderStyles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "baseline",
     paddingRight: 12,
-    marginTop: 18,
+    marginTop: 28,
     marginBottom: 10,
     marginLeft: 16,
   },

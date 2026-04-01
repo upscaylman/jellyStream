@@ -266,7 +266,7 @@ export function useJellyfinHome(): JellyfinHomeData {
         return m;
       }),
       showAll: true,
-      showAllRoute: "/films",
+      showAllRoute: "/(tabs)/films",
     });
   }
 
@@ -279,7 +279,7 @@ export function useJellyfinHome(): JellyfinHomeData {
         return m;
       }),
       showAll: true,
-      showAllRoute: "/series-list",
+      showAllRoute: "/(tabs)/series-list",
     });
   }
 

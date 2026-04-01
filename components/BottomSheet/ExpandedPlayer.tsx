@@ -825,7 +825,7 @@ export function ExpandedPlayer({
                       onPress={() => {
                         if (colItem.Id) {
                           router.push({
-                            pathname: "/movie/[id]",
+                            pathname: "/(tabs)/movie/[id]",
                             params: { id: colItem.Id },
                           });
                         }
@@ -922,7 +922,7 @@ export function ExpandedPlayer({
                     onPress={() => {
                       if (similar.Id) {
                         router.push({
-                          pathname: "/movie/[id]",
+                          pathname: "/(tabs)/movie/[id]",
                           params: { id: similar.Id },
                         });
                       }

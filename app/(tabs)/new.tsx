@@ -222,7 +222,7 @@ export default function NewScreen() {
       <Pressable
         key={item.Id}
         style={newStyles.comingSoonItem}
-        onPress={() => router.push(`/movie/${item.Id}`)}
+        onPress={() => router.push(`/(tabs)/movie/${item.Id}`)}
       >
         <View style={newStyles.contentContainer}>
           <View style={newStyles.previewCard}>
@@ -307,7 +307,7 @@ export default function NewScreen() {
                 style={itemStyles.myListBtn}
                 onPress={() => {
                   if (item.Id) {
-                    router.push(`/movie/${item.Id}`);
+                    router.push(`/(tabs)/movie/${item.Id}`);
                   }
                 }}
               >
@@ -338,7 +338,7 @@ export default function NewScreen() {
       <Pressable
         key={item.Id}
         style={newStyles.top10Item}
-        onPress={() => router.push(`/movie/${item.Id}`)}
+        onPress={() => router.push(`/(tabs)/movie/${item.Id}`)}
       >
         <View style={newStyles.top10RankContainer}>
           <Text

@@ -80,7 +80,7 @@ export const styles = StyleSheet.create({
   featuredContent: {
     width: "100%",
     height: 528,
-    marginBottom: 24,
+    marginBottom: 14,
     position: "relative",
     paddingHorizontal: 20,
   },
@@ -195,7 +195,7 @@ export const styles = StyleSheet.create({
     fontWeight: "bold",
     marginLeft: 16,
     marginBottom: 10,
-    marginTop: 18,
+    marginTop: 28,
   },
   contentList: {
     paddingHorizontal: 16,

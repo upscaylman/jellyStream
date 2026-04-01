@@ -169,24 +169,6 @@ function AnimatedStack() {
               },
             }}
           />
-          <Stack.Screen
-            name="films"
-            options={{
-              headerShown: false,
-              contentStyle: {
-                backgroundColor: "#141414",
-              },
-            }}
-          />
-          <Stack.Screen
-            name="series-list"
-            options={{
-              headerShown: false,
-              contentStyle: {
-                backgroundColor: "#141414",
-              },
-            }}
-          />
           <Stack.Screen name="+not-found" />
         </Stack>
       </Animated.View>

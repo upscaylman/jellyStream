@@ -95,7 +95,7 @@ export default function ProfileScreen() {
       return (
         <TouchableOpacity
           style={styles.likedItemContainer}
-          onPress={() => router.push(`/movie/${item.Id}`)}
+          onPress={() => router.push(`/(tabs)/movie/${item.Id}`)}
         >
           {uri ? (
             <ExpoImage

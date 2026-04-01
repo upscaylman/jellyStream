@@ -258,7 +258,7 @@ export default function SearchTab() {
                       style={styles.posterCard}
                       onPress={() =>
                         router.push({
-                          pathname: "/movie/[id]",
+                          pathname: "/(tabs)/movie/[id]",
                           params: { id: item.Id ?? "" },
                         })
                       }
@@ -327,7 +327,7 @@ export default function SearchTab() {
                       style={styles.rowPoster}
                       onPress={() =>
                         router.push({
-                          pathname: "/movie/[id]",
+                          pathname: "/(tabs)/movie/[id]",
                           params: { id: item.Id ?? "" },
                         })
                       }
@@ -390,7 +390,7 @@ export default function SearchTab() {
                         style={styles.rowPoster}
                         onPress={() =>
                           router.push({
-                            pathname: "/movie/[id]",
+                            pathname: "/(tabs)/movie/[id]",
                             params: { id: item.Id ?? "" },
                           })
                         }
@@ -450,7 +450,7 @@ export default function SearchTab() {
                       style={styles.itemRow}
                       onPress={() =>
                         router.push({
-                          pathname: "/movie/[id]",
+                          pathname: "/(tabs)/movie/[id]",
                           params: { id: item.Id ?? "" },
                         })
                       }
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   section: {
-    paddingVertical: 16,
+    paddingVertical: 24,
   },
   sectionTitle: {
     color: "white",

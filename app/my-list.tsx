@@ -104,7 +104,7 @@ export default function MyListScreen() {
       return (
         <Pressable
           style={s.itemRow}
-          onPress={() => router.push(`/movie/${item.Id}`)}
+          onPress={() => router.push(`/(tabs)/movie/${item.Id}`)}
         >
           <View style={s.itemThumbContainer}>
             {imageUri ? (

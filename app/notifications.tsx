@@ -114,7 +114,7 @@ export default function NotificationsScreen() {
     return (
       <TouchableOpacity
         style={styles.notificationRow}
-        onPress={() => router.push(`/movie/${item.id}`)}
+        onPress={() => router.push(`/(tabs)/movie/${item.id}`)}
         activeOpacity={0.7}
       >
         {imageUri ? (
