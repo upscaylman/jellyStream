@@ -1,3 +1,4 @@
+import { useCastSheet } from "@/hooks/useCastSheet";
 import { CastIcon } from "@/icons/CastIcon";
 import {
   useLatestMovies,
@@ -46,6 +47,7 @@ interface NotificationItem {
 export default function NotificationsScreen() {
   const router = useRouter();
   const serverUrl = useAuthStore((s) => s.serverUrl) ?? "";
+  const openCast = useCastSheet();
   const markAsSeen = useNotificationStore((s) => s.markAsSeen);
 
   // Marquer les notifications comme lues à l'ouverture
@@ -157,7 +159,7 @@ export default function NotificationsScreen() {
           <Ionicons name="arrow-back" size={24} color="white" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
-        <TouchableOpacity style={styles.castButton}>
+        <TouchableOpacity style={styles.castButton} onPress={openCast}>
           <CastIcon size={24} color="#fff" />
         </TouchableOpacity>
       </View>

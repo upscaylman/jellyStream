@@ -1,6 +1,7 @@
 // Écran de sélection du serveur Jellyfin
 import { jellyfin } from "@/src/api/client";
 import { useAuthStore } from "@/src/stores/authStore";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -93,54 +94,62 @@ export default function ServerSelectScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <View style={styles.content}>
-        <View style={styles.logoContainer}>
-          <Image
-            source={require("@/assets/images/logo.png")}
-            style={styles.logoImage}
-            resizeMode="contain"
+    <View style={styles.container}>
+      {/* Dégradé noir → rouge */}
+      <LinearGradient
+        colors={["rgba(139, 0, 0, 0.56)", "rgba(0, 0, 0, 0.95)"]}
+        locations={[0, 0.4]}
+        style={[StyleSheet.absoluteFillObject, { pointerEvents: "none" }]}
+      />
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <View style={styles.content}>
+          <View style={styles.logoContainer}>
+            <Image
+              source={require("@/assets/images/logo.png")}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+            <Text style={styles.logo}>JellyStream</Text>
+          </View>
+          <Text style={styles.subtitle}>
+            Connectez-vous à votre serveur Jellyfin
+          </Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="https://jellyfin.exemple.com"
+            placeholderTextColor="#808080"
+            value={serverUrl}
+            onChangeText={(text) => {
+              setServerUrl(text);
+              setError(null);
+            }}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+            returnKeyType="go"
+            onSubmitEditing={handleConnect}
           />
-          <Text style={styles.logo}>JellyStream</Text>
+
+          {error && <Text style={styles.error}>{error}</Text>}
+
+          <Pressable
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleConnect}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Se connecter</Text>
+            )}
+          </Pressable>
         </View>
-        <Text style={styles.subtitle}>
-          Connectez-vous à votre serveur Jellyfin
-        </Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="https://jellyfin.exemple.com"
-          placeholderTextColor="#808080"
-          value={serverUrl}
-          onChangeText={(text) => {
-            setServerUrl(text);
-            setError(null);
-          }}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-          returnKeyType="go"
-          onSubmitEditing={handleConnect}
-        />
-
-        {error && <Text style={styles.error}>{error}</Text>}
-
-        <Pressable
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handleConnect}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Se connecter</Text>
-          )}
-        </Pressable>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -148,6 +157,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#141414",
+  },
+  keyboardView: {
+    flex: 1,
   },
   content: {
     flex: 1,

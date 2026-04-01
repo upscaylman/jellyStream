@@ -20,18 +20,34 @@ export function useCastSessions() {
     queryFn: async () => {
       if (!api || !userId) return [];
       const sessionApi = getSessionApi(api);
-      const { data } = await sessionApi.getSessions({
+      const currentDeviceId = jellyfin.deviceInfo.id;
+
+      // Stratégie 1 : sessions contrôlables par l'utilisateur
+      const { data: controllable } = await sessionApi.getSessions({
         controllableByUserId: userId,
         activeWithinSeconds: 960,
       });
-      // Exclure l'appareil courant
-      const currentDeviceId = jellyfin.deviceInfo.id;
-      return data.filter(
-        (s) => s.SupportsMediaControl && s.DeviceId !== currentDeviceId,
-      );
+
+      // Stratégie 2 : toutes les sessions actives (fallback)
+      const { data: allSessions } = await sessionApi.getSessions({
+        activeWithinSeconds: 960,
+      });
+
+      // Fusionner et dédupliquer par Id
+      const seen = new Set<string>();
+      const merged: SessionInfoDto[] = [];
+      for (const s of [...controllable, ...allSessions]) {
+        if (!s.Id || seen.has(s.Id)) continue;
+        seen.add(s.Id);
+        // Exclure l'appareil courant
+        if (s.DeviceId === currentDeviceId) continue;
+        merged.push(s);
+      }
+
+      return merged;
     },
     enabled: !!api && !!userId,
-    refetchInterval: 10_000, // Rafraîchir toutes les 10s
+    refetchInterval: 10_000,
     staleTime: 5_000,
   });
 }

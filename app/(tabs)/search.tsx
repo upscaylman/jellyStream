@@ -1,3 +1,4 @@
+import { useCastSheet } from "@/hooks/useCastSheet";
 import { CastIcon } from "@/icons/CastIcon";
 import { useSearchItems, useTrending } from "@/src/api/queries/useMediaQueries";
 import { useAuthStore } from "@/src/stores/authStore";
@@ -35,6 +36,7 @@ export default function SearchTab() {
   const serverUrl = useAuthStore((s) => s.serverUrl) ?? "";
   const insets = useSafeAreaInsets();
   const badgeCount = useNotificationBadgeCount();
+  const openCast = useCastSheet();
 
   const { data: searchResults, isLoading: isSearching } =
     useSearchItems(debouncedSearchTerm);
@@ -120,12 +122,7 @@ export default function SearchTab() {
         <View style={styles.headerRow}>
           <Text style={styles.headerTitle}>Rechercher</Text>
           <View style={styles.headerButtons}>
-            <TouchableOpacity
-              style={styles.headerIcon}
-              onPress={() => {
-                /* TODO: cast */
-              }}
-            >
+            <TouchableOpacity style={styles.headerIcon} onPress={openCast}>
               <CastIcon size={28} color="#fff" />
             </TouchableOpacity>
             <TouchableOpacity

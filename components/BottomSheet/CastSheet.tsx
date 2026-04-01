@@ -2,11 +2,13 @@
 import { useBottomSheet } from "@/components/BottomSheet/BottomSheetContext";
 import { CastIcon } from "@/icons/CastIcon";
 import { useCastSessions } from "@/src/api/queries/useCastSessions";
+import { useGoogleCast } from "@/src/hooks/useGoogleCast";
 import { Ionicons } from "@expo/vector-icons";
 import type { SessionInfoDto } from "@jellyfin/sdk/lib/generated-client/models/session-info-dto";
 import React from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,12 +22,26 @@ interface ICastSheetProps {
 
 export function CastSheet({ onSelect }: ICastSheetProps) {
   const { data: sessions, isLoading, refetch } = useCastSessions();
+  const googleCast = useGoogleCast();
   const { closeSheet } = useBottomSheet();
 
   const handleSelect = (session: SessionInfoDto) => {
     onSelect?.(session);
     closeSheet();
   };
+
+  const handleChromecast = async () => {
+    await googleCast.requestSession();
+    closeSheet();
+  };
+
+  const handleDisconnectChromecast = () => {
+    googleCast.disconnect();
+  };
+
+  const hasJellyfinSessions = (sessions?.length ?? 0) > 0;
+  const hasChromecast = Platform.OS === "web" && googleCast.available;
+  const hasAnyDevice = hasJellyfinSessions || hasChromecast;
 
   return (
     <View style={s.container}>
@@ -39,16 +55,67 @@ export function CastSheet({ onSelect }: ICastSheetProps) {
           <ActivityIndicator color="#E50914" size="small" />
           <Text style={s.loadingText}>Recherche d'appareils…</Text>
         </View>
-      ) : !sessions?.length ? (
+      ) : !hasAnyDevice ? (
         <View style={s.emptyContainer}>
           <Text style={s.emptyText}>Aucun appareil disponible</Text>
+          <Text style={s.hintText}>
+            Assurez-vous qu'un appareil Jellyfin ou Chromecast est allumé sur le
+            même réseau.
+          </Text>
           <Pressable style={s.retryButton} onPress={() => refetch()}>
             <Text style={s.retryText}>Réessayer</Text>
           </Pressable>
         </View>
       ) : (
         <ScrollView style={s.list}>
-          {sessions.map((session) => (
+          {/* Chromecast via Google Cast SDK */}
+          {hasChromecast && (
+            <>
+              {googleCast.connectedDevice ? (
+                <Pressable
+                  style={[s.deviceRow, s.deviceRowActive]}
+                  onPress={handleDisconnectChromecast}
+                >
+                  <CastIcon size={22} color="#E50914" />
+                  <View style={s.deviceInfo}>
+                    <Text style={[s.deviceName, { color: "#E50914" }]}>
+                      {googleCast.connectedDevice.name}
+                    </Text>
+                    <Text style={s.deviceClient}>
+                      Connecté · Appuyez pour déconnecter
+                    </Text>
+                  </View>
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={s.deviceRow}
+                  onPress={handleChromecast}
+                  disabled={googleCast.isConnecting}
+                >
+                  <CastIcon size={22} color="#B3B3B3" />
+                  <View style={s.deviceInfo}>
+                    <Text style={s.deviceName}>Chromecast</Text>
+                    <Text style={s.deviceClient}>
+                      {googleCast.isConnecting
+                        ? "Connexion…"
+                        : "Appareils Google Cast disponibles"}
+                    </Text>
+                  </View>
+                  {googleCast.isConnecting && (
+                    <ActivityIndicator color="#E50914" size="small" />
+                  )}
+                </Pressable>
+              )}
+            </>
+          )}
+
+          {/* Sessions Jellyfin */}
+          {hasJellyfinSessions && hasChromecast && (
+            <View style={s.sectionSeparator}>
+              <Text style={s.sectionLabel}>Appareils Jellyfin</Text>
+            </View>
+          )}
+          {sessions?.map((session) => (
             <Pressable
               key={session.Id}
               style={s.deviceRow}
@@ -103,17 +170,24 @@ const s = StyleSheet.create({
   emptyContainer: {
     padding: 32,
     alignItems: "center",
-    gap: 16,
+    gap: 12,
   },
   emptyText: {
     color: "#B3B3B3",
     fontSize: 14,
+  },
+  hintText: {
+    color: "#666",
+    fontSize: 12,
+    textAlign: "center",
+    paddingHorizontal: 16,
   },
   retryButton: {
     paddingHorizontal: 20,
     paddingVertical: 8,
     backgroundColor: "rgba(255,255,255,0.1)",
     borderRadius: 6,
+    marginTop: 4,
   },
   retryText: {
     color: "#fff",
@@ -131,6 +205,9 @@ const s = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "rgba(255,255,255,0.06)",
   },
+  deviceRowActive: {
+    backgroundColor: "rgba(229,9,20,0.08)",
+  },
   deviceInfo: {
     flex: 1,
   },
@@ -143,5 +220,17 @@ const s = StyleSheet.create({
     color: "#808080",
     fontSize: 13,
     marginTop: 2,
+  },
+  sectionSeparator: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 6,
+  },
+  sectionLabel: {
+    color: "#808080",
+    fontSize: 12,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
 });

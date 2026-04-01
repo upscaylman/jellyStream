@@ -18,6 +18,7 @@ import {
 
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useCastSheet } from "@/hooks/useCastSheet";
 import { CastIcon } from "@/icons/CastIcon";
 import {
   useFavoriteChannels,
@@ -156,6 +157,7 @@ function ChannelCard({
 export default function DirectTVScreen() {
   const router = useRouter();
   const serverUrl = useAuthStore((s) => s.serverUrl) ?? "";
+  const openCast = useCastSheet();
   const [activeTab, setActiveTab] = useState("all");
 
   const { data: allChannels, isLoading: isLoadingAll } = useLiveTvChannels();
@@ -228,7 +230,7 @@ export default function DirectTVScreen() {
           <View style={localStyles.headerContent}>
             <Text style={localStyles.headerTitle}>Direct TV</Text>
             <View style={localStyles.headerRight}>
-              <Pressable onPress={() => {}}>
+              <Pressable onPress={openCast}>
                 <CastIcon size={24} color="#fff" />
               </Pressable>
             </View>

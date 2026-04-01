@@ -1,4 +1,5 @@
 import { MovieList } from "@/components/MovieList/MovieList";
+import { useCastSheet } from "@/hooks/useCastSheet";
 import { CastIcon } from "@/icons/CastIcon";
 import {
   useFavoriteItems,
@@ -52,6 +53,7 @@ export default function ProfileScreen() {
   useScrollToTop(scrollViewRef);
   const insets = useSafeAreaInsets();
   const badgeCount = useNotificationBadgeCount();
+  const openCast = useCastSheet();
 
   // Scroll animation (même pattern que Home)
   const SCROLL_THRESHOLD = 4;
@@ -237,12 +239,7 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-down" size={18} color="#fff" />
             </Pressable>
             <View style={styles.headerButtons}>
-              <Pressable
-                style={styles.headerIcon}
-                onPress={() => {
-                  /* TODO: cast */
-                }}
-              >
+              <Pressable style={styles.headerIcon} onPress={openCast}>
                 <CastIcon size={28} color="#fff" />
               </Pressable>
               <Pressable
@@ -277,6 +274,7 @@ export default function ProfileScreen() {
       {/* Contenu scrollable */}
       <Animated.ScrollView
         ref={scrollViewRef}
+        style={{ flex: 1 }}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
@@ -332,6 +330,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000",
+    overflow: "hidden",
   },
   header: {
     position: "absolute",

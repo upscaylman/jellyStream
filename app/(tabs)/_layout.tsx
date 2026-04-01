@@ -7,7 +7,7 @@ import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
 import { Tabs } from "expo-router";
 import React from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 // Helper component for cross-platform icons
 function TabIcon({
@@ -97,7 +97,7 @@ export const TAB_SCREENS = [
     ),
   },
   {
-    name: "(profile)/profile",
+    name: "(profile)",
     title: "Mon JellyStream",
     icon: ({ focused }: { focused: boolean }) => (
       <ProfileImage focused={focused} />
@@ -126,7 +126,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: "#FFFFFF",
         tabBarInactiveTintColor: "#B3B3B3",
         headerShown: false,
-        ...(Platform.OS === "web" && { unmountOnBlur: true }),
+        freezeOnBlur: true,
         tabBarStyle: {
           position: "absolute",
           borderTopWidth: 0,
