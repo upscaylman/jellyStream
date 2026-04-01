@@ -14,6 +14,7 @@ import {
 } from "@/src/api/queries/useMediaQueries";
 import { useAuthStore } from "@/src/stores/authStore";
 import {
+  getBackdropUrl,
   getHlsStreamUrl,
   getImageUrl,
   getWebTranscodedUrl,
@@ -647,67 +648,78 @@ export function ExpandedPlayer({
                   ? `${Math.round(ep.RunTimeTicks / 600000000)}m`
                   : "";
                 return (
-                  <Pressable
-                    key={ep.Id}
-                    style={episodeStyles.episodeRow}
-                    onPress={() => {
-                      if (ep.Id) {
-                        player.pause();
-                        router.push({
-                          pathname: "/player",
-                          params: { itemId: ep.Id, title: ep.Name ?? "" },
-                        });
-                      }
-                    }}
-                  >
-                    <View style={episodeStyles.episodeThumbContainer}>
-                      {epThumb ? (
-                        <ExpoImage
-                          source={{ uri: epThumb }}
-                          style={episodeStyles.episodeThumb}
-                          cachePolicy="memory-disk"
-                          transition={200}
-                          contentFit="cover"
-                        />
-                      ) : (
-                        <View
-                          style={[
-                            episodeStyles.episodeThumb,
-                            { backgroundColor: "#2a2a2a" },
-                          ]}
-                        />
-                      )}
-                      <View style={episodeStyles.playOverlay}>
+                  <View key={ep.Id} style={episodeStyles.itemContainer}>
+                    <Pressable
+                      style={episodeStyles.itemRow}
+                      onPress={() => {
+                        if (ep.Id) {
+                          player.pause();
+                          router.push({
+                            pathname: "/player",
+                            params: { itemId: ep.Id, title: ep.Name ?? "" },
+                          });
+                        }
+                      }}
+                    >
+                      <View style={episodeStyles.itemThumbContainer}>
+                        {epThumb ? (
+                          <ExpoImage
+                            source={{ uri: epThumb }}
+                            style={episodeStyles.itemThumb}
+                            cachePolicy="memory-disk"
+                            transition={200}
+                            contentFit="cover"
+                          />
+                        ) : (
+                          <View
+                            style={[
+                              episodeStyles.itemThumb,
+                              {
+                                backgroundColor: "#2a2a2a",
+                                justifyContent: "center",
+                                alignItems: "center",
+                              },
+                            ]}
+                          >
+                            <Ionicons
+                              name="film-outline"
+                              size={24}
+                              color="#555"
+                            />
+                          </View>
+                        )}
+                      </View>
+                      <View style={episodeStyles.itemInfo}>
+                        <ThemedText
+                          style={episodeStyles.itemTitle}
+                          numberOfLines={2}
+                        >
+                          {ep.IndexNumber ? `${ep.IndexNumber}. ` : ""}
+                          {ep.Name}
+                        </ThemedText>
+                        {epDuration ? (
+                          <ThemedText style={episodeStyles.itemMeta}>
+                            {epDuration}
+                          </ThemedText>
+                        ) : null}
+                      </View>
+                      <View style={episodeStyles.downloadButton}>
                         <Ionicons
-                          name="play-circle-outline"
-                          size={30}
+                          name="download-outline"
+                          size={24}
                           color="white"
                         />
                       </View>
-                    </View>
-                    <View style={episodeStyles.episodeInfo}>
+                    </Pressable>
+                    {ep.Overview ? (
                       <ThemedText
-                        style={episodeStyles.episodeTitle}
-                        numberOfLines={1}
+                        style={episodeStyles.episodeOverview}
+                        numberOfLines={3}
                       >
-                        {ep.IndexNumber ? `${ep.IndexNumber}. ` : ""}
-                        {ep.Name}
+                        {ep.Overview}
                       </ThemedText>
-                      {epDuration ? (
-                        <ThemedText style={episodeStyles.episodeDuration}>
-                          {epDuration}
-                        </ThemedText>
-                      ) : null}
-                      {ep.Overview ? (
-                        <ThemedText
-                          style={episodeStyles.episodeOverview}
-                          numberOfLines={2}
-                        >
-                          {ep.Overview}
-                        </ThemedText>
-                      ) : null}
-                    </View>
-                  </Pressable>
+                    ) : null}
+                  </View>
                 );
               })}
             </View>
@@ -759,15 +771,26 @@ export function ExpandedPlayer({
             {collectionData!.items
               .filter((colItem) => colItem.Id !== itemId)
               .map((colItem) => {
-                const colTag = colItem.ImageTags?.["Primary"];
+                const backdropTag = colItem.BackdropImageTags?.[0];
+                const primaryTag = colItem.ImageTags?.["Primary"];
                 const colThumb = colItem.Id
-                  ? getImageUrl({
-                      serverUrl,
-                      itemId: colItem.Id,
-                      maxWidth: 300,
-                      quality: 80,
-                      tag: colTag ?? undefined,
-                    })
+                  ? backdropTag
+                    ? getBackdropUrl(
+                        serverUrl,
+                        colItem.Id,
+                        600,
+                        80,
+                        backdropTag,
+                      )
+                    : primaryTag
+                      ? getImageUrl({
+                          serverUrl,
+                          itemId: colItem.Id,
+                          maxWidth: 600,
+                          quality: 80,
+                          tag: primaryTag,
+                        })
+                      : getBackdropUrl(serverUrl, colItem.Id, 600, 80)
                   : "";
                 const colYear = colItem.ProductionYear
                   ? String(colItem.ProductionYear)
@@ -783,72 +806,75 @@ export function ExpandedPlayer({
                     })()
                   : "";
                 return (
-                  <Pressable
-                    key={colItem.Id}
-                    style={collectionStyles.itemRow}
-                    onPress={() => {
-                      if (colItem.Id) {
-                        router.push({
-                          pathname: "/movie/[id]",
-                          params: { id: colItem.Id },
-                        });
-                      }
-                    }}
-                  >
-                    <View style={collectionStyles.thumbContainer}>
-                      {colThumb ? (
-                        <ExpoImage
-                          source={{ uri: colThumb }}
-                          style={collectionStyles.thumb}
-                          cachePolicy="memory-disk"
-                          transition={200}
-                          contentFit="cover"
-                        />
-                      ) : (
-                        <View
-                          style={[
-                            collectionStyles.thumb,
-                            { backgroundColor: "#2a2a2a" },
-                          ]}
-                        />
-                      )}
-                      <View style={collectionStyles.playOverlay}>
+                  <View key={colItem.Id} style={collectionStyles.itemContainer}>
+                    <Pressable
+                      style={collectionStyles.itemRow}
+                      onPress={() => {
+                        if (colItem.Id) {
+                          router.push({
+                            pathname: "/movie/[id]",
+                            params: { id: colItem.Id },
+                          });
+                        }
+                      }}
+                    >
+                      <View style={collectionStyles.itemThumbContainer}>
+                        {colThumb ? (
+                          <ExpoImage
+                            source={{ uri: colThumb }}
+                            style={collectionStyles.itemThumb}
+                            cachePolicy="memory-disk"
+                            transition={200}
+                            contentFit="cover"
+                          />
+                        ) : (
+                          <View
+                            style={[
+                              collectionStyles.itemThumb,
+                              {
+                                backgroundColor: "#2a2a2a",
+                                justifyContent: "center",
+                                alignItems: "center",
+                              },
+                            ]}
+                          >
+                            <Ionicons
+                              name="film-outline"
+                              size={24}
+                              color="#555"
+                            />
+                          </View>
+                        )}
+                      </View>
+                      <View style={collectionStyles.itemInfo}>
+                        <ThemedText
+                          style={collectionStyles.itemTitle}
+                          numberOfLines={2}
+                        >
+                          {colItem.Name}
+                        </ThemedText>
+                        <ThemedText style={collectionStyles.itemMeta}>
+                          {colYear}
+                          {colDuration ? ` • ${colDuration}` : ""}
+                        </ThemedText>
+                      </View>
+                      <View style={collectionStyles.downloadButton}>
                         <Ionicons
-                          name="play-circle-outline"
-                          size={30}
+                          name="download-outline"
+                          size={24}
                           color="white"
                         />
                       </View>
-                    </View>
-                    <View style={collectionStyles.info}>
+                    </Pressable>
+                    {colItem.Overview ? (
                       <ThemedText
-                        style={collectionStyles.title}
-                        numberOfLines={1}
+                        style={collectionStyles.overview}
+                        numberOfLines={3}
                       >
-                        {colItem.Name}
+                        {colItem.Overview}
                       </ThemedText>
-                      <View style={collectionStyles.metaRow}>
-                        {colYear ? (
-                          <ThemedText style={collectionStyles.meta}>
-                            {colYear}
-                          </ThemedText>
-                        ) : null}
-                        {colDuration ? (
-                          <ThemedText style={collectionStyles.meta}>
-                            {colDuration}
-                          </ThemedText>
-                        ) : null}
-                      </View>
-                      {colItem.Overview ? (
-                        <ThemedText
-                          style={collectionStyles.overview}
-                          numberOfLines={2}
-                        >
-                          {colItem.Overview}
-                        </ThemedText>
-                      ) : null}
-                    </View>
-                  </Pressable>
+                    ) : null}
+                  </View>
                 );
               })}
           </View>
@@ -959,48 +985,47 @@ const episodeStyles = StyleSheet.create({
     color: "#fff",
     marginBottom: 12,
   },
-  episodeRow: {
-    flexDirection: "row",
+  itemContainer: {
     marginBottom: 14,
-    gap: 10,
   },
-  episodeThumbContainer: {
-    position: "relative",
+  itemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  itemThumbContainer: {
     width: 130,
     aspectRatio: 16 / 9,
     borderRadius: 4,
     overflow: "hidden",
   },
-  episodeThumb: {
+  itemThumb: {
     width: "100%",
     height: "100%",
-    borderRadius: 4,
   },
-  playOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.3)",
-  },
-  episodeInfo: {
+  itemInfo: {
     flex: 1,
     justifyContent: "center",
   },
-  episodeTitle: {
-    fontSize: 14,
-    fontWeight: "600",
+  itemTitle: {
     color: "#fff",
-    marginBottom: 2,
+    fontSize: 14,
+    fontWeight: "bold",
   },
-  episodeDuration: {
+  itemMeta: {
+    color: "#808080",
     fontSize: 12,
-    color: "#999",
-    marginBottom: 4,
+    marginTop: 2,
+  },
+  downloadButton: {
+    padding: 8,
   },
   episodeOverview: {
     fontSize: 12,
     lineHeight: 16,
     color: "#888",
+    marginTop: 6,
+    width: "75%",
   },
 });
 
@@ -1055,51 +1080,46 @@ const collectionStyles = StyleSheet.create({
     color: "#fff",
     marginBottom: 12,
   },
+  itemContainer: {
+    marginBottom: 14,
+  },
   itemRow: {
     flexDirection: "row",
-    marginBottom: 14,
-    gap: 10,
+    alignItems: "center",
+    gap: 12,
   },
-  thumbContainer: {
-    position: "relative",
-    width: 110,
-    aspectRatio: 2 / 3,
+  itemThumbContainer: {
+    width: 130,
+    aspectRatio: 16 / 9,
     borderRadius: 4,
     overflow: "hidden",
   },
-  thumb: {
+  itemThumb: {
     width: "100%",
     height: "100%",
-    borderRadius: 4,
   },
-  playOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.3)",
-  },
-  info: {
+  itemInfo: {
     flex: 1,
     justifyContent: "center",
   },
-  title: {
-    fontSize: 14,
-    fontWeight: "600",
+  itemTitle: {
     color: "#fff",
-    marginBottom: 2,
+    fontSize: 14,
+    fontWeight: "bold",
   },
-  metaRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 4,
-  },
-  meta: {
+  itemMeta: {
+    color: "#808080",
     fontSize: 12,
-    color: "#999",
+    marginTop: 2,
+  },
+  downloadButton: {
+    padding: 8,
   },
   overview: {
     fontSize: 12,
     lineHeight: 16,
     color: "#888",
+    marginTop: 6,
+    width: "75%",
   },
 });
