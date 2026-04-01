@@ -133,7 +133,7 @@ export function useJellyfinHome(): JellyfinHomeData {
   const newlyAdded = useNewlyAdded(20);
   const favorites = useFavoriteItems(20);
 
-  // Précharger l'index des collections (BoxSets) pour que les pages film soient instantanées
+  // Précharger l'index BoxSets en arrière-plan (une seule fois)
   useBoxSetIndex();
 
   const isLoading =

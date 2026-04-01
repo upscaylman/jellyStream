@@ -103,13 +103,6 @@ export function ExpandedPlayer({
   const isBoxSet = movie.type === "BoxSet";
   const itemId = typeof movie.id === "string" ? movie.id : movie.id.toString();
 
-  // DEBUG: log état des queries à chaque render
-  useEffect(() => {
-    console.log(
-      `[EXPANDED] Render — itemId=${itemId}, type=${movie.type}, similar=${similarItems?.length ?? "loading"}, isLoadingSimilar=${isLoadingSimilar}`,
-    );
-  });
-
   // Favoris / Ma liste
   const { data: isFavorite } = useIsFavorite(itemId);
   const toggleFavorite = useToggleFavorite();
@@ -134,13 +127,6 @@ export function ExpandedPlayer({
   const showCollectionTab =
     (isMovie || isBoxSet) && (hasCollection || isLoadingCollection);
   const hasSimilar = !!similarItems && similarItems.length > 0;
-
-  // DEBUG: log état collection
-  useEffect(() => {
-    console.log(
-      `[EXPANDED] Collection — loading=${isLoadingCollection}, hasCollection=${hasCollection}, items=${collectionData?.items.length ?? 0}, boxSet="${collectionData?.boxSet?.Name ?? ""}"`,
-    );
-  }, [isLoadingCollection, hasCollection, collectionData]);
 
   // Saisons & épisodes pour les séries
   const { data: seasons } = useSeasons(isSeries ? seriesId : "");

@@ -1,7 +1,6 @@
 // Queries TanStack pour les films et médias Jellyfin
 import { useAuthStore } from "@/src/stores/authStore";
 import {
-  BaseItemDto,
   BaseItemKind,
   ItemFields,
   ItemFilter,
@@ -690,227 +689,140 @@ export function useEpisodes(seriesId: string, seasonId: string) {
   });
 }
 
-// Collection (BoxSet) contenant un item donné
-// Stratégie 0 : l'item EST un BoxSet → récupérer ses enfants directement.
-// Stratégie : index préchargé → ancêtres → itération BoxSets séquentielle.
-export function useCollectionForItem(itemId: string, itemType?: string) {
-  const { api, userId } = useJellyfinApi();
-  const queryClient = useQueryClient();
+const TMDB_API_KEY = "0d6ab6b7b423555a44bd9a18c7330e06";
 
-  // Lecture synchrone de l'index pour placeholderData (rendu instantané)
-  const cachedIndex = queryClient.getQueryData<
-    Record<string, { boxSet: BaseItemDto; items: BaseItemDto[] }>
-  >(["boxset-index"]);
-  const placeholder = cachedIndex?.[itemId] ?? undefined;
-
-  return useQuery({
-    queryKey: ["collection-for-item", itemId],
-    queryFn: async () => {
-      const t0 = performance.now();
-      console.log(
-        `[COLLECTION] Début recherche pour ${itemId} (type=${itemType})`,
-      );
-
-      // Vérifier d'abord l'index préchargé
-      const idx = queryClient.getQueryData<
-        Record<string, { boxSet: BaseItemDto; items: BaseItemDto[] }>
-      >(["boxset-index"]);
-      if (idx?.[itemId]) {
-        console.log(
-          `[COLLECTION] ✅ Trouvé dans index préchargé en ${Math.round(performance.now() - t0)}ms`,
-        );
-        return idx[itemId];
-      }
-      console.log(
-        `[COLLECTION] Index préchargé: ${idx ? `${Object.keys(idx).length} items` : "ABSENT"}`,
-      );
-
-      const itemsApi = getItemsApi(api!);
-      const libApi = getLibraryApi(api!);
-
-      // Si l'item EST un BoxSet → retourner ses enfants directement
-      if (itemType === "BoxSet") {
-        const t1 = performance.now();
-        const [selfResult, children] = await Promise.all([
-          itemsApi.getItems({
-            userId,
-            ids: [itemId],
-            fields: [ItemFields.Overview, ItemFields.People],
-          }),
-          itemsApi.getItems({
-            userId,
-            parentId: itemId,
-            sortBy: [ItemSortBy.ProductionYear, ItemSortBy.SortName],
-            sortOrder: [SortOrder.Ascending],
-            fields: [ItemFields.Overview, ItemFields.People],
-          }),
-        ]);
-        const selfItem = selfResult.data.Items?.[0];
-        console.log(
-          `[COLLECTION] BoxSet direct: ${children.data.Items?.length ?? 0} enfants en ${Math.round(performance.now() - t1)}ms`,
-        );
-        if (selfItem) {
-          return { boxSet: selfItem, items: children.data.Items ?? [] };
-        }
-      }
-
-      // Stratégie 1 : ancêtres directs (rapide, 1 seule requête)
-      try {
-        const t1 = performance.now();
-        const ancestors = await libApi.getAncestors({ itemId, userId });
-        const boxSetAncestor = (ancestors.data ?? []).find(
-          (a) => a.Type === BaseItemKind.BoxSet,
-        );
-        console.log(
-          `[COLLECTION] Stratégie 1 (ancestors): ${ancestors.data?.length ?? 0} ancêtres, BoxSet=${boxSetAncestor ? "OUI" : "NON"} en ${Math.round(performance.now() - t1)}ms`,
-        );
-        if (boxSetAncestor?.Id) {
-          const t2 = performance.now();
-          const children = await itemsApi.getItems({
-            userId,
-            parentId: boxSetAncestor.Id,
-            sortBy: [ItemSortBy.ProductionYear, ItemSortBy.SortName],
-            sortOrder: [SortOrder.Ascending],
-            fields: [ItemFields.Overview, ItemFields.People],
-          });
-          const items = children.data.Items ?? [];
-          if (items.length > 0) {
-            console.log(
-              `[COLLECTION] ✅ Stratégie 1 match: ${items.length} items en ${Math.round(performance.now() - t2)}ms (total: ${Math.round(performance.now() - t0)}ms)`,
-            );
-            return { boxSet: boxSetAncestor, items };
-          }
-        }
-      } catch (_e) {
-        console.log(`[COLLECTION] Stratégie 1 erreur:`, _e);
-      }
-
-      // Stratégie 2 : itérer les BoxSets séquentiellement, s'arrêter au premier match
-      try {
-        const t3 = performance.now();
-        const boxSetsResult = await itemsApi.getItems({
-          userId,
-          includeItemTypes: [BaseItemKind.BoxSet],
-          recursive: true,
-        });
-        const boxSets = boxSetsResult.data.Items ?? [];
-        console.log(
-          `[COLLECTION] Stratégie 2: ${boxSets.length} BoxSets trouvés en ${Math.round(performance.now() - t3)}ms`,
-        );
-        for (let i = 0; i < boxSets.length; i++) {
-          const bs = boxSets[i];
-          try {
-            const t4 = performance.now();
-            const children = await itemsApi.getItems({
-              userId,
-              parentId: bs.Id!,
-              sortBy: [ItemSortBy.ProductionYear, ItemSortBy.SortName],
-              sortOrder: [SortOrder.Ascending],
-              fields: [ItemFields.Overview, ItemFields.People],
-            });
-            const items = children.data.Items ?? [];
-            const match = items.some((it) => it.Id === itemId);
-            console.log(
-              `[COLLECTION] Stratégie 2 [${i + 1}/${boxSets.length}] "${bs.Name}": ${items.length} items, match=${match} en ${Math.round(performance.now() - t4)}ms`,
-            );
-            if (match) {
-              console.log(
-                `[COLLECTION] ✅ Trouvé dans "${bs.Name}" (total: ${Math.round(performance.now() - t0)}ms)`,
-              );
-              return { boxSet: bs, items };
-            }
-          } catch (_e) {
-            // Ignorer
-          }
-        }
-        console.log(
-          `[COLLECTION] ❌ Aucun BoxSet ne contient cet item (total: ${Math.round(performance.now() - t0)}ms)`,
-        );
-      } catch (_e) {
-        console.log(`[COLLECTION] Stratégie 2 erreur:`, _e);
-      }
-
-      console.log(
-        `[COLLECTION] ❌ Aucune collection trouvée (total: ${Math.round(performance.now() - t0)}ms)`,
-      );
-      return null;
-    },
-    enabled: !!api && !!userId && !!itemId,
-    staleTime: 30 * 60 * 1000,
-    gcTime: 60 * 60 * 1000,
-    placeholderData: placeholder,
-  });
-}
-
-/**
- * Index global des BoxSets : précharge toutes les collections et leurs enfants.
- * Appelé une seule fois au démarrage (home), le cache est partagé par toutes les pages film.
- */
+// Liste des BoxSets avec ProviderIds (1 seule requête, pas de chargement d'enfants)
 export function useBoxSetIndex() {
   const { api, userId } = useJellyfinApi();
 
   return useQuery({
     queryKey: ["boxset-index"],
-    queryFn: async () => {
-      const t0 = performance.now();
-      console.log(
-        `[BOXSET-INDEX] Début chargement (api=${!!api}, userId=${userId})`,
-      );
+    queryFn: async (): Promise<{
+      byTmdb: Record<string, BaseItemDto>; // tmdbCollectionId → boxSet
+      byId: Record<string, BaseItemDto>; // boxSetId → boxSet
+    }> => {
       const itemsApi = getItemsApi(api!);
-      const boxSetsResult = await itemsApi.getItems({
+      const result = await itemsApi.getItems({
         userId,
         includeItemTypes: [BaseItemKind.BoxSet],
         recursive: true,
+        fields: [ItemFields.ProviderIds],
       });
-      const boxSets = boxSetsResult.data.Items ?? [];
+      const boxSets = result.data.Items ?? [];
+      const byTmdb: Record<string, BaseItemDto> = {};
+      const byId: Record<string, BaseItemDto> = {};
+      for (const bs of boxSets) {
+        if (bs.Id) byId[bs.Id] = bs;
+        const tmdbId = bs.ProviderIds?.Tmdb;
+        if (tmdbId) byTmdb[tmdbId] = bs;
+      }
       console.log(
-        `[BOXSET-INDEX] ${boxSets.length} BoxSets trouvés en ${Math.round(performance.now() - t0)}ms`,
+        `[BOXSET-INDEX] ✅ ${boxSets.length} BoxSets indexés (${Object.keys(byTmdb).length} avec TMDB ID)`,
       );
-      // Index : itemId → { boxSet, items }
-      const index: Record<
-        string,
-        { boxSet: BaseItemDto; items: BaseItemDto[] }
-      > = {};
-
-      // Charger les enfants de chaque BoxSet en parallèle (une seule fois, pas à chaque film)
-      await Promise.all(
-        boxSets.map(async (bs) => {
-          try {
-            const t1 = performance.now();
-            const children = await itemsApi.getItems({
-              userId,
-              parentId: bs.Id!,
-              sortBy: [ItemSortBy.ProductionYear, ItemSortBy.SortName],
-              sortOrder: [SortOrder.Ascending],
-              fields: [ItemFields.Overview, ItemFields.People],
-            });
-            const items = children.data.Items ?? [];
-            console.log(
-              `[BOXSET-INDEX] "${bs.Name}": ${items.length} enfants en ${Math.round(performance.now() - t1)}ms`,
-            );
-            for (const item of items) {
-              if (item.Id) {
-                index[item.Id] = { boxSet: bs, items };
-              }
-            }
-            // Le BoxSet lui-même pointe vers ses enfants
-            if (bs.Id) {
-              index[bs.Id] = { boxSet: bs, items };
-            }
-          } catch (_e) {
-            console.log(`[BOXSET-INDEX] ❌ Erreur pour "${bs.Name}":`, _e);
-          }
-        }),
-      );
-      console.log(
-        `[BOXSET-INDEX] ✅ Index complet: ${Object.keys(index).length} entrées en ${Math.round(performance.now() - t0)}ms`,
-      );
-      return index;
+      return { byTmdb, byId };
     },
     enabled: !!api && !!userId,
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
   });
+}
+
+// Récupère le TMDB collection ID d'un film via l'API TMDB (1 appel léger)
+function useTmdbCollectionId(tmdbMovieId: string | undefined) {
+  return useQuery({
+    queryKey: ["tmdb-collection", tmdbMovieId],
+    queryFn: async (): Promise<string | null> => {
+      const res = await fetch(
+        `https://api.themoviedb.org/3/movie/${tmdbMovieId}?api_key=${TMDB_API_KEY}&language=fr-FR`,
+      );
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.belongs_to_collection?.id?.toString() ?? null;
+    },
+    enabled: !!tmdbMovieId,
+    staleTime: 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+  });
+}
+
+// Récupère les ProviderIds d'un item Jellyfin (pour obtenir son TMDB ID)
+function useItemProviderIds(itemId: string | undefined) {
+  const { api, userId } = useJellyfinApi();
+
+  return useQuery({
+    queryKey: ["item-providers", itemId],
+    queryFn: async () => {
+      const itemsApi = getItemsApi(api!);
+      const result = await itemsApi.getItems({
+        userId,
+        ids: [itemId!],
+        fields: [ItemFields.ProviderIds],
+      });
+      return result.data.Items?.[0]?.ProviderIds ?? null;
+    },
+    enabled: !!api && !!userId && !!itemId,
+    staleTime: 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+  });
+}
+
+// Charge les enfants d'un BoxSet (1 requête, cachée par boxSetId)
+function useBoxSetChildren(boxSetId: string | undefined) {
+  const { api, userId } = useJellyfinApi();
+
+  return useQuery({
+    queryKey: ["boxset-children", boxSetId],
+    queryFn: async () => {
+      const itemsApi = getItemsApi(api!);
+      const children = await itemsApi.getItems({
+        userId,
+        parentId: boxSetId!,
+        sortBy: [ItemSortBy.ProductionYear, ItemSortBy.SortName],
+        sortOrder: [SortOrder.Ascending],
+        fields: [ItemFields.Overview, ItemFields.People],
+      });
+      return children.data.Items ?? [];
+    },
+    enabled: !!api && !!userId && !!boxSetId,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+  });
+}
+
+// Pipeline : itemId → ProviderIds → TMDB collectionId → BoxSet → enfants
+// Total : 3-4 requêtes (dont 1 cachée globalement) au lieu de 212
+export function useCollectionForItem(itemId: string, itemType?: string) {
+  const { data: index, isLoading: indexLoading } = useBoxSetIndex();
+
+  // Si c'est déjà un BoxSet, on le connaît directement
+  const isBoxSet = itemType === "BoxSet";
+  const directBoxSet = isBoxSet && itemId ? index?.byId[itemId] : undefined;
+
+  // Sinon, récupérer le TMDB ID du film
+  const shouldLookup = !!itemId && !isBoxSet;
+  const { data: providerIds } = useItemProviderIds(
+    shouldLookup ? itemId : undefined,
+  );
+  const tmdbMovieId = providerIds?.Tmdb;
+
+  // Appeler TMDB pour trouver la collection
+  const { data: tmdbCollectionId } = useTmdbCollectionId(tmdbMovieId);
+
+  // Trouver le BoxSet Jellyfin correspondant
+  const matchedBoxSet = tmdbCollectionId
+    ? index?.byTmdb[tmdbCollectionId]
+    : undefined;
+  const boxSet = directBoxSet ?? matchedBoxSet;
+  const boxSetId = boxSet?.Id;
+
+  // Charger les enfants du BoxSet trouvé
+  const { data: items, isLoading: childrenLoading } =
+    useBoxSetChildren(boxSetId);
+
+  const data = boxSet && items && items.length > 0 ? { boxSet, items } : null;
+  const isLoading = indexLoading || (!data && childrenLoading);
+
+  return { data, isLoading };
 }
 
 // Top 10 séries TV (les plus jouées)

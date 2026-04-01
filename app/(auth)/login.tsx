@@ -172,7 +172,7 @@ export default function LoginScreen() {
         }
       } else {
         login(serverUrl, token, userId, newUserName, rememberMe);
-        router.replace("/(tabs)");
+        router.replace("/(auth)/profile-select");
       }
     } catch {
       setError("Mot de passe ou nom d'utilisateur incorrect.");

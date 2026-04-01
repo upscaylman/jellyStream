@@ -52,8 +52,7 @@ function AnimatedStack() {
 
   // Rediriger selon l'état d'auth
   // - Pas auth → écran login
-  // - Vient de se connecter (false→true) → /(tabs)
-  // - Déjà auth au démarrage → ne rien faire (route par défaut = tabs)
+  // - Auth (login ou session restaurée) → sélection profil
   const prevAuth = useRef<boolean | null>(null);
   useEffect(() => {
     if (isRestoring) return;
@@ -63,11 +62,10 @@ function AnimatedStack() {
     if (!isAuthenticated) {
       // Différer pour laisser le navigator s'initialiser (évite GO_BACK warning sur web)
       requestAnimationFrame(() => router.replace("/(auth)/server-select"));
-    } else if (wasAuthenticated === false) {
-      // Login : était déconnecté, maintenant connecté
-      requestAnimationFrame(() => router.replace("/(tabs)"));
+    } else if (wasAuthenticated === null || wasAuthenticated === false) {
+      // Session restaurée (null→true) ou login (false→true) → sélection profil
+      requestAnimationFrame(() => router.replace("/(auth)/profile-select"));
     }
-    // wasAuthenticated === null (premier rendu, déjà auth) → on ne fait rien
   }, [isRestoring, isAuthenticated]);
 
   // Écran de chargement pendant la restauration de session
