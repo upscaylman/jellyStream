@@ -1,16 +1,19 @@
 import { ThemedText } from "@/components/ThemedText";
+import {
+  useCurrentUser,
+  usePublicSystemInfo,
+  usePublicUsers,
+  useSystemInfo,
+} from "@/src/api/queries/useServerQueries";
 import { useAuthStore } from "@/src/stores/authStore";
 import { Ionicons } from "@expo/vector-icons";
-import type {
-  UserConfiguration,
-  UserDto,
-} from "@jellyfin/sdk/lib/generated-client/models";
+import type { UserConfiguration } from "@jellyfin/sdk/lib/generated-client/models";
 import { SubtitlePlaybackMode } from "@jellyfin/sdk/lib/generated-client/models";
-import { getSystemApi } from "@jellyfin/sdk/lib/utils/api/system-api";
 import { getUserApi } from "@jellyfin/sdk/lib/utils/api/user-api";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -58,6 +61,7 @@ const SUBTITLE_MODES = Object.values(SubtitlePlaybackMode);
 export default function SwitchProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const userId = useAuthStore((s) => s.userId);
   const api = useAuthStore((s) => s.api);
   const serverUrl = useAuthStore((s) => s.serverUrl);
@@ -68,10 +72,14 @@ export default function SwitchProfileScreen() {
 
   const token = useAuthStore((s) => s.token);
 
-  const [serverVersion, setServerVersion] = useState<string | null>(null);
-  const [userData, setUserData] = useState<UserDto | null>(null);
-  const [config, setConfig] = useState<UserConfiguration | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Données serveur via TanStack Query
+  const { data: userData } = useCurrentUser();
+  const { data: publicSystemInfo } = usePublicSystemInfo();
+  const { data: systemInfo } = useSystemInfo();
+  const { data: publicUsers } = usePublicUsers();
+  const config = userData?.Configuration ?? null;
+  const serverVersion = publicSystemInfo?.Version ?? null;
+
   const [saving, setSaving] = useState(false);
 
   // Avatar picker (GetAvatar plugin)
@@ -86,29 +94,6 @@ export default function SwitchProfileScreen() {
   const [settingAvatar, setSettingAvatar] = useState(false);
   const [avatarRefreshKey, setAvatarRefreshKey] = useState(0);
 
-  // Récupérer infos serveur + utilisateur
-  useEffect(() => {
-    if (!api) return;
-
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [sysRes, userRes] = await Promise.all([
-          getSystemApi(api).getPublicSystemInfo(),
-          getUserApi(api).getCurrentUser(),
-        ]);
-        setServerVersion(sysRes.data.Version ?? null);
-        setUserData(userRes.data);
-        setConfig(userRes.data.Configuration ?? null);
-      } catch {
-        // Fallback silencieux
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [api]);
-
   // Sauvegarder la config utilisateur sur le serveur
   const saveConfig = useCallback(
     async (newConfig: UserConfiguration) => {
@@ -118,7 +103,7 @@ export default function SwitchProfileScreen() {
         await getUserApi(api).updateUserConfiguration({
           userConfiguration: newConfig,
         });
-        setConfig(newConfig);
+        queryClient.invalidateQueries({ queryKey: ["server", "currentUser"] });
       } catch {
         if (Platform.OS === "web") {
           // eslint-disable-next-line no-alert
@@ -130,7 +115,7 @@ export default function SwitchProfileScreen() {
         setSaving(false);
       }
     },
-    [api],
+    [api, queryClient],
   );
 
   // Toggle boolean config
@@ -225,6 +210,23 @@ export default function SwitchProfileScreen() {
       (avatarRefreshKey ? `&_r=${avatarRefreshKey}` : ""),
   }));
 
+  // Profils serveur Jellyfin (tous les utilisateurs publics sauf le courant)
+  const otherServerUsers = (publicUsers ?? [])
+    .filter((u) => u.Id !== userId)
+    .map((u) => ({
+      jellyfinId: u.Id ?? "",
+      name: u.Name ?? "Utilisateur",
+      avatar:
+        getUserImageUrl(
+          serverUrl,
+          u.Id ?? "",
+          u.Name ?? "",
+          token ?? undefined,
+        ) + (avatarRefreshKey ? `&_r=${avatarRefreshKey}` : ""),
+      hasSavedProfile: savedProfiles.some((p) => p.userId === u.Id),
+      savedProfileId: savedProfiles.find((p) => p.userId === u.Id)?.id,
+    }));
+
   const handleProfileSelect = async (profileId: string) => {
     const profile = savedProfiles.find((p) => p.id === profileId);
     if (profile && profile.userId !== userId) {
@@ -234,6 +236,18 @@ export default function SwitchProfileScreen() {
       router.back();
     } else {
       router.replace("/(tabs)");
+    }
+  };
+
+  const handleServerUserSelect = (user: (typeof otherServerUsers)[0]) => {
+    if (user.hasSavedProfile && user.savedProfileId) {
+      // Profil déjà sauvegardé → switch direct
+      handleProfileSelect(user.savedProfileId);
+    } else {
+      // Pas encore connecté → aller au login avec le nom pré-rempli
+      router.push(
+        `/(auth)/login?addProfile=1&username=${encodeURIComponent(user.name)}`,
+      );
     }
   };
 
@@ -301,30 +315,26 @@ export default function SwitchProfileScreen() {
           );
         })()}
 
-        {/* Other profiles */}
-        {profiles.filter((p) => p.userId !== userId).length > 0 && (
+        {/* Other profiles (from Jellyfin server) */}
+        {otherServerUsers.length > 0 && (
           <View style={styles.otherProfilesRow}>
-            {profiles
-              .filter((p) => p.userId !== userId)
-              .map((profile, index) => (
-                <Animated.View
-                  key={profile.id}
-                  entering={FadeIn.delay(index * 100 + 250)}
+            {otherServerUsers.map((user, index) => (
+              <Animated.View
+                key={user.jellyfinId}
+                entering={FadeIn.delay(index * 100 + 250)}
+              >
+                <TouchableOpacity
+                  onPress={() => handleServerUserSelect(user)}
+                  style={styles.otherProfileItem}
                 >
-                  <TouchableOpacity
-                    onPress={() => handleProfileSelect(profile.id)}
-                    style={styles.otherProfileItem}
-                  >
-                    <Image
-                      source={{ uri: profile.avatar }}
-                      style={styles.otherAvatar}
-                    />
-                    <ThemedText style={styles.otherName}>
-                      {profile.name}
-                    </ThemedText>
-                  </TouchableOpacity>
-                </Animated.View>
-              ))}
+                  <Image
+                    source={{ uri: user.avatar }}
+                    style={styles.otherAvatar}
+                  />
+                  <ThemedText style={styles.otherName}>{user.name}</ThemedText>
+                </TouchableOpacity>
+              </Animated.View>
+            ))}
           </View>
         )}
 
@@ -550,6 +560,44 @@ export default function SwitchProfileScreen() {
               </ThemedText>
             </View>
           </View>
+
+          {/* === INFOS SERVEUR (admin) === */}
+          {systemInfo && (
+            <>
+              <ThemedText style={styles.sectionTitle}>Serveur</ThemedText>
+
+              <View style={styles.menuItem}>
+                <Ionicons name="hardware-chip-outline" size={24} color="#fff" />
+                <View style={styles.menuTextContainer}>
+                  <ThemedText style={styles.menuText}>Système</ThemedText>
+                  <ThemedText style={styles.menuSubtext}>
+                    {systemInfo.OperatingSystem ?? "—"}
+                  </ThemedText>
+                </View>
+              </View>
+
+              <View style={styles.menuItem}>
+                <Ionicons name="speedometer-outline" size={24} color="#fff" />
+                <View style={styles.menuTextContainer}>
+                  <ThemedText style={styles.menuText}>Transcodage</ThemedText>
+                  <ThemedText style={styles.menuSubtext}>
+                    {systemInfo.TranscodingTempPath
+                      ? "Activé"
+                      : "Non configuré"}
+                  </ThemedText>
+                </View>
+              </View>
+
+              {systemInfo.HasPendingRestart && (
+                <View style={styles.menuItem}>
+                  <Ionicons name="warning-outline" size={24} color="#E50914" />
+                  <ThemedText style={[styles.menuText, { color: "#E50914" }]}>
+                    Redémarrage en attente
+                  </ThemedText>
+                </View>
+              )}
+            </>
+          )}
 
           {/* === AUTRES === */}
           <ThemedText style={styles.sectionTitle}>Autres</ThemedText>

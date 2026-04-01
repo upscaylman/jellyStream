@@ -3,7 +3,7 @@ import { useAuthStore } from "@/src/stores/authStore";
 import { getUserApi } from "@jellyfin/sdk/lib/utils/api/user-api";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -111,8 +111,16 @@ export default function LoginScreen() {
   const passwordRef = useRef<TextInput | null>(null);
   const { api, serverUrl, login, addProfile } = useAuthStore();
   const router = useRouter();
-  const { addProfile: addProfileParam } = useLocalSearchParams();
+  const { addProfile: addProfileParam, username: usernameParam } =
+    useLocalSearchParams();
   const isAddingProfile = addProfileParam === "1";
+
+  // Pré-remplir le username si passé en paramètre (depuis le profil switcher)
+  useEffect(() => {
+    if (typeof usernameParam === "string" && usernameParam) {
+      setUsername(usernameParam);
+    }
+  }, [usernameParam]);
 
   const handleLogin = async () => {
     if (!username.trim()) {

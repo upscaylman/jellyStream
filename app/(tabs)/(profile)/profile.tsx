@@ -91,11 +91,7 @@ export default function ProfileScreen() {
   }));
 
   const headerTitleStyle = useAnimatedStyle(() => ({
-    transform: [
-      {
-        scale: interpolate(scrollDirection.value, [0, 1], [1, 0.96], "clamp"),
-      },
-    ],
+    opacity: 1,
   }));
 
   const { data: likedItems, error: likedErr } = useLikedItems(20);
