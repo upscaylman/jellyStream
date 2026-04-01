@@ -706,19 +706,31 @@ export function useCollectionForItem(itemId: string, itemType?: string) {
   return useQuery({
     queryKey: ["collection-for-item", itemId],
     queryFn: async () => {
+      const t0 = performance.now();
+      console.log(
+        `[COLLECTION] Début recherche pour ${itemId} (type=${itemType})`,
+      );
+
       // Vérifier d'abord l'index préchargé
       const idx = queryClient.getQueryData<
         Record<string, { boxSet: BaseItemDto; items: BaseItemDto[] }>
       >(["boxset-index"]);
       if (idx?.[itemId]) {
+        console.log(
+          `[COLLECTION] ✅ Trouvé dans index préchargé en ${Math.round(performance.now() - t0)}ms`,
+        );
         return idx[itemId];
       }
+      console.log(
+        `[COLLECTION] Index préchargé: ${idx ? `${Object.keys(idx).length} items` : "ABSENT"}`,
+      );
 
       const itemsApi = getItemsApi(api!);
       const libApi = getLibraryApi(api!);
 
       // Si l'item EST un BoxSet → retourner ses enfants directement
       if (itemType === "BoxSet") {
+        const t1 = performance.now();
         const [selfResult, children] = await Promise.all([
           itemsApi.getItems({
             userId,
@@ -734,6 +746,9 @@ export function useCollectionForItem(itemId: string, itemType?: string) {
           }),
         ]);
         const selfItem = selfResult.data.Items?.[0];
+        console.log(
+          `[COLLECTION] BoxSet direct: ${children.data.Items?.length ?? 0} enfants en ${Math.round(performance.now() - t1)}ms`,
+        );
         if (selfItem) {
           return { boxSet: selfItem, items: children.data.Items ?? [] };
         }
@@ -741,11 +756,16 @@ export function useCollectionForItem(itemId: string, itemType?: string) {
 
       // Stratégie 1 : ancêtres directs (rapide, 1 seule requête)
       try {
+        const t1 = performance.now();
         const ancestors = await libApi.getAncestors({ itemId, userId });
         const boxSetAncestor = (ancestors.data ?? []).find(
           (a) => a.Type === BaseItemKind.BoxSet,
         );
+        console.log(
+          `[COLLECTION] Stratégie 1 (ancestors): ${ancestors.data?.length ?? 0} ancêtres, BoxSet=${boxSetAncestor ? "OUI" : "NON"} en ${Math.round(performance.now() - t1)}ms`,
+        );
         if (boxSetAncestor?.Id) {
+          const t2 = performance.now();
           const children = await itemsApi.getItems({
             userId,
             parentId: boxSetAncestor.Id,
@@ -754,22 +774,33 @@ export function useCollectionForItem(itemId: string, itemType?: string) {
             fields: [ItemFields.Overview, ItemFields.People],
           });
           const items = children.data.Items ?? [];
-          if (items.length > 0) return { boxSet: boxSetAncestor, items };
+          if (items.length > 0) {
+            console.log(
+              `[COLLECTION] ✅ Stratégie 1 match: ${items.length} items en ${Math.round(performance.now() - t2)}ms (total: ${Math.round(performance.now() - t0)}ms)`,
+            );
+            return { boxSet: boxSetAncestor, items };
+          }
         }
       } catch (_e) {
-        // Fallback
+        console.log(`[COLLECTION] Stratégie 1 erreur:`, _e);
       }
 
       // Stratégie 2 : itérer les BoxSets séquentiellement, s'arrêter au premier match
       try {
+        const t3 = performance.now();
         const boxSetsResult = await itemsApi.getItems({
           userId,
           includeItemTypes: [BaseItemKind.BoxSet],
           recursive: true,
         });
         const boxSets = boxSetsResult.data.Items ?? [];
-        for (const bs of boxSets) {
+        console.log(
+          `[COLLECTION] Stratégie 2: ${boxSets.length} BoxSets trouvés en ${Math.round(performance.now() - t3)}ms`,
+        );
+        for (let i = 0; i < boxSets.length; i++) {
+          const bs = boxSets[i];
           try {
+            const t4 = performance.now();
             const children = await itemsApi.getItems({
               userId,
               parentId: bs.Id!,
@@ -778,17 +809,30 @@ export function useCollectionForItem(itemId: string, itemType?: string) {
               fields: [ItemFields.Overview, ItemFields.People],
             });
             const items = children.data.Items ?? [];
-            if (items.some((i) => i.Id === itemId)) {
+            const match = items.some((it) => it.Id === itemId);
+            console.log(
+              `[COLLECTION] Stratégie 2 [${i + 1}/${boxSets.length}] "${bs.Name}": ${items.length} items, match=${match} en ${Math.round(performance.now() - t4)}ms`,
+            );
+            if (match) {
+              console.log(
+                `[COLLECTION] ✅ Trouvé dans "${bs.Name}" (total: ${Math.round(performance.now() - t0)}ms)`,
+              );
               return { boxSet: bs, items };
             }
           } catch (_e) {
             // Ignorer
           }
         }
+        console.log(
+          `[COLLECTION] ❌ Aucun BoxSet ne contient cet item (total: ${Math.round(performance.now() - t0)}ms)`,
+        );
       } catch (_e) {
-        // Ignorer
+        console.log(`[COLLECTION] Stratégie 2 erreur:`, _e);
       }
 
+      console.log(
+        `[COLLECTION] ❌ Aucune collection trouvée (total: ${Math.round(performance.now() - t0)}ms)`,
+      );
       return null;
     },
     enabled: !!api && !!userId && !!itemId,
@@ -808,6 +852,10 @@ export function useBoxSetIndex() {
   return useQuery({
     queryKey: ["boxset-index"],
     queryFn: async () => {
+      const t0 = performance.now();
+      console.log(
+        `[BOXSET-INDEX] Début chargement (api=${!!api}, userId=${userId})`,
+      );
       const itemsApi = getItemsApi(api!);
       const boxSetsResult = await itemsApi.getItems({
         userId,
@@ -815,6 +863,9 @@ export function useBoxSetIndex() {
         recursive: true,
       });
       const boxSets = boxSetsResult.data.Items ?? [];
+      console.log(
+        `[BOXSET-INDEX] ${boxSets.length} BoxSets trouvés en ${Math.round(performance.now() - t0)}ms`,
+      );
       // Index : itemId → { boxSet, items }
       const index: Record<
         string,
@@ -825,6 +876,7 @@ export function useBoxSetIndex() {
       await Promise.all(
         boxSets.map(async (bs) => {
           try {
+            const t1 = performance.now();
             const children = await itemsApi.getItems({
               userId,
               parentId: bs.Id!,
@@ -833,6 +885,9 @@ export function useBoxSetIndex() {
               fields: [ItemFields.Overview, ItemFields.People],
             });
             const items = children.data.Items ?? [];
+            console.log(
+              `[BOXSET-INDEX] "${bs.Name}": ${items.length} enfants en ${Math.round(performance.now() - t1)}ms`,
+            );
             for (const item of items) {
               if (item.Id) {
                 index[item.Id] = { boxSet: bs, items };
@@ -843,9 +898,12 @@ export function useBoxSetIndex() {
               index[bs.Id] = { boxSet: bs, items };
             }
           } catch (_e) {
-            // Ignorer
+            console.log(`[BOXSET-INDEX] ❌ Erreur pour "${bs.Name}":`, _e);
           }
         }),
+      );
+      console.log(
+        `[BOXSET-INDEX] ✅ Index complet: ${Object.keys(index).length} entrées en ${Math.round(performance.now() - t0)}ms`,
       );
       return index;
     },

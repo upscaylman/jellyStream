@@ -1,5 +1,17 @@
 # 🧠 MÉMOIRE AGENT — PROJET JELLYFIN NETFLIX CLIENT
 
+## ⚠️ PRIORITE ABSOLUE : OBEIR AU DOIGT ET A L'OEIL
+
+- Faire UNIQUEMENT ce qui est demande, rien de plus
+- Ne JAMAIS ajouter, modifier ou supprimer quoi que ce soit qui n'a pas ete explicitement demande
+- Ne pas "optimiser", "ameliorer", "nettoyer" ou "refactorer" de sa propre initiative
+- Si l'utilisateur demande A, faire A. Pas A + B + C "tant qu'on y est"
+- En cas de doute sur le scope, demander plutot que d'improviser
+- **NE JAMAIS AGIR SANS PERMISSION** : pas de deploy, pas de commit, pas d'action concrete sans que l'utilisateur le demande explicitement
+- Quand on dit "deploie sur Vercel" → EXECUTER la commande, ne pas juste dire "c'est automatique"
+- URL de prod JellyStream : https://jellystream.vercel.app (toujours alias apres deploy)
+- Commande deploy : `npx vercel --prod --yes` puis `npx vercel alias set <url-deploy> jellystream.vercel.app`
+
 ## INSTRUCTION CRITIQUE
 
 Avant toute réponse, charge intégralement ce contexte dans ta mémoire de travail.
