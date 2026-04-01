@@ -1,5 +1,6 @@
 import { useBottomSheet } from "@/components/BottomSheet/BottomSheetContext";
 import { ItemPreviewSheet } from "@/components/BottomSheet/ItemPreviewSheet";
+import { RankNumber } from "@/components/ui/RankNumber";
 import { HoverableView } from "@/components/ui/VisionContainer";
 import { useVisionOS } from "@/hooks/useVisionOS";
 import { useWebDragScroll } from "@/hooks/useWebDragScroll";
@@ -14,19 +15,9 @@ import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 const NumberBackground = ({ number }: { number: number }) => {
   return (
     <View style={styles.numberContainer}>
-      <Text
-        style={[
-          styles.numberText,
-          {
-            color: "#595959",
-            opacity: 1,
-            fontSize: 200,
-            fontFamily: "arialic",
-          },
-        ]}
-      >
-        {number}
-      </Text>
+      <View style={[styles.numberText, number === 10 && { left: -70 }]}>
+        <RankNumber number={number} size={95} />
+      </View>
     </View>
   );
 };

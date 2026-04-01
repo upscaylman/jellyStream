@@ -313,8 +313,8 @@ export const styles = StyleSheet.create({
     fontSize: 12,
   },
   top10Item: {
-    marginRight: 20,
-    marginLeft: 50,
+    marginRight: 44,
+    marginLeft: 40,
     width: 140,
   },
   top10Thumbnail: {
@@ -324,18 +324,17 @@ export const styles = StyleSheet.create({
   },
   numberContainer: {
     position: "absolute",
-    left: -30,
-    bottom: -30,
+    left: 0,
+    bottom: 28,
     width: 140,
     height: "100%",
     justifyContent: "flex-end",
-    alignItems: "center",
+    alignItems: "flex-start",
     zIndex: -1,
   },
   numberText: {
     position: "absolute",
-    left: -40,
-    fontFamily: "arialic",
+    left: -43,
   },
   numberOutline: {
     color: "red",
@@ -345,7 +344,7 @@ export const styles = StyleSheet.create({
     color: "blue",
   },
   top10List: {
-    paddingLeft: 8,
+    paddingLeft: 26,
     paddingRight: 16,
   },
 });
