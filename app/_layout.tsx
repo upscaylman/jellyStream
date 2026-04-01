@@ -6,6 +6,7 @@ import { useVisionOS } from "@/hooks/useVisionOS";
 import { JellyQueryProvider } from "@/src/api/queryProvider";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useNotificationStore } from "@/src/stores/notificationStore";
+import { usePreferencesStore } from "@/src/stores/preferencesStore";
 import {
   DarkTheme,
   DefaultTheme,
@@ -45,6 +46,7 @@ function AnimatedStack() {
   useEffect(() => {
     restoreSession();
     useNotificationStore.getState().restore();
+    usePreferencesStore.getState().restore();
     setIsRestoring(false);
   }, []);
 

@@ -28,6 +28,7 @@ import { useRouter } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Linking,
   Platform,
   Pressable,
@@ -129,6 +130,9 @@ export function ExpandedPlayer({
     useCollectionForItem(isMovie || isBoxSet ? itemId : "", movie.type);
   const hasCollection =
     !!collectionData && collectionData.items.length > (isBoxSet ? 0 : 1);
+  // Afficher l'onglet Collection dès qu'on est sur un film ou BoxSet (même en loading)
+  const showCollectionTab =
+    (isMovie || isBoxSet) && (hasCollection || isLoadingCollection);
   const hasSimilar = !!similarItems && similarItems.length > 0;
 
   // DEBUG: log état collection
@@ -144,7 +148,7 @@ export function ExpandedPlayer({
   const [showSeasonPicker, setShowSeasonPicker] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "episodes" | "trailers" | "similar" | "collection"
-  >(isSeries ? "episodes" : isBoxSet ? "collection" : "similar");
+  >(isSeries ? "episodes" : isBoxSet ? "collection" : "collection");
 
   // Bandes-annonces YouTube (max 6)
   const trailers = useMemo(() => {
@@ -162,9 +166,18 @@ export function ExpandedPlayer({
 
   // Basculer l'onglet actif si celui sélectionné n'est plus disponible
   useEffect(() => {
+    if (
+      activeTab === "collection" &&
+      !showCollectionTab &&
+      !isLoadingCollection
+    ) {
+      if (hasSimilar) setActiveTab("similar");
+      else if (isSeries) setActiveTab("episodes");
+      else if (hasTrailers) setActiveTab("trailers");
+    }
     if (activeTab === "similar" && !hasSimilar && !isLoadingSimilar) {
-      if (isSeries) setActiveTab("episodes");
-      else if (hasCollection) setActiveTab("collection");
+      if (showCollectionTab) setActiveTab("collection");
+      else if (isSeries) setActiveTab("episodes");
       else if (hasTrailers) setActiveTab("trailers");
     }
   }, [
@@ -172,7 +185,8 @@ export function ExpandedPlayer({
     isLoadingSimilar,
     activeTab,
     isSeries,
-    hasCollection,
+    showCollectionTab,
+    isLoadingCollection,
     hasTrailers,
   ]);
 
@@ -640,7 +654,7 @@ export function ExpandedPlayer({
                 </ThemedText>
               </Pressable>
             )}
-            {hasCollection && (
+            {showCollectionTab && (
               <Pressable
                 style={[
                   styles.tabItem,
@@ -850,128 +864,139 @@ export function ExpandedPlayer({
         )}
 
         {/* Collection (BoxSet) */}
-        {activeTab === "collection" && hasCollection && (
+        {activeTab === "collection" && showCollectionTab && (
           <View style={collectionStyles.container}>
-            <ThemedText style={collectionStyles.collectionName}>
-              {collectionData!.boxSet.Name}
-            </ThemedText>
-            {collectionData!.items
-              .filter((colItem) => colItem.Id !== itemId)
-              .map((colItem) => {
-                const backdropTag = colItem.BackdropImageTags?.[0];
-                const primaryTag = colItem.ImageTags?.["Primary"];
-                const colThumb = colItem.Id
-                  ? backdropTag
-                    ? getBackdropUrl(
-                        serverUrl,
-                        colItem.Id,
-                        600,
-                        80,
-                        backdropTag,
-                      )
-                    : primaryTag
-                      ? getImageUrl({
-                          serverUrl,
-                          itemId: colItem.Id,
-                          maxWidth: 600,
-                          quality: 80,
-                          tag: primaryTag,
-                        })
-                      : getBackdropUrl(serverUrl, colItem.Id, 600, 80)
-                  : "";
-                const colYear = colItem.ProductionYear
-                  ? String(colItem.ProductionYear)
-                  : "";
-                const colDuration = colItem.RunTimeTicks
-                  ? (() => {
-                      const totalMin = Math.round(
-                        colItem.RunTimeTicks / 600000000,
-                      );
-                      const h = Math.floor(totalMin / 60);
-                      const m = totalMin % 60;
-                      return h > 0 ? `${h}h ${m}m` : `${m}m`;
-                    })()
-                  : "";
-                return (
-                  <View key={colItem.Id} style={collectionStyles.itemContainer}>
-                    <Pressable
-                      style={collectionStyles.itemRow}
-                      onPress={() => {
-                        if (colItem.Id) {
-                          router.push({
-                            pathname: "/(tabs)/movie/[id]",
-                            params: { id: colItem.Id },
-                          });
-                        }
-                      }}
-                    >
-                      <View style={collectionStyles.itemThumbContainer}>
-                        {colThumb ? (
-                          <ExpoImage
-                            source={{ uri: colThumb }}
-                            style={collectionStyles.itemThumb}
-                            cachePolicy="memory-disk"
-                            transition={200}
-                            contentFit="cover"
-                          />
-                        ) : (
-                          <View
-                            style={[
-                              collectionStyles.itemThumb,
-                              {
-                                backgroundColor: "#2a2a2a",
-                                justifyContent: "center",
-                                alignItems: "center",
-                              },
-                            ]}
-                          >
-                            <Ionicons
-                              name="film-outline"
-                              size={24}
-                              color="#555"
+            {isLoadingCollection && !hasCollection ? (
+              <View style={{ padding: 20, alignItems: "center" }}>
+                <ActivityIndicator color="#E50914" size="small" />
+              </View>
+            ) : hasCollection ? (
+              <>
+                <ThemedText style={collectionStyles.collectionName}>
+                  {collectionData!.boxSet.Name}
+                </ThemedText>
+                {collectionData!.items
+                  .filter((colItem) => colItem.Id !== itemId)
+                  .map((colItem) => {
+                    const backdropTag = colItem.BackdropImageTags?.[0];
+                    const primaryTag = colItem.ImageTags?.["Primary"];
+                    const colThumb = colItem.Id
+                      ? backdropTag
+                        ? getBackdropUrl(
+                            serverUrl,
+                            colItem.Id,
+                            600,
+                            80,
+                            backdropTag,
+                          )
+                        : primaryTag
+                          ? getImageUrl({
+                              serverUrl,
+                              itemId: colItem.Id,
+                              maxWidth: 600,
+                              quality: 80,
+                              tag: primaryTag,
+                            })
+                          : getBackdropUrl(serverUrl, colItem.Id, 600, 80)
+                      : "";
+                    const colYear = colItem.ProductionYear
+                      ? String(colItem.ProductionYear)
+                      : "";
+                    const colDuration = colItem.RunTimeTicks
+                      ? (() => {
+                          const totalMin = Math.round(
+                            colItem.RunTimeTicks / 600000000,
+                          );
+                          const h = Math.floor(totalMin / 60);
+                          const m = totalMin % 60;
+                          return h > 0 ? `${h}h ${m}m` : `${m}m`;
+                        })()
+                      : "";
+                    return (
+                      <View
+                        key={colItem.Id}
+                        style={collectionStyles.itemContainer}
+                      >
+                        <Pressable
+                          style={collectionStyles.itemRow}
+                          onPress={() => {
+                            if (colItem.Id) {
+                              router.push({
+                                pathname: "/(tabs)/movie/[id]",
+                                params: { id: colItem.Id },
+                              });
+                            }
+                          }}
+                        >
+                          <View style={collectionStyles.itemThumbContainer}>
+                            {colThumb ? (
+                              <ExpoImage
+                                source={{ uri: colThumb }}
+                                style={collectionStyles.itemThumb}
+                                cachePolicy="memory-disk"
+                                transition={200}
+                                contentFit="cover"
+                              />
+                            ) : (
+                              <View
+                                style={[
+                                  collectionStyles.itemThumb,
+                                  {
+                                    backgroundColor: "#2a2a2a",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                  },
+                                ]}
+                              >
+                                <Ionicons
+                                  name="film-outline"
+                                  size={24}
+                                  color="#555"
+                                />
+                              </View>
+                            )}
+                            <View style={collectionStyles.playOverlay}>
+                              <Ionicons
+                                name="play-circle-outline"
+                                size={30}
+                                color="white"
+                              />
+                            </View>
+                          </View>
+                          <View style={collectionStyles.itemInfo}>
+                            <ThemedText
+                              style={collectionStyles.itemTitle}
+                              numberOfLines={2}
+                            >
+                              {colItem.Name}
+                            </ThemedText>
+                            <ThemedText style={collectionStyles.itemMeta}>
+                              {colYear}
+                              {colDuration ? ` • ${colDuration}` : ""}
+                            </ThemedText>
+                          </View>
+                          <View style={collectionStyles.downloadButton}>
+                            <ExpoImage
+                              source={require("../../assets/images/replace-these/download-netflix-transparent.png")}
+                              style={{ width: 24, height: 24 }}
+                              cachePolicy="memory-disk"
+                              contentFit="contain"
                             />
                           </View>
-                        )}
-                        <View style={collectionStyles.playOverlay}>
-                          <Ionicons
-                            name="play-circle-outline"
-                            size={30}
-                            color="white"
-                          />
-                        </View>
+                        </Pressable>
+                        {colItem.Overview ? (
+                          <ThemedText
+                            style={collectionStyles.overview}
+                            numberOfLines={3}
+                          >
+                            {colItem.Overview}
+                          </ThemedText>
+                        ) : null}
                       </View>
-                      <View style={collectionStyles.itemInfo}>
-                        <ThemedText
-                          style={collectionStyles.itemTitle}
-                          numberOfLines={2}
-                        >
-                          {colItem.Name}
-                        </ThemedText>
-                        <ThemedText style={collectionStyles.itemMeta}>
-                          {colYear}
-                          {colDuration ? ` • ${colDuration}` : ""}
-                        </ThemedText>
-                      </View>
-                      <View style={collectionStyles.downloadButton}>
-                        <ExpoImage
-                          source={require("../../assets/images/replace-these/download-netflix-transparent.png")}
-                          style={{ width: 24, height: 24 }}
-                          cachePolicy="memory-disk"
-                          contentFit="contain"
-                        />
-                      </View>
-                    </Pressable>
-                    {colItem.Overview ? (
-                      <ThemedText
-                        style={collectionStyles.overview}
-                        numberOfLines={3}
-                      >
-                        {colItem.Overview}
-                      </ThemedText>
-                    ) : null}
-                  </View>
-                );
-              })}
+                    );
+                  })}
+              </>
+            ) : null}
           </View>
         )}
 
