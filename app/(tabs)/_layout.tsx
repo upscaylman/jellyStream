@@ -7,7 +7,7 @@ import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
 import { Tabs } from "expo-router";
 import React from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
 
 // Helper component for cross-platform icons
 function TabIcon({
@@ -20,9 +20,18 @@ function TabIcon({
   return <TabBarIcon name={ionIcon} color={color} />;
 }
 
-// Icône profil avec initiale du user Jellyfin
+// Icône profil avec avatar Jellyfin
 function ProfileImage({ focused }: { focused: boolean }) {
   const userName = useAuthStore((s) => s.userName);
+  const userId = useAuthStore((s) => s.userId);
+  const serverUrl = useAuthStore((s) => s.serverUrl);
+
+  // URL de l'avatar Jellyfin, fallback sur ui-avatars si pas d'image
+  const jellyfinAvatar =
+    serverUrl && userId
+      ? `${serverUrl.replace(/\/+$/, "")}/Users/${userId}/Images/Primary?maxWidth=48&quality=90`
+      : null;
+  const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName ?? "U")}&background=E50914&color=fff&size=48`;
 
   return (
     <View
@@ -39,11 +48,11 @@ function ProfileImage({ focused }: { focused: boolean }) {
       }}
     >
       <ExpoImage
-        source={{
-          uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(userName ?? "U")}&background=E50914&color=fff&size=48`,
-        }}
-        style={{ width: 20, height: 20, borderRadius: 2 }}
+        source={{ uri: jellyfinAvatar ?? fallbackAvatar }}
+        placeholder={{ uri: fallbackAvatar }}
+        style={{ width: 24, height: 24, borderRadius: 4 }}
         cachePolicy="memory-disk"
+        contentFit="cover"
       />
     </View>
   );
@@ -117,6 +126,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: "#FFFFFF",
         tabBarInactiveTintColor: "#B3B3B3",
         headerShown: false,
+        ...(Platform.OS === "web" && { unmountOnBlur: true }),
         tabBarStyle: {
           position: "absolute",
           borderTopWidth: 0,

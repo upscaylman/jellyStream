@@ -1,479 +1,902 @@
 import { ThemedText } from "@/components/ThemedText";
-import { useRootScale } from "@/contexts/RootScaleContext";
 import { useAuthStore } from "@/src/stores/authStore";
 import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import type {
+  UserConfiguration,
+  UserDto,
+} from "@jellyfin/sdk/lib/generated-client/models";
+import { SubtitlePlaybackMode } from "@jellyfin/sdk/lib/generated-client/models";
+import { getSystemApi } from "@jellyfin/sdk/lib/utils/api/system-api";
+import { getUserApi } from "@jellyfin/sdk/lib/utils/api/user-api";
+import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  Dimensions,
+  ActivityIndicator,
+  Alert,
+  FlatList,
   Image,
-  Pressable,
+  Linking,
+  Modal,
+  Platform,
+  ScrollView,
   StyleSheet,
+  Switch,
   TouchableOpacity,
   View,
 } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-  FadeIn,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from "react-native-reanimated";
+import Animated, { FadeIn } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const { width, height } = Dimensions.get("window");
-const SCALE_FACTOR = 0.83;
-const DRAG_THRESHOLD = Math.min(height * 0.2, 150);
-const HORIZONTAL_DRAG_THRESHOLD = Math.min(width * 0.51, 80);
-const DIRECTION_LOCK_ANGLE = 45;
-const ENABLE_HORIZONTAL_DRAG_CLOSE = false;
+/** URL de l'image de profil Jellyfin — GetAvatar plugin (avec fallback ui-avatars) */
+function getUserImageUrl(
+  serverUrl: string | null,
+  usrId: string,
+  userName: string,
+  token?: string,
+): string {
+  if (serverUrl) {
+    const base = serverUrl.replace(/\/+$/, "");
+    const params = new URLSearchParams({ quality: "90", maxWidth: "200" });
+    if (token) params.set("api_key", token);
+    return `${base}/Users/${usrId}/Images/Primary?${params.toString()}`;
+  }
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(userName || "U")}&background=E50914&color=fff&size=120`;
+}
+
+/** Labels lisibles pour SubtitlePlaybackMode */
+const SUBTITLE_MODE_LABELS: Record<string, string> = {
+  [SubtitlePlaybackMode.Default]: "Par défaut",
+  [SubtitlePlaybackMode.Always]: "Toujours",
+  [SubtitlePlaybackMode.OnlyForced]: "Forcés uniquement",
+  [SubtitlePlaybackMode.None]: "Désactivés",
+  [SubtitlePlaybackMode.Smart]: "Intelligent",
+};
+
+const SUBTITLE_MODES = Object.values(SubtitlePlaybackMode);
 
 export default function SwitchProfileScreen() {
-  const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { setScale } = useRootScale();
-  const userName = useAuthStore((s) => s.userName);
+  const insets = useSafeAreaInsets();
   const userId = useAuthStore((s) => s.userId);
+  const api = useAuthStore((s) => s.api);
+  const serverUrl = useAuthStore((s) => s.serverUrl);
+  const serverName = useAuthStore((s) => s.serverName);
   const logout = useAuthStore((s) => s.logout);
   const savedProfiles = useAuthStore((s) => s.savedProfiles);
   const switchProfile = useAuthStore((s) => s.switchProfile);
+
+  const token = useAuthStore((s) => s.token);
+
+  const [serverVersion, setServerVersion] = useState<string | null>(null);
+  const [userData, setUserData] = useState<UserDto | null>(null);
+  const [config, setConfig] = useState<UserConfiguration | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Avatar picker (GetAvatar plugin)
+  interface AvatarItem {
+    Id: string;
+    Name: string;
+    Url: string;
+  }
+  const [avatarPickerVisible, setAvatarPickerVisible] = useState(false);
+  const [availableAvatars, setAvailableAvatars] = useState<AvatarItem[]>([]);
+  const [loadingAvatars, setLoadingAvatars] = useState(false);
+  const [settingAvatar, setSettingAvatar] = useState(false);
+  const [avatarRefreshKey, setAvatarRefreshKey] = useState(0);
+
+  // Récupérer infos serveur + utilisateur
+  useEffect(() => {
+    if (!api) return;
+
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [sysRes, userRes] = await Promise.all([
+          getSystemApi(api).getPublicSystemInfo(),
+          getUserApi(api).getCurrentUser(),
+        ]);
+        setServerVersion(sysRes.data.Version ?? null);
+        setUserData(userRes.data);
+        setConfig(userRes.data.Configuration ?? null);
+      } catch {
+        // Fallback silencieux
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [api]);
+
+  // Sauvegarder la config utilisateur sur le serveur
+  const saveConfig = useCallback(
+    async (newConfig: UserConfiguration) => {
+      if (!api) return;
+      setSaving(true);
+      try {
+        await getUserApi(api).updateUserConfiguration({
+          userConfiguration: newConfig,
+        });
+        setConfig(newConfig);
+      } catch {
+        if (Platform.OS === "web") {
+          // eslint-disable-next-line no-alert
+          alert("Erreur lors de la sauvegarde des paramètres");
+        } else {
+          Alert.alert("Erreur", "Impossible de sauvegarder les paramètres");
+        }
+      } finally {
+        setSaving(false);
+      }
+    },
+    [api],
+  );
+
+  // Toggle boolean config
+  const toggleConfig = useCallback(
+    (key: keyof UserConfiguration) => {
+      if (!config) return;
+      const newConfig = { ...config, [key]: !config[key] };
+      saveConfig(newConfig);
+    },
+    [config, saveConfig],
+  );
+
+  // Cycle subtitle mode
+  const cycleSubtitleMode = useCallback(() => {
+    if (!config) return;
+    const currentIndex = SUBTITLE_MODES.indexOf(
+      config.SubtitleMode ?? SubtitlePlaybackMode.Default,
+    );
+    const nextIndex = (currentIndex + 1) % SUBTITLE_MODES.length;
+    saveConfig({ ...config, SubtitleMode: SUBTITLE_MODES[nextIndex] });
+  }, [config, saveConfig]);
+
+  // Charger les avatars disponibles (GetAvatar plugin)
+  const fetchAvatars = useCallback(async () => {
+    if (!serverUrl || !token) return;
+    setLoadingAvatars(true);
+    try {
+      const res = await fetch(`${serverUrl}/GetAvatar/Avatars`, {
+        headers: { "X-Emby-Token": token },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAvailableAvatars(data);
+      }
+    } catch {
+      // Plugin pas installé ou erreur réseau
+    } finally {
+      setLoadingAvatars(false);
+    }
+  }, [serverUrl, token]);
+
+  // Appliquer un avatar
+  const setAvatar = useCallback(
+    async (avatarId: string) => {
+      if (!serverUrl || !token) return;
+      setSettingAvatar(true);
+      try {
+        const res = await fetch(`${serverUrl}/GetAvatar/SetAvatar`, {
+          method: "POST",
+          headers: {
+            "X-Emby-Token": token,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ AvatarId: avatarId }),
+        });
+        if (res.ok) {
+          setAvatarPickerVisible(false);
+          // Forcer le refresh des images de profil
+          setAvatarRefreshKey((k) => k + 1);
+        } else {
+          const msg =
+            Platform.OS === "web"
+              ? () => alert("Erreur lors du changement d'avatar")
+              : () => Alert.alert("Erreur", "Impossible de changer l'avatar");
+          msg();
+        }
+      } catch {
+        const msg =
+          Platform.OS === "web"
+            ? () => alert("Erreur réseau")
+            : () => Alert.alert("Erreur", "Erreur réseau");
+        msg();
+      } finally {
+        setSettingAvatar(false);
+      }
+    },
+    [serverUrl, token],
+  );
+
+  // Ouvrir le picker
+  const openAvatarPicker = useCallback(() => {
+    setAvatarPickerVisible(true);
+    fetchAvatars();
+  }, [fetchAvatars]);
+
   const profiles = savedProfiles.map((p) => ({
     id: p.id,
     userId: p.userId,
     name: p.userName || "Utilisateur",
-    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(p.userName || "U")}&background=E50914&color=fff&size=120`,
+    avatar:
+      getUserImageUrl(p.serverUrl, p.userId, p.userName, p.token) +
+      (avatarRefreshKey ? `&_r=${avatarRefreshKey}` : ""),
   }));
-  const translateY = useSharedValue(0);
-  const isClosing = useRef(false);
-  const statusBarStyle = useSharedValue<"light" | "dark">("light");
-  const scrollOffset = useSharedValue(0);
-  const isDragging = useSharedValue(false);
-  const translateX = useSharedValue(0);
-  const initialGestureX = useSharedValue(0);
-  const initialGestureY = useSharedValue(0);
-  const isHorizontalGesture = useSharedValue(false);
-  const isScrolling = useSharedValue(false);
-  const blurIntensity = useSharedValue(20);
-
-  const numericId =
-    typeof id === "string"
-      ? parseInt(id, 10)
-      : Array.isArray(id)
-        ? parseInt(id[0], 10)
-        : 0;
-
-  const handleHapticFeedback = useCallback(() => {
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch (error) {
-      console.log("Haptics not available:", error);
-    }
-  }, []);
-
-  const goBack = useCallback(() => {
-    if (!isClosing.current) {
-      isClosing.current = true;
-      handleHapticFeedback();
-      requestAnimationFrame(() => {
-        if (router.canGoBack()) {
-          router.back();
-        } else {
-          router.replace("/(tabs)");
-        }
-      });
-    }
-  }, [router, handleHapticFeedback]);
-
-  const handleScale = useCallback(
-    (newScale: number) => {
-      try {
-        setScale(newScale);
-      } catch (error) {
-        console.log("Scale error:", error);
-      }
-    },
-    [setScale],
-  );
-
-  const calculateGestureAngle = (x: number, y: number) => {
-    "worklet";
-    const angle = Math.abs(Math.atan2(y, x) * (180 / Math.PI));
-    return angle;
-  };
-
-  const panGesture = Gesture.Pan()
-    .onStart((event) => {
-      "worklet";
-      initialGestureX.value = event.x;
-      initialGestureY.value = event.y;
-      isHorizontalGesture.value = false;
-
-      if (scrollOffset.value <= 0) {
-        isDragging.value = true;
-      }
-    })
-    .onUpdate((event) => {
-      "worklet";
-      const dx = event.translationX;
-      const dy = event.translationY;
-      const angle = calculateGestureAngle(dx, dy);
-
-      if (
-        ENABLE_HORIZONTAL_DRAG_CLOSE &&
-        !isHorizontalGesture.value &&
-        !isScrolling.value
-      ) {
-        if (Math.abs(dx) > 10) {
-          if (angle < DIRECTION_LOCK_ANGLE) {
-            isHorizontalGesture.value = true;
-          }
-        }
-      }
-
-      if (ENABLE_HORIZONTAL_DRAG_CLOSE && isHorizontalGesture.value) {
-        translateX.value = dx;
-        translateY.value = dy;
-        blurIntensity.value = Math.max(0, 20 - Math.abs(dx) / 10);
-
-        if (Math.abs(dx) / 300 > 0.2) {
-          statusBarStyle.value = "dark";
-        } else {
-          statusBarStyle.value = "light";
-        }
-      } else if (scrollOffset.value <= 0 && isDragging.value) {
-        translateY.value = Math.max(0, dy);
-        blurIntensity.value = Math.max(0, 20 - dy / 20);
-
-        if (dy / 600 > 0.5) {
-          statusBarStyle.value = "dark";
-        } else {
-          statusBarStyle.value = "light";
-        }
-      }
-    })
-    .onEnd((event) => {
-      "worklet";
-      isDragging.value = false;
-
-      if (ENABLE_HORIZONTAL_DRAG_CLOSE && isHorizontalGesture.value) {
-        const dx = event.translationX;
-        const dy = event.translationY;
-        const totalDistance = Math.sqrt(dx * dx + dy * dy);
-        const shouldClose = totalDistance > HORIZONTAL_DRAG_THRESHOLD;
-
-        if (shouldClose) {
-          const exitX = dx * 2;
-          const exitY = dy * 2;
-
-          translateX.value = withTiming(exitX, { duration: 300 });
-          translateY.value = withTiming(exitY, { duration: 300 });
-
-          runOnJS(handleScale)(1);
-          runOnJS(handleHapticFeedback)();
-          runOnJS(goBack)();
-        } else {
-          translateX.value = withSpring(0, {
-            damping: 15,
-            stiffness: 150,
-          });
-          translateY.value = withSpring(0, {
-            damping: 15,
-            stiffness: 150,
-          });
-          runOnJS(handleScale)(SCALE_FACTOR);
-        }
-      } else if (scrollOffset.value <= 0) {
-        const shouldClose = event.translationY > DRAG_THRESHOLD;
-
-        if (shouldClose) {
-          translateY.value = withTiming(event.translationY + 100, {
-            duration: 300,
-          });
-          runOnJS(handleScale)(1);
-          runOnJS(handleHapticFeedback)();
-          runOnJS(goBack)();
-        } else {
-          translateY.value = withSpring(0, {
-            damping: 15,
-            stiffness: 150,
-          });
-          runOnJS(handleScale)(SCALE_FACTOR);
-        }
-      }
-    })
-    .onFinalize(() => {
-      "worklet";
-      isDragging.value = false;
-      isHorizontalGesture.value = false;
-    });
-
-  const scrollGesture = Gesture.Native()
-    .onBegin(() => {
-      "worklet";
-      isScrolling.value = true;
-      if (!isDragging.value) {
-        translateY.value = 0;
-      }
-    })
-    .onEnd(() => {
-      "worklet";
-      isScrolling.value = false;
-    });
-
-  const composedGestures = Gesture.Simultaneous(panGesture, scrollGesture);
-
-  const ScrollComponent = useCallback(
-    (props: any) => {
-      return (
-        <GestureDetector gesture={composedGestures}>
-          <Animated.ScrollView
-            {...props}
-            onScroll={(event) => {
-              "worklet";
-              scrollOffset.value = event.nativeEvent.contentOffset.y;
-              if (!isDragging.value && translateY.value !== 0) {
-                translateY.value = 0;
-              }
-              props.onScroll?.(event);
-            }}
-            scrollEventThrottle={16}
-            // bounces={scrollOffset.value >= 0 && !isDragging.value}
-            bounces={false}
-            showsVerticalScrollIndicator={false}
-            showsHorizontalScrollIndicator={false}
-            scrollEnabled={false}
-          />
-        </GestureDetector>
-      );
-    },
-    [composedGestures],
-  );
 
   const handleProfileSelect = async (profileId: string) => {
     const profile = savedProfiles.find((p) => p.id === profileId);
     if (profile && profile.userId !== userId) {
       switchProfile(profileId);
     }
-    goBack();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
+    }
   };
 
-  const handleAddProfile = () => {
-    goBack();
-    setTimeout(() => {
-      router.push("/(auth)/login?addProfile=1");
-    }, 350);
+  // Formater la date de dernière connexion
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return null;
+    try {
+      return new Date(dateStr).toLocaleDateString("fr-FR", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return null;
+    }
   };
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: translateY.value },
-      { translateX: translateX.value },
-    ],
-    opacity: withSpring(1),
-  }));
-
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      try {
-        setScale(SCALE_FACTOR);
-      } catch (error) {
-        console.log("Initial scale error:", error);
-      }
-    }, 0);
-
-    return () => {
-      clearTimeout(timeout);
-      try {
-        setScale(1);
-      } catch (error) {
-        console.log("Cleanup scale error:", error);
-      }
-    };
-  }, []);
 
   return (
-    <View style={styles.container}>
-      <Pressable
-        onPress={() => router.back()}
-        style={styles.clickableContainer}
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <StatusBar style="light" />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={{ flex: 1 }} />
+        <ThemedText style={styles.title}>Profil</ThemedText>
+        <View style={{ flex: 1, alignItems: "flex-end" }}>
+          <TouchableOpacity
+            onPress={() => {
+              if (router.canGoBack()) router.back();
+              else router.replace("/(tabs)");
+            }}
+            style={styles.closeButton}
+          >
+            <Ionicons name="close" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <StatusBar animated={true} style={statusBarStyle.value} />
-        <Animated.View style={[styles.modalContent, animatedStyle]}>
-          <ScrollComponent>
-            <View style={styles.switchProfileContainer}>
-              <View style={styles.header}>
-                <View style={styles.headerTitle}>
-                  <ThemedText style={styles.title}>Switch Profiles</ThemedText>
-                </View>
-                <TouchableOpacity
-                  onPress={() => router.back()}
-                  style={styles.closeButton}
-                >
-                  <Ionicons name="close-outline" size={24} color="#fff" />
-                </TouchableOpacity>
+        {/* Current profile card */}
+        {(() => {
+          const current = profiles.find((p) => p.userId === userId);
+          if (!current) return null;
+          return (
+            <View style={styles.currentProfileCard}>
+              <View style={styles.currentProfileInner}>
+                <Image
+                  source={{ uri: current.avatar }}
+                  style={styles.currentAvatar}
+                />
               </View>
+              <TouchableOpacity
+                style={styles.editIcon}
+                onPress={openAvatarPicker}
+              >
+                <Ionicons name="pencil" size={20} color="#ccc" />
+              </TouchableOpacity>
+              <ThemedText style={styles.currentName}>{current.name}</ThemedText>
+            </View>
+          );
+        })()}
 
-              <View style={styles.gridContainer}>
-                {profiles.map((profile, index) => (
-                  <Animated.View
-                    key={profile.id}
-                    entering={FadeIn.delay(index * 100 + 250)}
+        {/* Other profiles */}
+        {profiles.filter((p) => p.userId !== userId).length > 0 && (
+          <View style={styles.otherProfilesRow}>
+            {profiles
+              .filter((p) => p.userId !== userId)
+              .map((profile, index) => (
+                <Animated.View
+                  key={profile.id}
+                  entering={FadeIn.delay(index * 100 + 250)}
+                >
+                  <TouchableOpacity
+                    onPress={() => handleProfileSelect(profile.id)}
+                    style={styles.otherProfileItem}
                   >
-                    <TouchableOpacity
-                      onPress={() => handleProfileSelect(profile.id)}
-                      style={styles.profileButton}
-                    >
-                      <View style={styles.profileContainer}>
-                        <Image
-                          source={{ uri: profile.avatar }}
-                          style={[
-                            styles.avatar,
-                            profile.userId === userId && styles.avatarActive,
-                          ]}
-                        />
-                        <ThemedText style={styles.profileName}>
-                          {profile.name}
-                        </ThemedText>
-                      </View>
-                    </TouchableOpacity>
-                  </Animated.View>
-                ))}
+                    <Image
+                      source={{ uri: profile.avatar }}
+                      style={styles.otherAvatar}
+                    />
+                    <ThemedText style={styles.otherName}>
+                      {profile.name}
+                    </ThemedText>
+                  </TouchableOpacity>
+                </Animated.View>
+              ))}
+          </View>
+        )}
 
-                <TouchableOpacity
-                  style={styles.profileButton}
-                  onPress={handleAddProfile}
-                >
-                  <View style={styles.addProfileContainer}>
-                    <Ionicons name="add" size={44} color="#fff" />
-                  </View>
-                  <ThemedText style={styles.addProfileText}>
-                    Add Profile
-                  </ThemedText>
-                </TouchableOpacity>
-              </View>
+        {/* Gérer les profils */}
+        <TouchableOpacity style={styles.manageButton}>
+          <ThemedText style={styles.manageButtonText}>
+            Gérer les profils
+          </ThemedText>
+        </TouchableOpacity>
 
-              <TouchableOpacity style={styles.doneButton}>
-                <Ionicons name="pencil" size={24} color="#ffffffba" />
-                <ThemedText style={styles.doneButtonText}>
-                  Manage Profiles
-                </ThemedText>
+        {/* Menu items */}
+        <View style={styles.menuSection}>
+          {/* === PARAMÈTRES DE LECTURE === */}
+          <ThemedText style={styles.sectionTitle}>Lecture</ThemedText>
+
+          <View style={styles.menuItem}>
+            <Ionicons name="play-circle-outline" size={24} color="#fff" />
+            <View style={styles.menuTextContainer}>
+              <ThemedText style={styles.menuText}>
+                Piste audio par défaut
+              </ThemedText>
+              <ThemedText style={styles.menuSubtext}>
+                {config?.AudioLanguagePreference || "Non définie"}
+              </ThemedText>
+            </View>
+            <Switch
+              value={config?.PlayDefaultAudioTrack ?? true}
+              onValueChange={() => toggleConfig("PlayDefaultAudioTrack")}
+              trackColor={{ false: "#555", true: "#fff" }}
+              thumbColor={
+                (config?.PlayDefaultAudioTrack ?? true) ? "#E50914" : "#fff"
+              }
+              {...(Platform.OS === "web"
+                ? ({ activeThumbColor: "#E50914" } as Record<string, string>)
+                : {})}
+              disabled={!config || saving}
+            />
+          </View>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={cycleSubtitleMode}
+            disabled={!config || saving}
+          >
+            <Ionicons name="text-outline" size={24} color="#fff" />
+            <View style={styles.menuTextContainer}>
+              <ThemedText style={styles.menuText}>Mode sous-titres</ThemedText>
+              <ThemedText style={styles.menuSubtext}>
+                {
+                  SUBTITLE_MODE_LABELS[
+                    config?.SubtitleMode ?? SubtitlePlaybackMode.Default
+                  ]
+                }
+              </ThemedText>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#666" />
+          </TouchableOpacity>
+
+          <View style={styles.menuItem}>
+            <Ionicons
+              name="arrow-forward-circle-outline"
+              size={24}
+              color="#fff"
+            />
+            <ThemedText style={styles.menuText}>
+              Épisode suivant automatique
+            </ThemedText>
+            <Switch
+              value={config?.EnableNextEpisodeAutoPlay ?? true}
+              onValueChange={() => toggleConfig("EnableNextEpisodeAutoPlay")}
+              trackColor={{ false: "#555", true: "#fff" }}
+              thumbColor={
+                (config?.EnableNextEpisodeAutoPlay ?? true) ? "#E50914" : "#fff"
+              }
+              {...(Platform.OS === "web"
+                ? ({ activeThumbColor: "#E50914" } as Record<string, string>)
+                : {})}
+              disabled={!config || saving}
+            />
+          </View>
+
+          <View style={styles.menuItem}>
+            <Ionicons name="musical-notes-outline" size={24} color="#fff" />
+            <ThemedText style={styles.menuText}>
+              Mémoriser les pistes audio
+            </ThemedText>
+            <Switch
+              value={config?.RememberAudioSelections ?? true}
+              onValueChange={() => toggleConfig("RememberAudioSelections")}
+              trackColor={{ false: "#555", true: "#fff" }}
+              thumbColor={
+                (config?.RememberAudioSelections ?? true) ? "#E50914" : "#fff"
+              }
+              {...(Platform.OS === "web"
+                ? ({ activeThumbColor: "#E50914" } as Record<string, string>)
+                : {})}
+              disabled={!config || saving}
+            />
+          </View>
+
+          <View style={styles.menuItem}>
+            <Ionicons name="chatbubble-outline" size={24} color="#fff" />
+            <ThemedText style={styles.menuText}>
+              Mémoriser les sous-titres
+            </ThemedText>
+            <Switch
+              value={config?.RememberSubtitleSelections ?? true}
+              onValueChange={() => toggleConfig("RememberSubtitleSelections")}
+              trackColor={{ false: "#555", true: "#fff" }}
+              thumbColor={
+                (config?.RememberSubtitleSelections ?? true)
+                  ? "#E50914"
+                  : "#fff"
+              }
+              {...(Platform.OS === "web"
+                ? ({ activeThumbColor: "#E50914" } as Record<string, string>)
+                : {})}
+              disabled={!config || saving}
+            />
+          </View>
+
+          {/* === AFFICHAGE === */}
+          <ThemedText style={styles.sectionTitle}>Affichage</ThemedText>
+
+          <View style={styles.menuItem}>
+            <Ionicons name="eye-off-outline" size={24} color="#fff" />
+            <ThemedText style={styles.menuText}>Épisodes manquants</ThemedText>
+            <Switch
+              value={config?.DisplayMissingEpisodes ?? false}
+              onValueChange={() => toggleConfig("DisplayMissingEpisodes")}
+              trackColor={{ false: "#555", true: "#fff" }}
+              thumbColor={
+                (config?.DisplayMissingEpisodes ?? false) ? "#E50914" : "#fff"
+              }
+              {...(Platform.OS === "web"
+                ? ({ activeThumbColor: "#E50914" } as Record<string, string>)
+                : {})}
+              disabled={!config || saving}
+            />
+          </View>
+
+          <View style={styles.menuItem}>
+            <Ionicons name="albums-outline" size={24} color="#fff" />
+            <ThemedText style={styles.menuText}>
+              Afficher les collections
+            </ThemedText>
+            <Switch
+              value={config?.DisplayCollectionsView ?? false}
+              onValueChange={() => toggleConfig("DisplayCollectionsView")}
+              trackColor={{ false: "#555", true: "#fff" }}
+              thumbColor={
+                (config?.DisplayCollectionsView ?? false) ? "#E50914" : "#fff"
+              }
+              {...(Platform.OS === "web"
+                ? ({ activeThumbColor: "#E50914" } as Record<string, string>)
+                : {})}
+              disabled={!config || saving}
+            />
+          </View>
+
+          <View style={styles.menuItem}>
+            <Ionicons name="checkmark-done-outline" size={24} color="#fff" />
+            <ThemedText style={styles.menuText}>
+              Masquer les vus dans Nouveautés
+            </ThemedText>
+            <Switch
+              value={config?.HidePlayedInLatest ?? true}
+              onValueChange={() => toggleConfig("HidePlayedInLatest")}
+              trackColor={{ false: "#555", true: "#fff" }}
+              thumbColor={
+                (config?.HidePlayedInLatest ?? true) ? "#E50914" : "#fff"
+              }
+              {...(Platform.OS === "web"
+                ? ({ activeThumbColor: "#E50914" } as Record<string, string>)
+                : {})}
+              disabled={!config || saving}
+            />
+          </View>
+
+          {/* === COMPTE === */}
+          <ThemedText style={styles.sectionTitle}>Compte</ThemedText>
+
+          <View style={styles.menuItem}>
+            <Ionicons name="person-outline" size={24} color="#fff" />
+            <View style={styles.menuTextContainer}>
+              <ThemedText style={styles.menuText}>Utilisateur</ThemedText>
+              <ThemedText style={styles.menuSubtext}>
+                {userData?.Name ?? "—"}
+              </ThemedText>
+            </View>
+          </View>
+
+          <View style={styles.menuItem}>
+            <Ionicons name="server-outline" size={24} color="#fff" />
+            <View style={styles.menuTextContainer}>
+              <ThemedText style={styles.menuText}>Serveur</ThemedText>
+              <ThemedText style={styles.menuSubtext}>
+                {[serverName, serverVersion && `v${serverVersion}`]
+                  .filter(Boolean)
+                  .join(" · ") || "—"}
+              </ThemedText>
+            </View>
+          </View>
+
+          <View style={styles.menuItem}>
+            <Ionicons name="globe-outline" size={24} color="#fff" />
+            <View style={styles.menuTextContainer}>
+              <ThemedText style={styles.menuText}>Adresse</ThemedText>
+              <ThemedText style={styles.menuSubtext}>
+                {serverUrl?.replace(/^https?:\/\//, "") ?? "—"}
+              </ThemedText>
+            </View>
+          </View>
+
+          <View style={styles.menuItem}>
+            <Ionicons name="time-outline" size={24} color="#fff" />
+            <View style={styles.menuTextContainer}>
+              <ThemedText style={styles.menuText}>
+                Dernière connexion
+              </ThemedText>
+              <ThemedText style={styles.menuSubtext}>
+                {formatDate(userData?.LastLoginDate) ?? "—"}
+              </ThemedText>
+            </View>
+          </View>
+
+          {/* === AUTRES === */}
+          <ThemedText style={styles.sectionTitle}>Autres</ThemedText>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              const url = serverUrl
+                ? `${serverUrl}/web/index.html`
+                : "https://jellyfin.org/docs/";
+              Linking.openURL(url);
+            }}
+          >
+            <Ionicons name="help-circle-outline" size={24} color="#fff" />
+            <ThemedText style={styles.menuText}>
+              Interface web Jellyfin
+            </ThemedText>
+            <Ionicons name="open-outline" size={20} color="#666" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => Linking.openURL("https://jellyfin.org/docs/")}
+          >
+            <Ionicons name="book-outline" size={24} color="#fff" />
+            <ThemedText style={styles.menuText}>Documentation</ThemedText>
+            <Ionicons name="open-outline" size={20} color="#666" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              logout();
+              router.replace("/(auth)/server-select");
+            }}
+          >
+            <Ionicons name="log-out-outline" size={24} color="#fff" />
+            <ThemedText style={styles.menuText}>Se déconnecter</ThemedText>
+            <Ionicons name="chevron-forward" size={20} color="#666" />
+          </TouchableOpacity>
+        </View>
+
+        {saving && (
+          <View style={styles.savingOverlay}>
+            <ActivityIndicator color="#E50914" size="small" />
+            <ThemedText style={styles.savingText}>Sauvegarde...</ThemedText>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Avatar Picker Modal */}
+      <Modal
+        visible={avatarPickerVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setAvatarPickerVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingTop: insets.top + 12 }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>
+                Choisir un avatar
+              </ThemedText>
+              <TouchableOpacity
+                onPress={() => setAvatarPickerVisible(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
-          </ScrollComponent>
-        </Animated.View>
-      </Pressable>
+
+            {loadingAvatars ? (
+              <View style={styles.modalLoading}>
+                <ActivityIndicator color="#E50914" size="large" />
+              </View>
+            ) : availableAvatars.length === 0 ? (
+              <View style={styles.modalLoading}>
+                <Ionicons name="images-outline" size={48} color="#555" />
+                <ThemedText style={styles.noAvatarsText}>
+                  Aucun avatar disponible
+                </ThemedText>
+                <ThemedText style={styles.noAvatarsSubtext}>
+                  Le plugin GetAvatar n&apos;est pas installé ou aucun avatar
+                  n&apos;a été ajouté
+                </ThemedText>
+              </View>
+            ) : (
+              <FlatList
+                data={availableAvatars}
+                numColumns={3}
+                keyExtractor={(item) => item.Id}
+                contentContainerStyle={styles.avatarGrid}
+                columnWrapperStyle={styles.avatarRow}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.avatarOption}
+                    onPress={() => setAvatar(item.Id)}
+                    disabled={settingAvatar}
+                  >
+                    <Image
+                      source={{
+                        uri: `${serverUrl}${item.Url}${token ? `?api_key=${token}` : ""}`,
+                      }}
+                      style={styles.avatarOptionImage}
+                    />
+                    <ThemedText
+                      style={styles.avatarOptionName}
+                      numberOfLines={1}
+                    >
+                      {item.Name}
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+
+            {settingAvatar && (
+              <View style={styles.settingOverlay}>
+                <ActivityIndicator color="#E50914" size="large" />
+                <ThemedText style={styles.savingText}>
+                  Application...
+                </ThemedText>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  doneButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 20,
-    marginBottom: 20,
-    justifyContent: "center",
-    marginTop: 12,
-  },
-  doneButtonText: {
-    fontSize: 16,
-    color: "#ffffffba",
-    fontWeight: "700",
-  },
   container: {
     flex: 1,
-    backgroundColor: "#0000008a",
-  },
-  clickableContainer: {
-    flex: 1,
-  },
-  modalContent: {
-    flex: 1,
-    backgroundColor: "#2d2d2d",
-    marginTop: height * 0.7, // This pushes the content down
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 14,
-  },
-  switchProfileContainer: {
-    flex: 1,
-    paddingTop: 20,
-    minHeight: height * 0.7, // Ensures the container takes up at least 70% of screen height
+    backgroundColor: "#232323",
   },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    marginBottom: 30,
-  },
-  headerTitle: {
-    flex: 1,
-    // alignItems: 'center',
+    paddingVertical: 12,
   },
   title: {
-    fontSize: 24,
-    fontWeight: "600",
+    fontSize: 20,
+    fontWeight: "700",
     color: "#fff",
-  },
-  editButton: {
-    fontSize: 16,
-    color: "#fff",
-    fontWeight: "600",
-  },
-  gridContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    // alignItems: 'center',
-  },
-  profileButton: {
-    width: width * 0.2,
-    aspectRatio: 1,
-    marginBottom: 24,
-    alignItems: "center",
-  },
-  profileContainer: {
-    alignItems: "center",
-    // gap: 2,
-  },
-  avatar: {
-    width: "80%",
-    height: undefined,
-    aspectRatio: 1,
-    borderRadius: 6,
-  },
-  avatarActive: {
-    borderWidth: 2,
-    borderColor: "#E50914",
-  },
-  profileName: {
-    fontSize: 12,
-    fontWeight: "500",
-    color: "#e5e5e5",
-  },
-  addProfileContainer: {
-    width: width * 0.15,
-    aspectRatio: 1,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: "#424242",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "transparent",
-  },
-  addProfileText: {
-    fontSize: 12,
-    color: "#ffffff",
-    // marginTop: 8,
-    fontWeight: "400",
+    textAlign: "center",
   },
   closeButton: {
-    padding: 2,
-    backgroundColor: "#0000005c",
-    borderRadius: 100,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#333",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  scrollContent: {
+    paddingTop: 12,
+    paddingBottom: 40,
+  },
+  currentProfileCard: {
+    backgroundColor: "#2d2d2d",
+    borderRadius: 32,
+    marginHorizontal: 20,
+    paddingVertical: 24,
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  currentProfileInner: {
+    marginBottom: 12,
+  },
+  currentAvatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 26,
+  },
+  editIcon: {
+    position: "absolute",
+    right: 24,
+    top: 24,
+    bottom: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingTop: 0,
+  },
+  currentName: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  otherProfilesRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 24,
+    marginBottom: 24,
+    paddingHorizontal: 20,
+  },
+  otherProfileItem: {
+    alignItems: "center",
+    gap: 6,
+  },
+  otherAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 8,
+  },
+  otherName: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#ccc",
+  },
+  manageButton: {
+    alignSelf: "center",
+    backgroundColor: "#2d2d2d",
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 24,
+    marginBottom: 32,
+  },
+  manageButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#ccc",
+  },
+  menuSection: {
+    paddingHorizontal: 16,
+    gap: 8,
+    paddingBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#888",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginTop: 16,
+    marginBottom: 4,
+    marginLeft: 4,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#2d2d2d",
+    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 14,
+  },
+  menuText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  menuTextContainer: {
+    flex: 1,
+  },
+  menuSubtext: {
+    fontSize: 12,
+    color: "#888",
+    marginTop: 2,
+  },
+  savingOverlay: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+  },
+  savingText: {
+    fontSize: 13,
+    color: "#888",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+  },
+  modalContent: {
+    flex: 1,
+    backgroundColor: "#232323",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    marginTop: 60,
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#333",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  modalLoading: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+  },
+  noAvatarsText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#888",
+  },
+  noAvatarsSubtext: {
+    fontSize: 13,
+    color: "#666",
+    textAlign: "center",
+    paddingHorizontal: 40,
+  },
+  avatarGrid: {
+    padding: 16,
+  },
+  avatarRow: {
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  avatarOption: {
+    flex: 1,
+    maxWidth: "31%",
+    alignItems: "center",
+    gap: 6,
+  },
+  avatarOptionImage: {
+    width: 90,
+    height: 90,
+    borderRadius: 16,
+    backgroundColor: "#2d2d2d",
+  },
+  avatarOptionName: {
+    fontSize: 11,
+    color: "#ccc",
+    textAlign: "center",
+  },
+  settingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
 });

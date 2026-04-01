@@ -6,6 +6,7 @@ import {
   Animated,
   Dimensions,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -212,7 +213,7 @@ export function CategoriesListModal({
                 scrollEventThrottle={16}
                 onScroll={Animated.event(
                   [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-                  { useNativeDriver: true },
+                  { useNativeDriver: Platform.OS !== "web" },
                 )}
                 contentContainerStyle={{
                   paddingTop: padV,

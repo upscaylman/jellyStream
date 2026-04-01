@@ -57,6 +57,7 @@ const KEYS = {
   USER_NAME: "jellyfin_user_name",
   SERVER_NAME: "jellyfin_server_name",
   SAVED_PROFILES: "jellyfin_saved_profiles",
+  REMEMBER_ME: "jellyfin_remember_me",
 } as const;
 
 interface SavedProfile {
@@ -84,6 +85,7 @@ interface AuthState {
     token: string,
     userId: string,
     userName: string,
+    rememberMe?: boolean,
   ) => void;
   logout: () => void;
   restoreSession: () => boolean;
@@ -105,14 +107,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setServer: (url: string, serverName?: string) => {
     const cleanUrl = url.replace(/\/+$/, "");
+    const currentState = get();
     storage.set(KEYS.SERVER_URL, cleanUrl);
     if (serverName) storage.set(KEYS.SERVER_NAME, serverName);
-    const api = createApiClient(cleanUrl);
-    set({
-      serverUrl: cleanUrl,
-      serverName: serverName ?? get().serverName,
-      api,
-    });
+
+    // Ne recréer l'API que si l'URL a changé, sinon conserver l'instance existante (avec son token)
+    if (currentState.serverUrl === cleanUrl && currentState.api) {
+      set({
+        serverName: serverName ?? currentState.serverName,
+      });
+    } else {
+      const api = createApiClient(cleanUrl);
+      if (currentState.token) api.accessToken = currentState.token;
+      set({
+        serverUrl: cleanUrl,
+        serverName: serverName ?? currentState.serverName,
+        api,
+      });
+    }
   },
 
   login: (
@@ -120,12 +132,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     token: string,
     userId: string,
     userName: string,
+    rememberMe = true,
   ) => {
     const cleanUrl = serverUrl.replace(/\/+$/, "");
     storage.set(KEYS.SERVER_URL, cleanUrl);
-    storage.set(KEYS.TOKEN, token);
-    storage.set(KEYS.USER_ID, userId);
-    storage.set(KEYS.USER_NAME, userName);
+    storage.set(KEYS.REMEMBER_ME, rememberMe ? "1" : "0");
+
+    if (rememberMe) {
+      storage.set(KEYS.TOKEN, token);
+      storage.set(KEYS.USER_ID, userId);
+      storage.set(KEYS.USER_NAME, userName);
+    } else {
+      storage.delete(KEYS.TOKEN);
+      storage.delete(KEYS.USER_ID);
+      storage.delete(KEYS.USER_NAME);
+    }
 
     const api = createApiClient(cleanUrl);
     api.accessToken = token;
@@ -181,6 +202,41 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   restoreSession: () => {
+    const rememberMe = storage.getString(KEYS.REMEMBER_ME);
+
+    // Si "Se souvenir de moi" était décoché, ne pas restaurer la session
+    if (rememberMe === "0") {
+      // Nettoyer les credentials pour ne pas les garder
+      storage.delete(KEYS.TOKEN);
+      storage.delete(KEYS.USER_ID);
+      storage.delete(KEYS.USER_NAME);
+      storage.delete(KEYS.REMEMBER_ME);
+
+      const serverUrl = storage.getString(KEYS.SERVER_URL);
+      const serverName = storage.getString(KEYS.SERVER_NAME);
+
+      // Charger les profils sauvegardés quand même
+      let savedProfiles: SavedProfile[] = [];
+      try {
+        const raw = storage.getString(KEYS.SAVED_PROFILES);
+        if (raw) savedProfiles = JSON.parse(raw);
+      } catch {
+        /* noop */
+      }
+
+      if (serverUrl) {
+        const cleanUrl = serverUrl.replace(/\/+$/, "");
+        const api = createApiClient(cleanUrl);
+        set({
+          serverUrl: cleanUrl,
+          serverName: serverName ?? null,
+          api,
+          savedProfiles,
+        });
+      }
+      return false;
+    }
+
     const serverUrl = storage.getString(KEYS.SERVER_URL);
     const token = storage.getString(KEYS.TOKEN);
     const userId = storage.getString(KEYS.USER_ID);

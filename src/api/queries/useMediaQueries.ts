@@ -3,11 +3,13 @@ import { useAuthStore } from "@/src/stores/authStore";
 import {
   BaseItemKind,
   ItemFields,
+  ItemFilter,
   ItemSortBy,
   SortOrder,
 } from "@jellyfin/sdk/lib/generated-client/models";
 import { getItemsApi } from "@jellyfin/sdk/lib/utils/api/items-api";
 import { getLibraryApi } from "@jellyfin/sdk/lib/utils/api/library-api";
+import { getPlaystateApi } from "@jellyfin/sdk/lib/utils/api/playstate-api";
 import { getTvShowsApi } from "@jellyfin/sdk/lib/utils/api/tv-shows-api";
 import { getUserLibraryApi } from "@jellyfin/sdk/lib/utils/api/user-library-api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -439,6 +441,66 @@ export function useToggleLike() {
   });
 }
 
+// Vérifie si un item est marqué comme vu (UserData.Played)
+export function useIsPlayed(itemId: string) {
+  const { api, userId } = useJellyfinApi();
+
+  return useQuery({
+    queryKey: ["isPlayed", itemId],
+    queryFn: async () => {
+      const userLibApi = getUserLibraryApi(api!);
+      const result = await userLibApi.getItem({ userId: userId!, itemId });
+      return result.data.UserData?.Played ?? false;
+    },
+    enabled: !!api && !!userId && !!itemId,
+  });
+}
+
+// Toggle played (marquer comme vu / non vu)
+// Si childItemIds est fourni, marque tous ces items (ex: épisodes d'une saison, films d'une collection)
+export function useTogglePlayed() {
+  const { api, userId } = useJellyfinApi();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      itemId,
+      isPlayed,
+      childItemIds,
+    }: {
+      itemId: string;
+      isPlayed: boolean;
+      childItemIds?: string[];
+    }) => {
+      const playstateApi = getPlaystateApi(api!);
+      const idsToToggle = childItemIds ?? [itemId];
+
+      await Promise.all(
+        idsToToggle.map((id) =>
+          isPlayed
+            ? playstateApi.markUnplayedItem({ itemId: id, userId: userId! })
+            : playstateApi.markPlayedItem({ itemId: id, userId: userId! }),
+        ),
+      );
+      return !isPlayed;
+    },
+    onSuccess: (newValue, { itemId, childItemIds }) => {
+      // Invalider le cache pour l'item parent et tous les enfants
+      queryClient.setQueryData(["isPlayed", itemId], newValue);
+      if (childItemIds) {
+        for (const id of childItemIds) {
+          queryClient.setQueryData(["isPlayed", id], newValue);
+        }
+      }
+      queryClient.invalidateQueries({ queryKey: ["movies"] });
+      queryClient.invalidateQueries({ queryKey: ["series"] });
+      queryClient.invalidateQueries({ queryKey: ["recently-played"] });
+      queryClient.invalidateQueries({ queryKey: ["episodes"] });
+      queryClient.invalidateQueries({ queryKey: ["collection-for-item"] });
+    },
+  });
+}
+
 // Items les mieux notés (CommunityRating + CriticRating)
 export function useTopRated(limit = 20) {
   const { api, userId } = useJellyfinApi();
@@ -483,7 +545,7 @@ export function useLikedItems(limit = 20) {
       const result = await itemsApi.getItems({
         userId,
         includeItemTypes: [BaseItemKind.Movie, BaseItemKind.Series],
-        filters: ["Likes" as any],
+        filters: [ItemFilter.Likes],
         sortBy: [ItemSortBy.DatePlayed],
         sortOrder: [SortOrder.Descending],
         limit,
@@ -497,6 +559,44 @@ export function useLikedItems(limit = 20) {
         imageTypeLimit: 1,
         enableImageTypes: ["Primary", "Backdrop", "Logo"],
       });
+      return result.data.Items ?? [];
+    },
+    enabled: !!api && !!userId,
+  });
+}
+
+// Vue récemment (films/séries joués récemment, triés par date de lecture)
+export function useRecentlyPlayed(limit = 20) {
+  const { api, userId } = useJellyfinApi();
+
+  return useQuery({
+    queryKey: ["recently-played", limit],
+    queryFn: async () => {
+      const itemsApi = getItemsApi(api!);
+      const result = await itemsApi.getItems({
+        userId,
+        includeItemTypes: [BaseItemKind.Movie, BaseItemKind.Series],
+        filters: [ItemFilter.IsPlayed],
+        sortBy: [ItemSortBy.DatePlayed],
+        sortOrder: [SortOrder.Descending],
+        limit,
+        recursive: true,
+        fields: [
+          ItemFields.Overview,
+          ItemFields.Genres,
+          ItemFields.DateCreated,
+        ],
+        imageTypeLimit: 1,
+        enableImageTypes: ["Primary", "Backdrop", "Logo"],
+      });
+      if (__DEV__) {
+        console.log(
+          "[useRecentlyPlayed] TotalRecordCount:",
+          result.data.TotalRecordCount,
+          "Items:",
+          result.data.Items?.length,
+        );
+      }
       return result.data.Items ?? [];
     },
     enabled: !!api && !!userId,

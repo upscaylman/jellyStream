@@ -1,8 +1,6 @@
-import { TAB_SCREENS } from "@/app/(tabs)/_layout";
 import { FeaturedContent } from "@/components/FeaturedContent/FeaturedContent";
 import { AnimatedHeader } from "@/components/Header/AnimatedHeader";
 import { MovieList } from "@/components/MovieList/MovieList";
-import { TabScreenWrapper } from "@/components/TabScreenWrapper";
 import { VisionContainer } from "@/components/ui/VisionContainer";
 import { useDeviceMotion } from "@/hooks/useDeviceMotion";
 import { useDominantColor } from "@/hooks/useDominantColor";
@@ -12,7 +10,6 @@ import { useAuthStore } from "@/src/stores/authStore";
 import { styles } from "@/styles";
 import { useScrollToTop } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
-import { usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Dimensions, View } from "react-native";
@@ -140,82 +137,66 @@ export default function HomeScreen() {
     ],
   }));
 
-  const pathname = usePathname();
-  const isActive = pathname === "/" || pathname === "/index";
-
-  const currentTabIndex = TAB_SCREENS.findIndex(
-    (screen) => screen.name === "index",
-  );
-  const activeTabIndex = TAB_SCREENS.findIndex(
-    (screen) =>
-      pathname === `/${screen.name}` ||
-      (screen.name === "index" && pathname === "/"),
-  );
-
-  const slideDirection = activeTabIndex > currentTabIndex ? "right" : "left";
-
   const scrollViewRef = useRef(null);
 
   useScrollToTop(scrollViewRef);
 
   return (
-    <TabScreenWrapper isActive={isActive} slideDirection={slideDirection}>
-      <VisionContainer style={styles.container}>
-        <StatusBar style="light" />
-        <AnimatedHeader
-          headerAnimatedProps={headerAnimatedProps}
-          title={serverName ?? "Accueil"}
-          scrollDirection={scrollDirection}
-          scrollY={scrollY}
-          activeFilter={activeFilter}
-          onFilterChange={setActiveFilter}
-          genres={genres}
-          selectedGenre={selectedGenre}
-          onGenreSelect={setSelectedGenre}
-        />
+    <VisionContainer style={styles.container}>
+      <StatusBar style="light" />
+      <AnimatedHeader
+        headerAnimatedProps={headerAnimatedProps}
+        title={serverName ?? "Accueil"}
+        scrollDirection={scrollDirection}
+        scrollY={scrollY}
+        activeFilter={activeFilter}
+        onFilterChange={setActiveFilter}
+        genres={genres}
+        selectedGenre={selectedGenre}
+        onGenreSelect={setSelectedGenre}
+      />
 
-        {isLoading && rows.length === 0 ? (
-          <View
-            style={{
-              flex: 1,
-              justifyContent: "center",
-              alignItems: "center",
-              backgroundColor: "#000",
-            }}
-          >
-            <ActivityIndicator size="large" color="#E50914" />
-          </View>
-        ) : (
-          <Animated.ScrollView
-            ref={scrollViewRef}
-            style={[styles.scrollView, isVisionOS && { paddingHorizontal: 20 }]}
-            onScroll={scrollHandler}
-            scrollEventThrottle={16}
-            contentContainerStyle={styles.scrollViewContent}
-            showsVerticalScrollIndicator={false}
-            bounces={false}
-          >
-            <LinearGradient
-              colors={[dominantColor, "#11111d", "#07070c"]}
-              locations={[0, 0.4, 0.8]}
-              style={[styles.gradient, { height: SCREEN_HEIGHT * 0.8 }]}
-            />
+      {isLoading && rows.length === 0 ? (
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "#000",
+          }}
+        >
+          <ActivityIndicator size="large" color="#E50914" />
+        </View>
+      ) : (
+        <Animated.ScrollView
+          ref={scrollViewRef}
+          style={[styles.scrollView, isVisionOS && { paddingHorizontal: 20 }]}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
+          contentContainerStyle={styles.scrollViewContent}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          <LinearGradient
+            colors={[dominantColor, "#11111d", "#07070c"]}
+            locations={[0, 0.4, 0.8]}
+            style={[styles.gradient, { height: SCREEN_HEIGHT * 0.8 }]}
+          />
 
-            <FeaturedContent
-              movie={featured ?? FALLBACK_FEATURED}
-              imageStyle={imageStyle}
-              categoriesStyle={categoriesStyle}
-              buttonsStyle={buttonsStyle}
-              topMargin={insets.top + 90}
-              dominantColor={dominantColor}
-            />
+          <FeaturedContent
+            movie={featured ?? FALLBACK_FEATURED}
+            imageStyle={imageStyle}
+            categoriesStyle={categoriesStyle}
+            buttonsStyle={buttonsStyle}
+            topMargin={insets.top + 90}
+            dominantColor={dominantColor}
+          />
 
-            {filteredRows.map((row) => (
-              <MovieList key={row.rowTitle} {...row} />
-            ))}
-          </Animated.ScrollView>
-        )}
-      </VisionContainer>
-    </TabScreenWrapper>
+          {filteredRows.map((row) => (
+            <MovieList key={row.rowTitle} {...row} />
+          ))}
+        </Animated.ScrollView>
+      )}
+    </VisionContainer>
   );
 }

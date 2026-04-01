@@ -1,22 +1,25 @@
-import { TAB_SCREENS } from "@/app/(tabs)/_layout";
-import { TabScreenWrapper } from "@/components/TabScreenWrapper";
+import { MovieList } from "@/components/MovieList/MovieList";
+import { CastIcon } from "@/icons/CastIcon";
 import {
   useFavoriteItems,
+  useLikedItems,
+  useRecentlyPlayed,
   useResumeItems,
 } from "@/src/api/queries/useMediaQueries";
+import { toMovie } from "@/src/hooks/useJellyfinHome";
 import { useAuthStore } from "@/src/stores/authStore";
 import { useNotificationBadgeCount } from "@/src/stores/notificationStore";
-import { getImageUrl } from "@/src/utils/imageUrl";
+import { getBackdropUrl, getImageUrl, getLogoUrl } from "@/src/utils/imageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { BaseItemDto } from "@jellyfin/sdk/lib/generated-client/models";
 import { useScrollToTop } from "@react-navigation/native";
 import { BlurView } from "expo-blur";
 import { Image as ExpoImage } from "expo-image";
-import { usePathname, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import React, { useCallback, useRef } from "react";
 import {
-  ActivityIndicator,
   FlatList,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -26,7 +29,9 @@ import Animated, {
   interpolate,
   useAnimatedProps,
   useAnimatedScrollHandler,
+  useAnimatedStyle,
   useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -34,54 +39,99 @@ const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
 export default function ProfileScreen() {
   const userName = useAuthStore((s) => s.userName);
+  const userId = useAuthStore((s) => s.userId);
   const serverUrl = useAuthStore((s) => s.serverUrl) ?? "";
-  const avatarUri = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName || "U")}&background=E50914&color=fff&size=120`;
-  const pathname = usePathname();
-  const isActive = pathname === "/profile";
+  const jellyfinAvatar =
+    serverUrl && userId
+      ? `${serverUrl.replace(/\/+$/, "")}/Users/${userId}/Images/Primary?maxWidth=120&quality=90`
+      : null;
+  const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName || "U")}&background=E50914&color=fff&size=120`;
+  const avatarUri = jellyfinAvatar ?? fallbackAvatar;
   const router = useRouter();
-  const scrollViewRef = useRef(null);
+  const scrollViewRef = useRef<Animated.ScrollView>(null);
   useScrollToTop(scrollViewRef);
   const insets = useSafeAreaInsets();
   const badgeCount = useNotificationBadgeCount();
 
-  const { data: favorites, isLoading: isLoadingFav } = useFavoriteItems(20);
-  const { data: resumeItems, isLoading: isLoadingResume } = useResumeItems(20);
-
-  const currentTabIndex = TAB_SCREENS.findIndex(
-    (screen) => screen.name === "profile",
-  );
-  const activeTabIndex = TAB_SCREENS.findIndex(
-    (screen) =>
-      pathname === `/${screen.name}` ||
-      (screen.name === "index" && pathname === "/"),
-  );
-
-  const slideDirection = activeTabIndex > currentTabIndex ? "right" : "left";
-
+  // Scroll animation (même pattern que Home)
+  const SCROLL_THRESHOLD = 4;
+  const SLIDE_ACTIVATION_POINT = 90;
   const scrollY = useSharedValue(0);
+  const lastScrollY = useSharedValue(0);
+  const scrollDirection = useSharedValue(0);
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
-      scrollY.value = event.contentOffset.y;
+      const currentScrollY = event.contentOffset.y;
+      const scrollDelta = currentScrollY - lastScrollY.value;
+
+      if (currentScrollY >= SLIDE_ACTIVATION_POINT) {
+        if (scrollDelta > SCROLL_THRESHOLD) {
+          scrollDirection.value = withTiming(1, { duration: 400 });
+        } else if (scrollDelta < -SCROLL_THRESHOLD) {
+          scrollDirection.value = withTiming(0, { duration: 400 });
+        }
+      } else {
+        scrollDirection.value = withTiming(0, { duration: 400 });
+      }
+
+      lastScrollY.value = currentScrollY;
+      scrollY.value = currentScrollY;
     },
   });
 
-  const headerAnimatedProps = useAnimatedProps(() => {
-    return {
-      intensity: interpolate(scrollY.value, [0, 90], [0, 85], "clamp"),
-    };
-  });
+  const headerAnimatedProps = useAnimatedProps(() => ({
+    intensity: interpolate(scrollY.value, [0, 90], [0, 85], "clamp"),
+  }));
 
-  const getItemPoster = useCallback(
+  const blurOpacityStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [0, 90], [0, 1], "clamp"),
+  }));
+
+  const headerTitleStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        scale: interpolate(scrollDirection.value, [0, 1], [1, 0.96], "clamp"),
+      },
+    ],
+  }));
+
+  const { data: likedItems, error: likedErr } = useLikedItems(20);
+  const { data: favorites } = useFavoriteItems(20);
+  const { data: resumeItems } = useResumeItems(20);
+  const { data: recentlyPlayed, error: recentErr } = useRecentlyPlayed(20);
+
+  if (__DEV__) {
+    if (likedErr) console.warn("[Profile] likedItems error:", likedErr);
+    if (recentErr) console.warn("[Profile] recentlyPlayed error:", recentErr);
+    console.log(
+      "[Profile] likedItems:",
+      likedItems?.length,
+      "recentlyPlayed:",
+      recentlyPlayed?.length,
+    );
+  }
+
+  const likedRow = (likedItems ?? []).map((item) => toMovie(item, serverUrl));
+  const favoritesRow = (favorites ?? []).map((item) =>
+    toMovie(item, serverUrl),
+  );
+  const resumeRow = (resumeItems ?? []).map((item) => toMovie(item, serverUrl));
+
+  const getBackdrop = useCallback(
     (item: BaseItemDto) => {
-      const tag = item.ImageTags?.["Primary"];
-      if (tag) {
+      const backdropTag = item.BackdropImageTags?.[0];
+      if (backdropTag) {
+        return getBackdropUrl(serverUrl, item.Id ?? "", 600, 80, backdropTag);
+      }
+      const primaryTag = item.ImageTags?.["Primary"];
+      if (primaryTag) {
         return getImageUrl({
           serverUrl,
           itemId: item.Id ?? "",
-          maxWidth: 200,
+          maxWidth: 400,
           quality: 80,
-          tag,
+          tag: primaryTag,
         });
       }
       return "";
@@ -89,220 +139,192 @@ export default function ProfileScreen() {
     [serverUrl],
   );
 
-  const renderMediaItem = useCallback(
+  const getLogoUri = useCallback(
+    (item: BaseItemDto) => {
+      const logoTag = item.ImageTags?.["Logo"];
+      if (logoTag) {
+        return getLogoUrl(serverUrl, item.Id ?? "", 300, 90, logoTag);
+      }
+      return "";
+    },
+    [serverUrl],
+  );
+
+  const renderRecentItem = useCallback(
     ({ item }: { item: BaseItemDto }) => {
-      const uri = getItemPoster(item);
+      const uri = getBackdrop(item);
+      const logoUri = getLogoUri(item);
       return (
         <TouchableOpacity
-          style={styles.likedItemContainer}
+          style={styles.recentItem}
           onPress={() => router.push(`/(tabs)/movie/${item.Id}`)}
         >
-          {uri ? (
-            <ExpoImage
-              source={{ uri }}
-              style={styles.likedShowImage}
-              cachePolicy="memory-disk"
-              transition={200}
-            />
-          ) : (
-            <View
-              style={[
-                styles.likedShowImage,
-                {
-                  backgroundColor: "#2a2a2a",
-                  justifyContent: "center",
-                  alignItems: "center",
-                },
-              ]}
-            >
-              <Ionicons name="film-outline" size={20} color="#555" />
-            </View>
-          )}
+          <View style={styles.recentImageWrapper}>
+            {uri ? (
+              <ExpoImage
+                source={{ uri }}
+                style={styles.recentImage}
+                cachePolicy="memory-disk"
+                transition={200}
+                contentFit="cover"
+              />
+            ) : (
+              <View
+                style={[
+                  styles.recentImage,
+                  {
+                    backgroundColor: "#2a2a2a",
+                    justifyContent: "center",
+                    alignItems: "center",
+                  },
+                ]}
+              >
+                <Ionicons name="film-outline" size={24} color="#555" />
+              </View>
+            )}
+            {logoUri ? (
+              <View style={styles.logoOverlay}>
+                <ExpoImage
+                  source={{ uri: logoUri }}
+                  style={styles.logoImage}
+                  cachePolicy="memory-disk"
+                  contentFit="contain"
+                />
+              </View>
+            ) : null}
+          </View>
+          <View style={styles.recentTitleContainer}>
+            <Text style={styles.recentTitle} numberOfLines={1}>
+              {item.Name}
+            </Text>
+          </View>
         </TouchableOpacity>
       );
     },
-    [getItemPoster, router],
-  );
-
-  const renderFavorites = () => (
-    <View style={styles.likedContent}>
-      {isLoadingFav ? (
-        <ActivityIndicator
-          size="small"
-          color="#E50914"
-          style={{ padding: 20 }}
-        />
-      ) : (favorites?.length ?? 0) > 0 ? (
-        <FlatList
-          horizontal
-          data={favorites}
-          keyExtractor={(item) => item.Id ?? ""}
-          renderItem={renderMediaItem}
-          showsHorizontalScrollIndicator={false}
-          maxToRenderPerBatch={5}
-          windowSize={3}
-          removeClippedSubviews={true}
-        />
-      ) : (
-        <Text style={{ color: "#666", padding: 16 }}>
-          Aucun favori pour le moment
-        </Text>
-      )}
-    </View>
-  );
-
-  const renderResumeList = () => (
-    <View style={styles.likedContent}>
-      {isLoadingResume ? (
-        <ActivityIndicator
-          size="small"
-          color="#E50914"
-          style={{ padding: 20 }}
-        />
-      ) : (resumeItems?.length ?? 0) > 0 ? (
-        <FlatList
-          horizontal
-          data={resumeItems}
-          keyExtractor={(item) => item.Id ?? ""}
-          renderItem={renderMediaItem}
-          showsHorizontalScrollIndicator={false}
-          maxToRenderPerBatch={5}
-          windowSize={3}
-          removeClippedSubviews={true}
-        />
-      ) : (
-        <Text style={{ color: "#666", padding: 16 }}>
-          Rien en cours de lecture
-        </Text>
-      )}
-    </View>
+    [getBackdrop, getLogoUri, router],
   );
 
   return (
-    <TabScreenWrapper isActive={isActive} slideDirection={slideDirection}>
-      <View style={styles.container}>
-        <AnimatedBlurView
-          tint="dark"
-          style={[styles.headerBlur]}
-          animatedProps={headerAnimatedProps}
+    <View style={styles.container}>
+      {/* Header animé — même style que Home */}
+      <Animated.View style={styles.header}>
+        <Animated.View
+          style={[
+            { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
+            blurOpacityStyle,
+          ]}
         >
-          <View style={styles.header}>
-            <Text style={styles.title}>Mon Profil</Text>
-            <View style={styles.headerRight}>
-              <TouchableOpacity
-                style={styles.searchButton}
-                onPress={() => router.push("/search")}
+          <AnimatedBlurView
+            tint="systemThickMaterialDark"
+            style={{ width: "100%", height: "100%" }}
+            animatedProps={headerAnimatedProps}
+          />
+        </Animated.View>
+        <View style={[styles.headerContent, { paddingTop: insets.top }]}>
+          <Animated.View style={[styles.headerRow, headerTitleStyle]}>
+            <Pressable
+              style={styles.headerLeft}
+              onPress={() => router.push("/switch-profile")}
+            >
+              <ExpoImage
+                source={{ uri: avatarUri }}
+                placeholder={{ uri: fallbackAvatar }}
+                style={styles.headerAvatar}
+                cachePolicy="memory-disk"
+                contentFit="cover"
+              />
+              <Text style={styles.headerTitle}>{userName}</Text>
+              <Ionicons name="chevron-down" size={18} color="#fff" />
+            </Pressable>
+            <View style={styles.headerButtons}>
+              <Pressable
+                style={styles.headerIcon}
+                onPress={() => {
+                  /* TODO: cast */
+                }}
               >
-                <Ionicons name="search" size={28} color="white" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.menuButton}>
-                <Ionicons name="menu" size={28} color="white" />
-              </TouchableOpacity>
+                <CastIcon size={28} color="#fff" />
+              </Pressable>
+              <Pressable
+                style={styles.headerIcon}
+                onPress={() => router.push("/downloads")}
+              >
+                <ExpoImage
+                  source={require("../../../assets/images/replace-these/download-netflix-transparent.png")}
+                  style={{ width: 28, height: 28 }}
+                  cachePolicy="memory-disk"
+                  contentFit="contain"
+                />
+              </Pressable>
+              <Pressable
+                style={[styles.headerIcon, { position: "relative" }]}
+                onPress={() => router.push("/notifications")}
+              >
+                <Ionicons name="notifications-outline" size={28} color="#fff" />
+                {badgeCount > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {badgeCount > 99 ? "99+" : badgeCount}
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
             </View>
-          </View>
-        </AnimatedBlurView>
-        <Animated.ScrollView
-          ref={scrollViewRef}
-          style={styles.scrollView}
-          onScroll={scrollHandler}
-          scrollEventThrottle={16}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingTop: insets.top + 50,
-            paddingBottom: 100,
-          }}
-        >
-          <TouchableOpacity
-            style={styles.profileSection}
-            onPress={() => router.push("/switch-profile")}
-          >
-            <ExpoImage
-              source={{ uri: avatarUri }}
-              style={styles.profileImage}
-              cachePolicy="memory-disk"
+          </Animated.View>
+        </View>
+      </Animated.View>
+
+      {/* Contenu scrollable */}
+      <Animated.ScrollView
+        ref={scrollViewRef}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+        contentContainerStyle={{
+          paddingTop: insets.top + 60,
+          paddingBottom: 100,
+        }}
+      >
+        {/* Séries et films que vous avez aimés */}
+        {likedRow.length > 0 && (
+          <MovieList
+            rowTitle="Séries et films que vous avez aimés"
+            movies={likedRow}
+          />
+        )}
+
+        {/* Ma liste */}
+        {favoritesRow.length > 0 && (
+          <MovieList
+            rowTitle="Ma liste"
+            movies={favoritesRow}
+            showAll
+            showAllRoute="/my-list"
+          />
+        )}
+
+        {/* Reprendre la lecture */}
+        {resumeRow.length > 0 && (
+          <MovieList rowTitle="Reprendre la lecture" movies={resumeRow} />
+        )}
+
+        {/* Vue récemment */}
+        {(recentlyPlayed?.length ?? 0) > 0 && (
+          <View style={styles.recentSection}>
+            <Text style={styles.sectionTitle}>Vue récemment</Text>
+            <FlatList
+              horizontal
+              data={recentlyPlayed}
+              keyExtractor={(item) => item.Id ?? ""}
+              renderItem={renderRecentItem}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 16 }}
             />
-            <View style={styles.profileNameContainer}>
-              <Text style={styles.profileName}>{userName}</Text>
-              <Ionicons name="chevron-down" size={16} color="white" />
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => router.push("/notifications")}
-          >
-            <View style={[styles.menuIconContainer, { position: "relative" }]}>
-              <View
-                style={[
-                  styles.notificationIconContainer,
-                  { backgroundColor: "#E51013" },
-                ]}
-              >
-                <Ionicons name="notifications" size={24} color="#fff" />
-              </View>
-              {badgeCount > 0 && (
-                <View
-                  style={{
-                    position: "absolute",
-                    top: -2,
-                    right: -2,
-                    backgroundColor: "#E50914",
-                    borderRadius: 9,
-                    minWidth: 18,
-                    height: 18,
-                    justifyContent: "center",
-                    alignItems: "center",
-                    paddingHorizontal: 4,
-                  }}
-                >
-                  <Text
-                    style={{ color: "#fff", fontSize: 10, fontWeight: "bold" }}
-                  >
-                    {badgeCount > 99 ? "99+" : badgeCount}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <View style={styles.menuContent}>
-              <Text style={styles.menuText}>Notifications</Text>
-              <Ionicons name="chevron-forward" size={20} color="#fff" />
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => router.push("/downloads")}
-          >
-            <View style={styles.menuIconContainer}>
-              <View
-                style={[
-                  styles.downloadIconContainer,
-                  { backgroundColor: "#0071EB" },
-                ]}
-              >
-                <Ionicons name="download-outline" size={24} color="#fff" />
-              </View>
-            </View>
-            <View style={styles.menuContent}>
-              <Text style={styles.menuText}>Téléchargements</Text>
-              <Ionicons name="chevron-forward" size={20} color="#fff" />
-            </View>
-          </TouchableOpacity>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionHeader}>Mes Favoris</Text>
-            {renderFavorites()}
           </View>
-
-          <View style={styles.section}>
-            <View style={styles.sectionHeaderContainer}>
-              <Text style={styles.sectionHeader}>En cours de lecture</Text>
-            </View>
-            {renderResumeList()}
-          </View>
-        </Animated.ScrollView>
-      </View>
-    </TabScreenWrapper>
+        )}
+      </Animated.ScrollView>
+    </View>
   );
 }
 
@@ -312,192 +334,107 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
   },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  searchButton: {
-    padding: 8,
-  },
-  profileSection: {
-    flexDirection: "column",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
-  },
-  profileImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 4,
-  },
-  profileName: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: "#fff",
-  },
-  menuItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  menuIconContainer: {
-    // marginBottom: 8,
-  },
-  profileNameContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  notificationIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#222",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  downloadIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#222",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  menuContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    flex: 1,
-  },
-  menuText: {
-    fontSize: 18,
-    fontWeight: "500",
-    color: "#fff",
-  },
-  notificationPreview: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 12,
-  },
-  notificationDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 10,
-    backgroundColor: "#E51013",
-    position: "absolute",
-    left: 8,
-    top: 40,
-  },
-  notificationImage: {
-    width: 120,
-    height: 70,
-    borderRadius: 4,
-    marginLeft: 12,
-  },
-  notificationText: {
-    flex: 1,
-    gap: 4,
-  },
-  notificationTitle: {
-    fontSize: 14,
-    color: "#fff",
-    fontWeight: "500",
-  },
-  notificationSubtitle: {
-    fontSize: 14,
-    color: "#999",
-  },
-  notificationDate: {
-    fontSize: 14,
-    color: "#666",
-  },
-  section: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#222",
-  },
-  sectionHeader: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  headerRight: {
-    flexDirection: "row",
-    gap: 16,
-  },
-  menuButton: {
-    padding: 8,
-  },
-  likedContent: {
-    marginTop: 12,
-  },
-  likedItemContainer: {
-    marginRight: 10,
-    width: 110,
-    backgroundColor: "#161616",
-    alignItems: "center",
-    borderRadius: 8,
-  },
-  likedShowImage: {
-    width: 110,
-    height: 150,
-    borderRadius: 8,
-    // borderBottomLeftRadius: 0,
-    // borderBottomRightRadius: 0,
-  },
-  shareButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 8,
-  },
-  shareText: {
-    color: "white",
-    fontSize: 13,
-  },
-  sectionHeaderContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  seeAll: {
-    color: "white",
-    fontSize: 14,
-  },
-  myList: {
-    marginTop: 12,
-  },
-  myListImage: {
-    width: 120,
-    height: 180,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  headerBlur: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
-    height: 120,
-    zIndex: 1,
+    zIndex: 1000,
   },
-  scrollView: {
-    flex: 1,
+  headerContent: {
+    // Conteneur intérieur du header
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    height: 50,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  headerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 4,
+  },
+  headerTitle: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "bold",
+  },
+  headerButtons: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  headerIcon: {
+    padding: 8,
+  },
+  badge: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    backgroundColor: "#E50914",
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+  recentSection: {
+    marginTop: 28,
+  },
+  sectionTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+    marginLeft: 16,
+  },
+  recentItem: {
+    marginRight: 10,
+    width: 200,
+  },
+  recentImageWrapper: {
+    position: "relative",
+    width: 200,
+    height: 112,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    overflow: "hidden",
+  },
+  recentImage: {
+    width: 200,
+    height: 112,
+  },
+  logoOverlay: {
+    position: "absolute",
+    bottom: 8,
+    left: 8,
+  },
+  logoImage: {
+    width: 100,
+    height: 30,
+  },
+  recentTitleContainer: {
+    backgroundColor: "#1a1a1a",
+    borderBottomLeftRadius: 6,
+    borderBottomRightRadius: 6,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    alignItems: "center",
+  },
+  recentTitle: {
+    color: "#ccc",
+    fontSize: 12,
+    fontWeight: "bold",
   },
 });

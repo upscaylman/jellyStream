@@ -7,10 +7,12 @@ import {
   useEpisodes,
   useIsFavorite,
   useIsLiked,
+  useIsPlayed,
   useSeasons,
   useSimilarItems,
   useToggleFavorite,
   useToggleLike,
+  useTogglePlayed,
 } from "@/src/api/queries/useMediaQueries";
 import { useAuthStore } from "@/src/stores/authStore";
 import {
@@ -108,6 +110,10 @@ export function ExpandedPlayer({
   const { data: isLiked } = useIsLiked(itemId);
   const toggleLike = useToggleLike();
 
+  // Vue / Played
+  const { data: isPlayedSingle } = useIsPlayed(itemId);
+  const togglePlayed = useTogglePlayed();
+
   // Pour un épisode, on remonte à la série parente via seriesId
   const seriesId = movie.seriesId ?? (movie.type === "Series" ? itemId : "");
 
@@ -169,6 +175,47 @@ export function ExpandedPlayer({
     selectedSeasonId ?? "",
   );
   const selectedSeason = seasons?.find((s) => s.Id === selectedSeasonId);
+
+  // Calcul du statut "Vue" et des IDs enfants selon le contexte :
+  // - Série : tous les épisodes de la saison courante
+  // - Collection (BoxSet) : tous les films de la collection
+  // - Film simple : l'item lui-même
+  const playedChildIds = useMemo(() => {
+    if (isSeries && episodes?.length) {
+      return episodes.map((ep) => ep.Id!).filter(Boolean);
+    }
+    if ((isBoxSet || hasCollection) && collectionData?.items.length) {
+      return collectionData.items.map((item) => item.Id!).filter(Boolean);
+    }
+    return undefined;
+  }, [isSeries, episodes, isBoxSet, hasCollection, collectionData]);
+
+  const isPlayed = useMemo(() => {
+    if (isSeries && episodes?.length) {
+      return episodes.every((ep) => ep.UserData?.Played === true);
+    }
+    if ((isBoxSet || hasCollection) && collectionData?.items.length) {
+      return collectionData.items.every(
+        (item) => item.UserData?.Played === true,
+      );
+    }
+    return isPlayedSingle ?? false;
+  }, [
+    isSeries,
+    episodes,
+    isBoxSet,
+    hasCollection,
+    collectionData,
+    isPlayedSingle,
+  ]);
+
+  const handleTogglePlayed = useCallback(() => {
+    togglePlayed.mutate({
+      itemId,
+      isPlayed,
+      childItemIds: playedChildIds,
+    });
+  }, [itemId, isPlayed, playedChildIds, togglePlayed]);
 
   const defaultMovieData = {
     video_url: "",
@@ -313,9 +360,9 @@ export function ExpandedPlayer({
                       height: 60,
                       background:
                         "linear-gradient(to bottom, rgba(0,0,0,0.9), transparent)",
+                      pointerEvents: "none",
                     } as any
                   }
-                  pointerEvents="none"
                 />
               )}
             </View>
@@ -513,9 +560,13 @@ export function ExpandedPlayer({
               />
               <ThemedText style={styles.actionItemText}>Évaluer</ThemedText>
             </Pressable>
-            <Pressable style={styles.actionItem}>
-              <Ionicons name="share-social-outline" size={24} color="white" />
-              <ThemedText style={styles.actionItemText}>Partager</ThemedText>
+            <Pressable style={styles.actionItem} onPress={handleTogglePlayed}>
+              <Ionicons
+                name={isPlayed ? "eye" : "eye-outline"}
+                size={24}
+                color="white"
+              />
+              <ThemedText style={styles.actionItemText}>Vue</ThemedText>
             </Pressable>
             <Pressable style={styles.actionItem}>
               <ExpoImage

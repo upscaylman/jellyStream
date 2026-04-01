@@ -3,7 +3,7 @@ import { BaseItemDto } from "@jellyfin/sdk/lib/generated-client/models";
 import { useScrollToTop } from "@react-navigation/native";
 import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { usePathname, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useRef, useState } from "react";
 import {
@@ -18,8 +18,6 @@ import {
 
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { TAB_SCREENS } from "@/app/(tabs)/_layout";
-import { TabScreenWrapper } from "@/components/TabScreenWrapper";
 import { CastIcon } from "@/icons/CastIcon";
 import {
   useFavoriteChannels,
@@ -156,18 +154,6 @@ function ChannelCard({
 }
 
 export default function DirectTVScreen() {
-  const pathname = usePathname();
-  const isActive = pathname === "/direct-tv";
-  const currentTabIndex = TAB_SCREENS.findIndex(
-    (screen) => screen.name === "direct-tv",
-  );
-  const activeTabIndex = TAB_SCREENS.findIndex(
-    (screen) =>
-      pathname === `/${screen.name}` ||
-      (screen.name === "index" && pathname === "/"),
-  );
-  const slideDirection = activeTabIndex > currentTabIndex ? "right" : "left";
-
   const router = useRouter();
   const serverUrl = useAuthStore((s) => s.serverUrl) ?? "";
   const [activeTab, setActiveTab] = useState("all");
@@ -234,67 +220,65 @@ export default function DirectTVScreen() {
   const channelCount = channels?.length ?? 0;
 
   return (
-    <TabScreenWrapper isActive={isActive} slideDirection={slideDirection}>
-      <View style={localStyles.container}>
-        <StatusBar style="light" />
-        <SafeAreaView style={{ flex: 1 }}>
-          {/* Header */}
-          <View style={localStyles.header}>
-            <View style={localStyles.headerContent}>
-              <Text style={localStyles.headerTitle}>Direct TV</Text>
-              <View style={localStyles.headerRight}>
-                <Pressable onPress={() => {}}>
-                  <CastIcon size={24} color="#fff" />
-                </Pressable>
-              </View>
-            </View>
-
-            <View style={localStyles.categoryTabs}>
-              {TAB_OPTIONS.map(renderTab)}
-              {!isLoading && (
-                <View style={localStyles.channelCountContainer}>
-                  <Text style={localStyles.channelCountText}>
-                    {channelCount} chaîne{channelCount > 1 ? "s" : ""}
-                  </Text>
-                </View>
-              )}
+    <View style={localStyles.container}>
+      <StatusBar style="light" />
+      <SafeAreaView style={{ flex: 1 }}>
+        {/* Header */}
+        <View style={localStyles.header}>
+          <View style={localStyles.headerContent}>
+            <Text style={localStyles.headerTitle}>Direct TV</Text>
+            <View style={localStyles.headerRight}>
+              <Pressable onPress={() => {}}>
+                <CastIcon size={24} color="#fff" />
+              </Pressable>
             </View>
           </View>
 
-          {/* Contenu */}
-          {isLoading ? (
-            <View style={localStyles.loadingContainer}>
-              <ActivityIndicator size="large" color="#E50914" />
-            </View>
-          ) : !channels?.length ? (
-            <View style={localStyles.emptyContainer}>
-              <Ionicons name="tv-outline" size={64} color="#333" />
-              <Text style={localStyles.emptyTitle}>
-                {activeTab === "favorites"
-                  ? "Aucune chaîne favorite"
-                  : "Aucune chaîne disponible"}
-              </Text>
-              <Text style={localStyles.emptySubtitle}>
-                {activeTab === "favorites"
-                  ? "Ajoutez des chaînes en favoris pour les retrouver ici"
-                  : "Configurez la TV en direct dans Jellyfin"}
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              ref={scrollViewRef}
-              data={channels}
-              renderItem={renderChannel}
-              keyExtractor={(item) => item.Id ?? ""}
-              numColumns={CHANNEL_COLUMNS}
-              contentContainerStyle={localStyles.channelGrid}
-              columnWrapperStyle={localStyles.channelRow}
-              showsVerticalScrollIndicator={false}
-            />
-          )}
-        </SafeAreaView>
-      </View>
-    </TabScreenWrapper>
+          <View style={localStyles.categoryTabs}>
+            {TAB_OPTIONS.map(renderTab)}
+            {!isLoading && (
+              <View style={localStyles.channelCountContainer}>
+                <Text style={localStyles.channelCountText}>
+                  {channelCount} chaîne{channelCount > 1 ? "s" : ""}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Contenu */}
+        {isLoading ? (
+          <View style={localStyles.loadingContainer}>
+            <ActivityIndicator size="large" color="#E50914" />
+          </View>
+        ) : !channels?.length ? (
+          <View style={localStyles.emptyContainer}>
+            <Ionicons name="tv-outline" size={64} color="#333" />
+            <Text style={localStyles.emptyTitle}>
+              {activeTab === "favorites"
+                ? "Aucune chaîne favorite"
+                : "Aucune chaîne disponible"}
+            </Text>
+            <Text style={localStyles.emptySubtitle}>
+              {activeTab === "favorites"
+                ? "Ajoutez des chaînes en favoris pour les retrouver ici"
+                : "Configurez la TV en direct dans Jellyfin"}
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            ref={scrollViewRef}
+            data={channels}
+            renderItem={renderChannel}
+            keyExtractor={(item) => item.Id ?? ""}
+            numColumns={CHANNEL_COLUMNS}
+            contentContainerStyle={localStyles.channelGrid}
+            columnWrapperStyle={localStyles.channelRow}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </SafeAreaView>
+    </View>
   );
 }
 

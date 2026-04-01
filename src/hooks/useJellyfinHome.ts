@@ -151,9 +151,6 @@ export function useJellyfinHome(): JellyfinHomeData {
       console.warn("[Home] newlyAdded error:", newlyAdded.error);
   }
 
-  // Construire les rows à partir des résultats
-  const rows: MovieRow[] = [];
-
   // Top 10 films + 10 séries : les mieux notés, rotation mensuelle
   const topRatedIds = useMemo(() => {
     const items = topRated.data ?? [];
@@ -183,29 +180,6 @@ export function useJellyfinHome(): JellyfinHomeData {
       [...top10Movies, ...top10Series].map((i) => i.Id!).filter(Boolean),
     );
   }, [topRated.data]);
-
-  if (resume.data?.length) {
-    rows.push({
-      rowTitle: "Reprendre la lecture",
-      movies: resume.data.map((item) => {
-        const m = toMovie(item, serverUrl);
-        m.isTopRated = topRatedIds.has(item.Id ?? "");
-        return m;
-      }),
-    });
-  }
-
-  if (favorites.data?.length) {
-    rows.push({
-      rowTitle: "Ma liste",
-      movies: favorites.data.map((item) => {
-        const m = toMovie(item, serverUrl);
-        m.isTopRated = topRatedIds.has(item.Id ?? "");
-        return m;
-      }),
-      showAll: true,
-    });
-  }
 
   // Algorithme Tendances : combine PlayCount, CommunityRating, CriticRating et likes
   const trendingRows = useMemo(() => {
@@ -245,66 +219,106 @@ export function useJellyfinHome(): JellyfinHomeData {
     return scored.slice(0, 20).map((s) => s.item);
   }, [trending.data, topRated.data, likedItems.data]);
 
-  if (trendingRows.length > 0) {
-    rows.push({
-      rowTitle: "Tendances",
-      movies: trendingRows.map((item) => {
-        const m = toMovie(item, serverUrl);
-        m.isTopRated = topRatedIds.has(item.Id ?? "");
-        return m;
-      }),
-      type: "top_10",
-    });
-  }
+  // Construire les rows à partir des résultats (mémorisé pour éviter les re-renders)
+  const rows = useMemo(() => {
+    const result: MovieRow[] = [];
 
-  if (latestMovies.data?.length) {
-    rows.push({
-      rowTitle: "Films récents",
-      movies: latestMovies.data.map((item) => {
-        const m = toMovie(item, serverUrl);
-        m.isTopRated = topRatedIds.has(item.Id ?? "");
-        return m;
-      }),
-      showAll: true,
-      showAllRoute: "/(tabs)/films",
-    });
-  }
+    if (resume.data?.length) {
+      result.push({
+        rowTitle: "Reprendre la lecture",
+        movies: resume.data.map((item) => {
+          const m = toMovie(item, serverUrl);
+          m.isTopRated = topRatedIds.has(item.Id ?? "");
+          return m;
+        }),
+      });
+    }
 
-  if (latestSeries.data?.length) {
-    rows.push({
-      rowTitle: "Séries récentes",
-      movies: latestSeries.data.map((item) => {
-        const m = toMovie(item, serverUrl);
-        m.isTopRated = topRatedIds.has(item.Id ?? "");
-        return m;
-      }),
-      showAll: true,
-      showAllRoute: "/(tabs)/series-list",
-    });
-  }
+    if (favorites.data?.length) {
+      result.push({
+        rowTitle: "Ma liste",
+        movies: favorites.data.map((item) => {
+          const m = toMovie(item, serverUrl);
+          m.isTopRated = topRatedIds.has(item.Id ?? "");
+          return m;
+        }),
+        showAll: true,
+      });
+    }
 
-  if (recentlyAdded.data?.length) {
-    rows.push({
-      rowTitle: "Ajoutés récemment",
-      movies: recentlyAdded.data.map((item) => {
-        const m = toMovie(item, serverUrl);
-        m.isTopRated = topRatedIds.has(item.Id ?? "");
-        return m;
-      }),
-    });
-  }
+    if (trendingRows.length > 0) {
+      result.push({
+        rowTitle: "Tendances",
+        movies: trendingRows.map((item) => {
+          const m = toMovie(item, serverUrl);
+          m.isTopRated = topRatedIds.has(item.Id ?? "");
+          return m;
+        }),
+        type: "top_10",
+      });
+    }
 
-  // Fallback : si aucune row n'est remplie, utiliser useNewlyAdded (même query que New & Hot, toujours fiable)
-  if (rows.length === 0 && newlyAdded.data?.length) {
-    rows.push({
-      rowTitle: "Votre bibliothèque",
-      movies: newlyAdded.data.map((item) => {
-        const m = toMovie(item, serverUrl);
-        m.isTopRated = topRatedIds.has(item.Id ?? "");
-        return m;
-      }),
-    });
-  }
+    if (latestMovies.data?.length) {
+      result.push({
+        rowTitle: "Films récents",
+        movies: latestMovies.data.map((item) => {
+          const m = toMovie(item, serverUrl);
+          m.isTopRated = topRatedIds.has(item.Id ?? "");
+          return m;
+        }),
+        showAll: true,
+        showAllRoute: "/(tabs)/films",
+      });
+    }
+
+    if (latestSeries.data?.length) {
+      result.push({
+        rowTitle: "Séries récentes",
+        movies: latestSeries.data.map((item) => {
+          const m = toMovie(item, serverUrl);
+          m.isTopRated = topRatedIds.has(item.Id ?? "");
+          return m;
+        }),
+        showAll: true,
+        showAllRoute: "/(tabs)/series-list",
+      });
+    }
+
+    if (recentlyAdded.data?.length) {
+      result.push({
+        rowTitle: "Ajoutés récemment",
+        movies: recentlyAdded.data.map((item) => {
+          const m = toMovie(item, serverUrl);
+          m.isTopRated = topRatedIds.has(item.Id ?? "");
+          return m;
+        }),
+      });
+    }
+
+    // Fallback : si aucune row n'est remplie, utiliser useNewlyAdded
+    if (result.length === 0 && newlyAdded.data?.length) {
+      result.push({
+        rowTitle: "Votre bibliothèque",
+        movies: newlyAdded.data.map((item) => {
+          const m = toMovie(item, serverUrl);
+          m.isTopRated = topRatedIds.has(item.Id ?? "");
+          return m;
+        }),
+      });
+    }
+
+    return result;
+  }, [
+    resume.data,
+    favorites.data,
+    trendingRows,
+    topRatedIds,
+    latestMovies.data,
+    latestSeries.data,
+    recentlyAdded.data,
+    newlyAdded.data,
+    serverUrl,
+  ]);
 
   // Featured : choisir parmi les derniers ajouts avec backdrop
   // On fige le choix dès que les données principales sont chargées pour éviter

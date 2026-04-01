@@ -1,5 +1,3 @@
-import { TAB_SCREENS } from "@/app/(tabs)/_layout";
-import { TabScreenWrapper } from "@/components/TabScreenWrapper";
 import {
   useNewlyAdded,
   useTop10Movies,
@@ -13,7 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { BaseItemDto } from "@jellyfin/sdk/lib/generated-client/models";
 import { useScrollToTop } from "@react-navigation/native";
 import { Image as ExpoImage } from "expo-image";
-import { usePathname, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useRef, useState } from "react";
 import {
@@ -135,18 +133,6 @@ const TAB_OPTIONS = [
 ];
 
 export default function NewScreen() {
-  const pathname = usePathname();
-  const isActive = pathname === "/new";
-  const currentTabIndex = TAB_SCREENS.findIndex(
-    (screen) => screen.name === "new",
-  );
-  const activeTabIndex = TAB_SCREENS.findIndex(
-    (screen) =>
-      pathname === `/${screen.name}` ||
-      (screen.name === "index" && pathname === "/"),
-  );
-  const slideDirection = activeTabIndex > currentTabIndex ? "right" : "left";
-
   const router = useRouter();
   const scrollY = useSharedValue(0);
   const [activeTab, setActiveTab] = useState("newly-added");
@@ -419,77 +405,75 @@ export default function NewScreen() {
   );
 
   return (
-    <TabScreenWrapper isActive={isActive} slideDirection={slideDirection}>
-      <View style={newStyles.container}>
-        <StatusBar style="light" />
-        <SafeAreaView style={{ flex: 1 }}>
-          <View style={[newStyles.header]}>
-            <View style={newStyles.headerContent}>
-              <Text style={newStyles.headerTitle}>Nouveautés</Text>
-              <View style={newStyles.headerRight}>
-                <Pressable onPress={() => router.push("/search")}>
-                  <Ionicons name="search" size={24} color="#fff" />
-                </Pressable>
-              </View>
+    <View style={newStyles.container}>
+      <StatusBar style="light" />
+      <SafeAreaView style={{ flex: 1 }}>
+        <View style={[newStyles.header]}>
+          <View style={newStyles.headerContent}>
+            <Text style={newStyles.headerTitle}>Nouveautés</Text>
+            <View style={newStyles.headerRight}>
+              <Pressable onPress={() => router.push("/search")}>
+                <Ionicons name="search" size={24} color="#fff" />
+              </Pressable>
             </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={newStyles.categoryTabs}
-            >
-              {TAB_OPTIONS.map(renderTab)}
-            </ScrollView>
           </View>
 
-          {isLoading ? (
-            <View
-              style={{
-                flex: 1,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <ActivityIndicator size="large" color="#E50914" />
-            </View>
-          ) : (
-            <Animated.ScrollView
-              ref={scrollViewRef}
-              showsVerticalScrollIndicator={false}
-              onScroll={scrollHandler}
-              scrollEventThrottle={16}
-              contentContainerStyle={{ paddingBottom: 90 }}
-            >
-              {isTop10 ? (
-                <View style={newStyles.top10List}>
-                  <View style={newStyles.top10Header}>
-                    <Ionicons
-                      name={
-                        activeTab === "top10-tv" ? "tv-outline" : "film-outline"
-                      }
-                      size={20}
-                      color="#E50914"
-                    />
-                    <Text style={newStyles.top10HeaderTitle}>
-                      {activeTab === "top10-tv"
-                        ? "Top 10 des séries aujourd'hui"
-                        : "Top 10 des films aujourd'hui"}
-                    </Text>
-                  </View>
-                  {(displayItems ?? []).map((item, index) =>
-                    renderTop10Item(item, index),
-                  )}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={newStyles.categoryTabs}
+          >
+            {TAB_OPTIONS.map(renderTab)}
+          </ScrollView>
+        </View>
+
+        {isLoading ? (
+          <View
+            style={{
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <ActivityIndicator size="large" color="#E50914" />
+          </View>
+        ) : (
+          <Animated.ScrollView
+            ref={scrollViewRef}
+            showsVerticalScrollIndicator={false}
+            onScroll={scrollHandler}
+            scrollEventThrottle={16}
+            contentContainerStyle={{ paddingBottom: 90 }}
+          >
+            {isTop10 ? (
+              <View style={newStyles.top10List}>
+                <View style={newStyles.top10Header}>
+                  <Ionicons
+                    name={
+                      activeTab === "top10-tv" ? "tv-outline" : "film-outline"
+                    }
+                    size={20}
+                    color="#E50914"
+                  />
+                  <Text style={newStyles.top10HeaderTitle}>
+                    {activeTab === "top10-tv"
+                      ? "Top 10 des séries aujourd'hui"
+                      : "Top 10 des films aujourd'hui"}
+                  </Text>
                 </View>
-              ) : (
-                <View style={newStyles.comingSoonList}>
-                  {(displayItems ?? []).map(renderItem)}
-                </View>
-              )}
-            </Animated.ScrollView>
-          )}
-        </SafeAreaView>
-      </View>
-    </TabScreenWrapper>
+                {(displayItems ?? []).map((item, index) =>
+                  renderTop10Item(item, index),
+                )}
+              </View>
+            ) : (
+              <View style={newStyles.comingSoonList}>
+                {(displayItems ?? []).map(renderItem)}
+              </View>
+            )}
+          </Animated.ScrollView>
+        )}
+      </SafeAreaView>
+    </View>
   );
 }
 

@@ -275,9 +275,7 @@ export const newStyles = StyleSheet.create({
     fontSize: 40,
     fontWeight: "900",
     fontStyle: "italic",
-    textShadowColor: "#E50914",
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    textShadow: "1px 1px 2px #E50914",
   },
   top10RankSmall: {
     fontSize: 32,

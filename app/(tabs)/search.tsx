@@ -1,5 +1,3 @@
-import { TAB_SCREENS } from "@/app/(tabs)/_layout";
-import { TabScreenWrapper } from "@/components/TabScreenWrapper";
 import { CastIcon } from "@/icons/CastIcon";
 import { useSearchItems, useTrending } from "@/src/api/queries/useMediaQueries";
 import { useAuthStore } from "@/src/stores/authStore";
@@ -8,7 +6,7 @@ import { getBackdropUrl, getImageUrl } from "@/src/utils/imageUrl";
 import { Ionicons } from "@expo/vector-icons";
 import { BaseItemDto } from "@jellyfin/sdk/lib/generated-client/models";
 import { Image as ExpoImage } from "expo-image";
-import { usePathname, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useMemo, useRef, useState } from "react";
 import {
@@ -30,18 +28,6 @@ const { width } = Dimensions.get("window");
 const POSTER_WIDTH = (width - 16 * 2 - 6 * 2) / 3;
 
 export default function SearchTab() {
-  const pathname = usePathname();
-  const isActive = pathname === "/search";
-  const currentTabIndex = TAB_SCREENS.findIndex(
-    (screen) => screen.name === "search",
-  );
-  const activeTabIndex = TAB_SCREENS.findIndex(
-    (screen) =>
-      pathname === `/${screen.name}` ||
-      (screen.name === "index" && pathname === "/"),
-  );
-  const slideDirection = activeTabIndex > currentTabIndex ? "right" : "left";
-
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchTerm] = useDebounce(searchQuery, 300);
   const inputRef = useRef<TextInput>(null);
@@ -127,189 +113,243 @@ export default function SearchTab() {
   };
 
   return (
-    <TabScreenWrapper isActive={isActive} slideDirection={slideDirection}>
-      <View style={styles.container}>
-        <StatusBar style="light" />
+    <View style={styles.container}>
+      <StatusBar style="light" />
 
-        <View style={[styles.header, { paddingTop: insets.top }]}>
-          <View style={styles.headerRow}>
-            <Text style={styles.headerTitle}>Rechercher</Text>
-            <View style={styles.headerButtons}>
-              <TouchableOpacity
-                style={styles.headerIcon}
-                onPress={() => {
-                  /* TODO: cast */
-                }}
-              >
-                <CastIcon size={28} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.headerIcon}
-                onPress={() => router.push("/downloads")}
-              >
-                <ExpoImage
-                  source={require("../../assets/images/replace-these/download-netflix-transparent.png")}
-                  style={{ width: 28, height: 28 }}
-                  cachePolicy="memory-disk"
-                  contentFit="contain"
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.headerIcon, { position: "relative" }]}
-                onPress={() => {
-                  router.push("/notifications");
-                }}
-              >
-                <Ionicons name="notifications-outline" size={28} color="#fff" />
-                {badgeCount > 0 && (
-                  <View
+      <View style={[styles.header, { paddingTop: insets.top }]}>
+        <View style={styles.headerRow}>
+          <Text style={styles.headerTitle}>Rechercher</Text>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity
+              style={styles.headerIcon}
+              onPress={() => {
+                /* TODO: cast */
+              }}
+            >
+              <CastIcon size={28} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerIcon}
+              onPress={() => router.push("/downloads")}
+            >
+              <ExpoImage
+                source={require("../../assets/images/replace-these/download-netflix-transparent.png")}
+                style={{ width: 28, height: 28 }}
+                cachePolicy="memory-disk"
+                contentFit="contain"
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.headerIcon, { position: "relative" }]}
+              onPress={() => {
+                router.push("/notifications");
+              }}
+            >
+              <Ionicons name="notifications-outline" size={28} color="#fff" />
+              {badgeCount > 0 && (
+                <View
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    right: 0,
+                    backgroundColor: "#E50914",
+                    borderRadius: 9,
+                    minWidth: 18,
+                    height: 18,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    paddingHorizontal: 4,
+                  }}
+                >
+                  <Text
                     style={{
-                      position: "absolute",
-                      top: 0,
-                      right: 0,
-                      backgroundColor: "#E50914",
-                      borderRadius: 9,
-                      minWidth: 18,
-                      height: 18,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      paddingHorizontal: 4,
+                      color: "#fff",
+                      fontSize: 10,
+                      fontWeight: "bold",
                     }}
                   >
-                    <Text
-                      style={{
-                        color: "#fff",
-                        fontSize: 10,
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {badgeCount > 99 ? "99+" : badgeCount}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-          <View style={styles.searchInputContainer}>
-            <Ionicons
-              name="search"
-              size={20}
-              color="#666"
-              style={styles.searchIcon}
-            />
-            <TextInput
-              ref={inputRef}
-              style={styles.searchInput}
-              placeholder="Rechercher films, séries..."
-              placeholderTextColor="#6b6b6b"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoCapitalize="none"
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity
-                onPress={() => setSearchQuery("")}
-                style={{ marginRight: 4 }}
-              >
-                <Ionicons name="close-circle" size={20} color="#666" />
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity onPress={startVoiceSearch}>
-              <Ionicons name="mic-outline" size={22} color="#999" />
+                    {badgeCount > 99 ? "99+" : badgeCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         </View>
+        <View style={styles.searchInputContainer}>
+          <Ionicons
+            name="search"
+            size={20}
+            color="#666"
+            style={styles.searchIcon}
+          />
+          <TextInput
+            ref={inputRef}
+            style={styles.searchInput}
+            placeholder="Rechercher films, séries..."
+            placeholderTextColor="#6b6b6b"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery("")}
+              style={{ marginRight: 4 }}
+            >
+              <Ionicons name="close-circle" size={20} color="#666" />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={startVoiceSearch}>
+            <Ionicons name="mic-outline" size={22} color="#999" />
+          </TouchableOpacity>
+        </View>
+      </View>
 
-        {isLoading ? (
-          <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color="#E50914" />
-          </View>
-        ) : isSearchActive && (!searchResults || searchResults.length === 0) ? (
-          <View style={styles.noResults}>
-            <Text style={styles.noResultsTitle}>Aucun résultat</Text>
-            <Text style={styles.noResultsSubtitle}>
-              Essayez de rechercher un autre film, série, acteur ou genre.
-            </Text>
-          </View>
-        ) : isShortSearch && searchResults?.length ? (
-          /* 1-2 lettres : grille de posters comme les titres similaires */
-          <ScrollView
-            style={styles.content}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 70 }}
-          >
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Résultats</Text>
-              <View style={styles.posterGrid}>
-                {searchResults.map((item) => {
-                  const tag = item.ImageTags?.["Primary"];
-                  const uri = item.Id
-                    ? getImageUrl({
-                        serverUrl,
-                        itemId: item.Id,
-                        maxWidth: 300,
-                        quality: 80,
-                        tag: tag ?? undefined,
+      {isLoading ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#E50914" />
+        </View>
+      ) : isSearchActive && (!searchResults || searchResults.length === 0) ? (
+        <View style={styles.noResults}>
+          <Text style={styles.noResultsTitle}>Aucun résultat</Text>
+          <Text style={styles.noResultsSubtitle}>
+            Essayez de rechercher un autre film, série, acteur ou genre.
+          </Text>
+        </View>
+      ) : isShortSearch && searchResults?.length ? (
+        /* 1-2 lettres : grille de posters comme les titres similaires */
+        <ScrollView
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 70 }}
+        >
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Résultats</Text>
+            <View style={styles.posterGrid}>
+              {searchResults.map((item) => {
+                const tag = item.ImageTags?.["Primary"];
+                const uri = item.Id
+                  ? getImageUrl({
+                      serverUrl,
+                      itemId: item.Id,
+                      maxWidth: 300,
+                      quality: 80,
+                      tag: tag ?? undefined,
+                    })
+                  : "";
+                return (
+                  <TouchableOpacity
+                    key={item.Id}
+                    style={styles.posterCard}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/(tabs)/movie/[id]",
+                        params: { id: item.Id ?? "" },
                       })
-                    : "";
-                  return (
-                    <TouchableOpacity
-                      key={item.Id}
-                      style={styles.posterCard}
-                      onPress={() =>
-                        router.push({
-                          pathname: "/(tabs)/movie/[id]",
-                          params: { id: item.Id ?? "" },
-                        })
-                      }
-                    >
-                      {uri ? (
-                        <ExpoImage
-                          source={{ uri }}
-                          style={styles.posterImage}
-                          cachePolicy="memory-disk"
-                          transition={200}
-                          contentFit="cover"
-                        />
-                      ) : (
-                        <View
-                          style={[
-                            styles.posterImage,
-                            {
-                              backgroundColor: "#2a2a2a",
-                              justifyContent: "center",
-                              alignItems: "center",
-                            },
-                          ]}
-                        >
-                          <Ionicons
-                            name="film-outline"
-                            size={20}
-                            color="#555"
-                          />
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                    }
+                  >
+                    {uri ? (
+                      <ExpoImage
+                        source={{ uri }}
+                        style={styles.posterImage}
+                        cachePolicy="memory-disk"
+                        transition={200}
+                        contentFit="cover"
+                      />
+                    ) : (
+                      <View
+                        style={[
+                          styles.posterImage,
+                          {
+                            backgroundColor: "#2a2a2a",
+                            justifyContent: "center",
+                            alignItems: "center",
+                          },
+                        ]}
+                      >
+                        <Ionicons name="film-outline" size={20} color="#555" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-          </ScrollView>
-        ) : isFullSearch && searchResults?.length ? (
-          /* 3+ lettres : meilleurs résultats + rows par genre */
-          <ScrollView
-            style={styles.content}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 70 }}
-          >
-            {/* Meilleurs résultats */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Meilleurs résultats</Text>
+          </View>
+        </ScrollView>
+      ) : isFullSearch && searchResults?.length ? (
+        /* 3+ lettres : meilleurs résultats + rows par genre */
+        <ScrollView
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 70 }}
+        >
+          {/* Meilleurs résultats */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Meilleurs résultats</Text>
+            <FlatList
+              data={searchResults.slice(0, 10)}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item) => item.Id ?? ""}
+              contentContainerStyle={{ paddingHorizontal: 16 }}
+              renderItem={({ item }) => {
+                const tag = item.ImageTags?.["Primary"];
+                const uri = item.Id
+                  ? getImageUrl({
+                      serverUrl,
+                      itemId: item.Id,
+                      maxWidth: 300,
+                      quality: 80,
+                      tag: tag ?? undefined,
+                    })
+                  : "";
+                return (
+                  <TouchableOpacity
+                    style={styles.rowPoster}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/(tabs)/movie/[id]",
+                        params: { id: item.Id ?? "" },
+                      })
+                    }
+                  >
+                    {uri ? (
+                      <ExpoImage
+                        source={{ uri }}
+                        style={styles.rowPosterImage}
+                        cachePolicy="memory-disk"
+                        transition={200}
+                        contentFit="cover"
+                      />
+                    ) : (
+                      <View
+                        style={[
+                          styles.rowPosterImage,
+                          {
+                            backgroundColor: "#2a2a2a",
+                            justifyContent: "center",
+                            alignItems: "center",
+                          },
+                        ]}
+                      >
+                        <Ionicons name="film-outline" size={20} color="#555" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          </View>
+
+          {/* Rows par genre */}
+          {genreGroupedResults.map(({ genre, items }) => (
+            <View key={genre} style={styles.section}>
+              <Text style={styles.sectionTitle}>{genre}</Text>
               <FlatList
-                data={searchResults.slice(0, 10)}
+                data={items}
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                keyExtractor={(item) => item.Id ?? ""}
+                keyExtractor={(item) => `${genre}-${item.Id}`}
                 contentContainerStyle={{ paddingHorizontal: 16 }}
                 renderItem={({ item }) => {
                   const tag = item.ImageTags?.["Primary"];
@@ -363,151 +403,87 @@ export default function SearchTab() {
                 }}
               />
             </View>
-
-            {/* Rows par genre */}
-            {genreGroupedResults.map(({ genre, items }) => (
-              <View key={genre} style={styles.section}>
-                <Text style={styles.sectionTitle}>{genre}</Text>
-                <FlatList
-                  data={items}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  keyExtractor={(item) => `${genre}-${item.Id}`}
-                  contentContainerStyle={{ paddingHorizontal: 16 }}
-                  renderItem={({ item }) => {
-                    const tag = item.ImageTags?.["Primary"];
-                    const uri = item.Id
-                      ? getImageUrl({
-                          serverUrl,
-                          itemId: item.Id,
-                          maxWidth: 300,
-                          quality: 80,
-                          tag: tag ?? undefined,
-                        })
-                      : "";
-                    return (
-                      <TouchableOpacity
-                        style={styles.rowPoster}
-                        onPress={() =>
-                          router.push({
-                            pathname: "/(tabs)/movie/[id]",
-                            params: { id: item.Id ?? "" },
-                          })
-                        }
-                      >
-                        {uri ? (
-                          <ExpoImage
-                            source={{ uri }}
-                            style={styles.rowPosterImage}
-                            cachePolicy="memory-disk"
-                            transition={200}
-                            contentFit="cover"
-                          />
-                        ) : (
-                          <View
-                            style={[
-                              styles.rowPosterImage,
-                              {
-                                backgroundColor: "#2a2a2a",
-                                justifyContent: "center",
-                                alignItems: "center",
-                              },
-                            ]}
-                          >
-                            <Ionicons
-                              name="film-outline"
-                              size={20}
-                              color="#555"
-                            />
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  }}
-                />
-              </View>
-            ))}
-          </ScrollView>
-        ) : (
-          /* Default : séries et films suggérés en liste */
-          <ScrollView
-            style={styles.content}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 70 }}
-          >
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Séries et films suggérés</Text>
-              <View style={styles.listContainer}>
-                {(trendingItems ?? []).map((item) => {
-                  const imageUri = getItemImage(item, "backdrop");
-                  const year = item.ProductionYear?.toString() ?? "";
-                  const duration = item.RunTimeTicks
-                    ? `${Math.round(item.RunTimeTicks / 600000000)}m`
-                    : "";
-                  return (
-                    <TouchableOpacity
-                      key={item.Id}
-                      style={styles.itemRow}
-                      onPress={() =>
-                        router.push({
-                          pathname: "/(tabs)/movie/[id]",
-                          params: { id: item.Id ?? "" },
-                        })
-                      }
-                    >
-                      <View style={styles.itemThumbContainer}>
-                        {imageUri ? (
-                          <ExpoImage
-                            source={{ uri: imageUri }}
-                            style={styles.itemThumb}
-                            cachePolicy="memory-disk"
-                            transition={200}
-                            contentFit="cover"
-                          />
-                        ) : (
-                          <View
-                            style={[
-                              styles.itemThumb,
-                              {
-                                backgroundColor: "#2a2a2a",
-                                justifyContent: "center",
-                                alignItems: "center",
-                              },
-                            ]}
-                          >
-                            <Ionicons
-                              name="film-outline"
-                              size={24}
-                              color="#555"
-                            />
-                          </View>
-                        )}
-                      </View>
-                      <View style={styles.itemInfo}>
-                        <Text style={styles.itemTitle} numberOfLines={2}>
-                          {item.Name}
-                        </Text>
-                        <Text style={styles.itemMeta}>
-                          {year}
-                          {duration ? ` • ${duration}` : ""}
-                        </Text>
-                      </View>
-                      <View style={styles.playButton}>
-                        <Ionicons
-                          name="play-circle-outline"
-                          size={40}
-                          color="white"
+          ))}
+        </ScrollView>
+      ) : (
+        /* Default : séries et films suggérés en liste */
+        <ScrollView
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 70 }}
+        >
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Séries et films suggérés</Text>
+            <View style={styles.listContainer}>
+              {(trendingItems ?? []).map((item) => {
+                const imageUri = getItemImage(item, "backdrop");
+                const year = item.ProductionYear?.toString() ?? "";
+                const duration = item.RunTimeTicks
+                  ? `${Math.round(item.RunTimeTicks / 600000000)}m`
+                  : "";
+                return (
+                  <TouchableOpacity
+                    key={item.Id}
+                    style={styles.itemRow}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/(tabs)/movie/[id]",
+                        params: { id: item.Id ?? "" },
+                      })
+                    }
+                  >
+                    <View style={styles.itemThumbContainer}>
+                      {imageUri ? (
+                        <ExpoImage
+                          source={{ uri: imageUri }}
+                          style={styles.itemThumb}
+                          cachePolicy="memory-disk"
+                          transition={200}
+                          contentFit="cover"
                         />
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                      ) : (
+                        <View
+                          style={[
+                            styles.itemThumb,
+                            {
+                              backgroundColor: "#2a2a2a",
+                              justifyContent: "center",
+                              alignItems: "center",
+                            },
+                          ]}
+                        >
+                          <Ionicons
+                            name="film-outline"
+                            size={24}
+                            color="#555"
+                          />
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.itemInfo}>
+                      <Text style={styles.itemTitle} numberOfLines={2}>
+                        {item.Name}
+                      </Text>
+                      <Text style={styles.itemMeta}>
+                        {year}
+                        {duration ? ` • ${duration}` : ""}
+                      </Text>
+                    </View>
+                    <View style={styles.playButton}>
+                      <Ionicons
+                        name="play-circle-outline"
+                        size={40}
+                        color="white"
+                      />
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-          </ScrollView>
-        )}
-      </View>
-    </TabScreenWrapper>
+          </View>
+        </ScrollView>
+      )}
+    </View>
   );
 }
 

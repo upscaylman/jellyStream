@@ -1,6 +1,7 @@
 // Écran de login JellyStream — style Netflix
 import { useAuthStore } from "@/src/stores/authStore";
 import { getUserApi } from "@jellyfin/sdk/lib/utils/api/user-api";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
@@ -162,7 +163,7 @@ export default function LoginScreen() {
           router.replace("/(tabs)");
         }
       } else {
-        login(serverUrl, token, userId, newUserName);
+        login(serverUrl, token, userId, newUserName, rememberMe);
         router.replace("/(tabs)");
       }
     } catch {
@@ -174,6 +175,13 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.wrapper}>
+      {/* Dégradé noir → rouge */}
+      <LinearGradient
+        colors={["rgba(139, 0, 0, 0.56)", "rgba(0, 0, 0, 0.95)"]}
+        locations={[0, 0.4]}
+        style={[StyleSheet.absoluteFillObject, { pointerEvents: "none" }]}
+      />
+
       {/* Header avec logo */}
       <View style={styles.header}>
         <Image
@@ -346,7 +354,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   formCard: {
-    backgroundColor: "rgba(0, 0, 0, 0.75)",
+    backgroundColor: "transparent",
     borderRadius: 8,
     paddingHorizontal: IS_WIDE ? 68 : 24,
     paddingTop: 48,

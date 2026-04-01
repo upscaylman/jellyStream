@@ -106,20 +106,10 @@ function AnimatedStack() {
           <Stack.Screen
             name="switch-profile"
             options={{
-              presentation: "transparentModal",
               headerShown: false,
+              animation: "fade",
               contentStyle: {
-                backgroundColor: "transparent",
-              },
-            }}
-            listeners={{
-              focus: () => {
-                setIsModalActive(true);
-                setCanBlur(false);
-              },
-              beforeRemove: () => {
-                setIsModalActive(false);
-                setCanBlur(false);
+                backgroundColor: "#232323",
               },
             }}
           />

@@ -111,7 +111,7 @@ export function GlobalBottomSheet({
   if (!visible) return null;
 
   return (
-    <View style={styles.root} pointerEvents="box-none">
+    <View style={[styles.root, { pointerEvents: "box-none" }]}>
       {/* Backdrop */}
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose}>
         <Animated.View style={[styles.backdrop, backdropStyle]} />
