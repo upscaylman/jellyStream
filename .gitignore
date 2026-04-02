@@ -30,6 +30,9 @@ expo-env.d.ts
 *.swo
 *~
 
+# AI memory / instructions
+.github/copilot-instructions.md
+
 # OS
 .DS_Store
 Thumbs.db
