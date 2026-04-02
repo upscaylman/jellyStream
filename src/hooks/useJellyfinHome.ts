@@ -8,14 +8,19 @@ import {
   useLikedItems,
   useNewlyAdded,
   useRecentlyAdded,
+  useRecentlyPlayed,
   useResumeItems,
   useTopRated,
   useTrending,
 } from "@/src/api/queries/useMediaQueries";
 import { useAuthStore } from "@/src/stores/authStore";
+import { usePreferencesStore } from "@/src/stores/preferencesStore";
 import { getBackdropUrl, getImageUrl, getLogoUrl } from "@/src/utils/imageUrl";
 import { MovieRow } from "@/types/movie";
-import { BaseItemDto } from "@jellyfin/sdk/lib/generated-client/models";
+import {
+  BaseItemDto,
+  ImageType,
+} from "@jellyfin/sdk/lib/generated-client/models";
 import { useMemo, useRef } from "react";
 
 interface JellyfinHomeData {
@@ -33,21 +38,24 @@ interface JellyfinHomeData {
 }
 
 // Détermine le badge à afficher sur l'affiche (style Netflix)
-export function computeBadge(item: BaseItemDto): string | undefined {
-  // Nouvelle saison : série avec plus d'une saison dont du contenu ajouté il y a ≤ 7 jours
+export function computeBadge(
+  item: BaseItemDto,
+  recentDays = 7,
+): string | undefined {
+  // Nouvelle saison : série avec plus d'une saison dont du contenu ajouté il y a ≤ N jours
   if (item.Type === "Series" && (item.ChildCount ?? 0) > 1) {
     const lastMedia = item.DateLastMediaAdded;
     if (lastMedia) {
       const daysSince =
         (Date.now() - new Date(lastMedia).getTime()) / 86_400_000;
-      if (daysSince <= 7) return "Nouvelle saison";
+      if (daysSince <= recentDays) return "Nouvelle saison";
     }
   }
-  // Ajout récent : ajouté il y a ≤ 7 jours
+  // Ajout récent : ajouté il y a ≤ N jours
   const dateAdded = item.DateCreated;
   if (dateAdded) {
     const daysSince = (Date.now() - new Date(dateAdded).getTime()) / 86_400_000;
-    if (daysSince <= 7) return "Ajout récent";
+    if (daysSince <= recentDays) return "Ajout récent";
   }
   return undefined;
 }
@@ -57,6 +65,7 @@ export function toMovie(
   item: BaseItemDto,
   serverUrl: string,
   badgeMap?: Map<string, string>,
+  useEpisodeThumbnail?: boolean,
 ) {
   const imageTag = item.ImageTags?.["Primary"];
   // Toujours construire une URL d'image si on a un itemId — Jellyfin servira
@@ -67,17 +76,71 @@ export function toMovie(
   const inheritedBadge =
     badgeMap?.get(itemId) ??
     (item.SeriesId ? badgeMap?.get(item.SeriesId) : undefined);
-  return {
-    id: itemId,
-    imageUrl: itemId
-      ? getImageUrl({
+
+  // Pour les épisodes en mode resume/next-up : utiliser la vignette de l'épisode
+  // plutôt que le poster de la série
+  let imageUrl = "";
+  if (itemId) {
+    if (useEpisodeThumbnail && item.Type === "Episode") {
+      // Priorité : Thumb de l'épisode > Backdrop de l'épisode > Thumb parent (série) > Primary fallback
+      const thumbTag = item.ImageTags?.["Thumb"];
+      const backdropTag = item.BackdropImageTags?.[0];
+      if (thumbTag) {
+        imageUrl = getImageUrl({
+          serverUrl,
+          itemId,
+          imageType: "Thumb" as ImageType,
+          maxWidth: 400,
+          quality: 90,
+          tag: thumbTag,
+        });
+      } else if (backdropTag) {
+        imageUrl = getBackdropUrl(serverUrl, itemId, 400, 90, backdropTag);
+      } else if (item.ParentThumbItemId) {
+        imageUrl = getImageUrl({
+          serverUrl,
+          itemId: item.ParentThumbItemId,
+          imageType: "Thumb" as ImageType,
+          maxWidth: 400,
+          quality: 90,
+          tag: item.ParentThumbImageTag ?? undefined,
+        });
+      } else {
+        imageUrl = getImageUrl({
           serverUrl,
           itemId,
           maxWidth: 300,
           quality: 90,
           tag: imageTag,
-        })
-      : "",
+        });
+      }
+    } else {
+      imageUrl = getImageUrl({
+        serverUrl,
+        itemId,
+        maxWidth: 300,
+        quality: 90,
+        tag: imageTag,
+      });
+    }
+  }
+
+  // Backdrop URL pour les big cards
+  const backdropTag =
+    item.BackdropImageTags?.[0] ?? item.ImageTags?.["Backdrop"];
+  const backdropUrl = backdropTag
+    ? getBackdropUrl(serverUrl, itemId, 780, 90, backdropTag)
+    : "";
+
+  // Logo URL
+  const logoTag = item.ImageTags?.["Logo"];
+  const logoUrl = logoTag
+    ? getLogoUrl(serverUrl, itemId, 400, 90, logoTag)
+    : "";
+
+  return {
+    id: itemId,
+    imageUrl,
     title: item.Name ?? "",
     year: item.ProductionYear?.toString() ?? "",
     duration: item.RunTimeTicks
@@ -88,6 +151,15 @@ export function toMovie(
     mediaType: item.Type ?? "",
     badge: directBadge ?? inheritedBadge,
     genres: item.Genres ?? [],
+    progressPercent:
+      item.UserData?.PlaybackPositionTicks && item.RunTimeTicks
+        ? Math.min(
+            (item.UserData.PlaybackPositionTicks / item.RunTimeTicks) * 100,
+            100,
+          )
+        : undefined,
+    backdropUrl,
+    logoUrl,
   };
 }
 
@@ -122,6 +194,7 @@ function buildFeatured(
 
 export function useJellyfinHome(): JellyfinHomeData {
   const serverUrl = useAuthStore((s) => s.serverUrl) ?? "";
+  const recentDays = Number(usePreferencesStore((s) => s.recentItemDays)) || 7;
 
   const resume = useResumeItems(12);
   const latestMovies = useLatestMovies(20);
@@ -132,6 +205,7 @@ export function useJellyfinHome(): JellyfinHomeData {
   const recentlyAdded = useRecentlyAdded(20);
   const newlyAdded = useNewlyAdded(20);
   const favorites = useFavoriteItems(20);
+  const watchedFilms = useRecentlyPlayed(20);
 
   // Précharger l'index BoxSets en arrière-plan (une seule fois)
   useBoxSetIndex();
@@ -247,7 +321,7 @@ export function useJellyfinHome(): JellyfinHomeData {
       ...(trendingRows ?? []),
     ];
     for (const item of allSources) {
-      const badge = computeBadge(item);
+      const badge = computeBadge(item, recentDays);
       if (badge && item.Id) {
         badgeMap.set(item.Id, badge);
       }
@@ -257,7 +331,7 @@ export function useJellyfinHome(): JellyfinHomeData {
       result.push({
         rowTitle: "Reprendre la lecture",
         movies: resume.data.map((item) => {
-          const m = toMovie(item, serverUrl, badgeMap);
+          const m = toMovie(item, serverUrl, badgeMap, true);
           m.isTopRated = topRatedIds.has(item.Id ?? "");
           return m;
         }),
@@ -345,8 +419,10 @@ export function useJellyfinHome(): JellyfinHomeData {
     topRatedIds,
     latestMovies.data,
     latestSeries.data,
+    watchedFilms.data,
     recentlyAdded.data,
     newlyAdded.data,
+    recentDays,
     serverUrl,
   ]);
 

@@ -79,6 +79,7 @@ const KEYS = {
   NEXT_UP_EXPIRY_DAYS: "pref_next_up_expiry_days",
   ALLOW_WATCHED_NEXT_UP: "pref_allow_watched_next_up",
   USE_EPISODE_IMAGE_NEXT_UP: "pref_use_episode_image_next_up",
+  RECENT_ITEM_DAYS: "pref_recent_item_days",
 } as const;
 
 export const QUALITY_OPTIONS = [
@@ -128,6 +129,7 @@ interface PreferencesState {
   nextUpExpiryDays: string;
   allowWatchedNextUp: boolean;
   useEpisodeImageNextUp: boolean;
+  recentItemDays: string;
 
   // Actions
   setDefaultQuality: (label: string, bitrate: number) => void;
@@ -163,6 +165,7 @@ interface PreferencesState {
   setNextUpExpiryDays: (value: string) => void;
   setAllowWatchedNextUp: (value: boolean) => void;
   setUseEpisodeImageNextUp: (value: boolean) => void;
+  setRecentItemDays: (value: string) => void;
   restore: () => void;
 }
 
@@ -201,6 +204,7 @@ export const usePreferencesStore = create<PreferencesState>((set) => ({
   nextUpExpiryDays: "365",
   allowWatchedNextUp: false,
   useEpisodeImageNextUp: false,
+  recentItemDays: "7",
 
   setDefaultQuality: (label, bitrate) => {
     storage.set(KEYS.DEFAULT_QUALITY, label);
@@ -368,6 +372,11 @@ export const usePreferencesStore = create<PreferencesState>((set) => ({
     set({ useEpisodeImageNextUp: value });
   },
 
+  setRecentItemDays: (value) => {
+    storage.set(KEYS.RECENT_ITEM_DAYS, value);
+    set({ recentItemDays: value });
+  },
+
   restore: () => {
     const qualityLabel = storage.getString(KEYS.DEFAULT_QUALITY) ?? "Auto";
     const bitrate = parseInt(storage.getString(KEYS.MAX_BITRATE) ?? "0", 10);
@@ -410,6 +419,7 @@ export const usePreferencesStore = create<PreferencesState>((set) => ({
       storage.getString(KEYS.ALLOW_WATCHED_NEXT_UP) === "1";
     const useEpisodeImageNextUp =
       storage.getString(KEYS.USE_EPISODE_IMAGE_NEXT_UP) === "1";
+    const recentItemDays = storage.getString(KEYS.RECENT_ITEM_DAYS) ?? "7";
 
     set({
       defaultQualityLabel: qualityLabel,
@@ -446,6 +456,7 @@ export const usePreferencesStore = create<PreferencesState>((set) => ({
       nextUpExpiryDays,
       allowWatchedNextUp,
       useEpisodeImageNextUp,
+      recentItemDays,
     });
   },
 }));

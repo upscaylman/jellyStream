@@ -87,6 +87,18 @@ const MovieItem = ({
           />
         </View>
       )}
+      {item.progressPercent != null && item.progressPercent > 0 && (
+        <View style={progressStyles.container}>
+          <View style={progressStyles.track}>
+            <View
+              style={[
+                progressStyles.fill,
+                { width: `${item.progressPercent}%` },
+              ]}
+            />
+          </View>
+        </View>
+      )}
     </View>
     {item.badge && (
       <View
@@ -235,5 +247,23 @@ const rowHeaderStyles = StyleSheet.create({
     color: "#fff",
     fontSize: 18,
     fontWeight: "bold",
+  },
+});
+
+const progressStyles = StyleSheet.create({
+  container: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 0,
+  },
+  track: {
+    height: 3,
+    backgroundColor: "rgba(255,255,255,0.3)",
+  },
+  fill: {
+    height: "100%",
+    backgroundColor: "#E50914",
   },
 });

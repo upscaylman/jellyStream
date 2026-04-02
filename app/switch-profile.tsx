@@ -147,6 +147,35 @@ const DISPLAY_LANGUAGE_OPTIONS = [
   { value: "nb", label: "Norsk" },
 ] as const;
 
+const MIN_RESUME_PCT_OPTIONS = [
+  { value: "0", label: "0% (dès le début)" },
+  { value: "2", label: "2%" },
+  { value: "5", label: "5% (par défaut)" },
+  { value: "10", label: "10%" },
+] as const;
+
+const MAX_RESUME_PCT_OPTIONS = [
+  { value: "80", label: "80%" },
+  { value: "90", label: "90% (par défaut)" },
+  { value: "95", label: "95%" },
+] as const;
+
+const MIN_RESUME_DURATION_OPTIONS = [
+  { value: "0", label: "Aucune durée minimum" },
+  { value: "60", label: "1 minute" },
+  { value: "120", label: "2 minutes" },
+  { value: "300", label: "5 minutes (par défaut)" },
+  { value: "600", label: "10 minutes" },
+] as const;
+
+const RECENT_ITEM_DAYS_OPTIONS = [
+  { value: "3", label: "3 jours" },
+  { value: "7", label: "7 jours (par défaut)" },
+  { value: "14", label: "14 jours" },
+  { value: "30", label: "30 jours" },
+  { value: "60", label: "60 jours" },
+] as const;
+
 const LOCALE_OPTIONS = [
   { value: "", label: "Identique à la langue d'affichage" },
   { value: "fr", label: "Français" },
@@ -250,6 +279,8 @@ export default function SwitchProfileScreen() {
   const setUseEpisodeImageNextUp = usePreferencesStore(
     (s) => s.setUseEpisodeImageNextUp,
   );
+  const recentItemDays = usePreferencesStore((s) => s.recentItemDays);
+  const setRecentItemDays = usePreferencesStore((s) => s.setRecentItemDays);
   const maxAudioChannels = usePreferencesStore((s) => s.maxAudioChannels);
   const setMaxAudioChannels = usePreferencesStore((s) => s.setMaxAudioChannels);
   const disableVbrAudio = usePreferencesStore((s) => s.disableVbrAudio);
@@ -337,6 +368,19 @@ export default function SwitchProfileScreen() {
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [showAppLangPicker, setShowAppLangPicker] = useState(false);
 
+  // Playback settings (Server Configuration)
+  const [playbackSettingsVisible, setPlaybackSettingsVisible] = useState(false);
+  const [minResumePct, setMinResumePct] = useState("5");
+  const [maxResumePct, setMaxResumePct] = useState("90");
+  const [minResumeDuration, setMinResumeDuration] = useState("300");
+  const [showMinResumePctPicker, setShowMinResumePctPicker] = useState(false);
+  const [showMaxResumePctPicker, setShowMaxResumePctPicker] = useState(false);
+  const [showMinResumeDurationPicker, setShowMinResumeDurationPicker] =
+    useState(false);
+  const [showRecentItemDaysPicker, setShowRecentItemDaysPicker] =
+    useState(false);
+  const [savingServerConfig, setSavingServerConfig] = useState(false);
+
   const authorizeQuickConnect = useCallback(async () => {
     if (!api || !quickConnectCode.trim()) return;
     setQuickConnectLoading(true);
@@ -366,6 +410,59 @@ export default function SwitchProfileScreen() {
 
   const avatarVersion = useAuthStore((s) => s.avatarVersion);
   const bumpAvatarVersion = useAuthStore((s) => s.bumpAvatarVersion);
+
+  // Charger la config serveur (MinResumePct, etc.) à l'ouverture des paramètres lecture
+  const fetchServerConfig = useCallback(async () => {
+    if (!serverUrl || !token) return;
+    try {
+      const base = serverUrl.replace(/\/+$/, "");
+      const resp = await fetch(`${base}/System/Configuration`, {
+        headers: { Authorization: `MediaBrowser Token="${token}"` },
+      });
+      if (resp.ok) {
+        const cfg = await resp.json();
+        setMinResumePct(String(cfg.MinResumePct ?? 5));
+        setMaxResumePct(String(cfg.MaxResumePct ?? 90));
+        setMinResumeDuration(String(cfg.MinResumeDurationSeconds ?? 300));
+      }
+    } catch {
+      // Silently fail
+    }
+  }, [serverUrl, token]);
+
+  // Sauvegarder un champ de la config serveur
+  const saveServerConfigField = useCallback(
+    async (field: string, value: number) => {
+      if (!serverUrl || !token) return;
+      setSavingServerConfig(true);
+      try {
+        const base = serverUrl.replace(/\/+$/, "");
+        const headers = {
+          Authorization: `MediaBrowser Token="${token}"`,
+          "Content-Type": "application/json",
+        };
+        const resp = await fetch(`${base}/System/Configuration`, { headers });
+        if (!resp.ok) return;
+        const cfg = await resp.json();
+        (cfg as Record<string, unknown>)[field] = value;
+        await fetch(`${base}/System/Configuration`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(cfg),
+        });
+      } catch {
+        if (Platform.OS === "web") {
+          // eslint-disable-next-line no-alert
+          alert("Erreur lors de la sauvegarde de la config serveur");
+        } else {
+          Alert.alert("Erreur", "Impossible de sauvegarder la config serveur");
+        }
+      } finally {
+        setSavingServerConfig(false);
+      }
+    },
+    [serverUrl, token],
+  );
 
   // Sauvegarder la config utilisateur sur le serveur
   const saveConfig = useCallback(
@@ -973,6 +1070,63 @@ export default function SwitchProfileScreen() {
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#666" />
               </TouchableOpacity>
+
+              {/* === LECTURE (admin uniquement) === */}
+              {userData?.Policy?.IsAdministrator && (
+                <>
+                  <ThemedText style={styles.sectionTitle}>Lecture</ThemedText>
+
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={() => {
+                      fetchServerConfig();
+                      setPlaybackSettingsVisible(true);
+                    }}
+                  >
+                    <Ionicons
+                      name="play-circle-outline"
+                      size={24}
+                      color="#fff"
+                    />
+                    <View style={styles.menuTextContainer}>
+                      <ThemedText style={styles.menuText}>
+                        Seuils de reprise
+                      </ThemedText>
+                      <ThemedText style={styles.menuSubtext}>
+                        Progression minimum, marqué comme vu
+                      </ThemedText>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#666" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={() => setShowRecentItemDaysPicker(true)}
+                  >
+                    <Ionicons name="time-outline" size={24} color="#fff" />
+                    <View style={styles.menuTextContainer}>
+                      <ThemedText style={styles.menuText}>
+                        Durée des ajouts récents
+                      </ThemedText>
+                      <ThemedText style={styles.menuSubtext}>
+                        Badge "Ajout récent" affiché pendant {recentItemDays}{" "}
+                        jours
+                      </ThemedText>
+                    </View>
+                    <Ionicons name="chevron-down" size={20} color="#666" />
+                  </TouchableOpacity>
+                  <CategoriesListModal
+                    visible={showRecentItemDaysPicker}
+                    onClose={() => setShowRecentItemDaysPicker(false)}
+                    items={RECENT_ITEM_DAYS_OPTIONS.map((o) => ({
+                      id: o.value,
+                      label: o.label,
+                    }))}
+                    selectedId={recentItemDays}
+                    onSelect={(id) => setRecentItemDays(id)}
+                  />
+                </>
+              )}
 
               {/* === CONTRÔLES === */}
               <ThemedText style={styles.sectionTitle}>Contrôles</ThemedText>
@@ -2341,6 +2495,154 @@ export default function SwitchProfileScreen() {
               )}
 
               {saving && (
+                <View style={styles.savingOverlay}>
+                  <ActivityIndicator color="#E50914" size="small" />
+                  <ThemedText style={styles.savingText}>
+                    Sauvegarde...
+                  </ThemedText>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Playback Settings Sub-Modal */}
+      <Modal
+        visible={playbackSettingsVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPlaybackSettingsVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingTop: insets.top + 12 }]}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity
+                onPress={() => setPlaybackSettingsVisible(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="arrow-back" size={20} color="#fff" />
+              </TouchableOpacity>
+              <ThemedText style={styles.modalTitle}>
+                Seuils de reprise
+              </ThemedText>
+              <View style={{ width: 32 }} />
+            </View>
+
+            <ScrollView
+              contentContainerStyle={styles.settingsScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <ThemedText
+                style={[
+                  styles.menuSubtext,
+                  { marginBottom: 16, paddingHorizontal: 0 },
+                ]}
+              >
+                Ces paramètres s&apos;appliquent à tout le serveur Jellyfin.
+              </ThemedText>
+
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => setShowMinResumePctPicker(true)}
+                disabled={savingServerConfig}
+              >
+                <Ionicons name="play-outline" size={24} color="#fff" />
+                <View style={styles.menuTextContainer}>
+                  <ThemedText style={styles.menuText}>
+                    Début de reprise
+                  </ThemedText>
+                  <ThemedText style={styles.menuSubtext}>
+                    La progression est ignorée en dessous de ce %. Valeur :{" "}
+                    {minResumePct}%
+                  </ThemedText>
+                </View>
+                <Ionicons name="chevron-down" size={20} color="#666" />
+              </TouchableOpacity>
+              <CategoriesListModal
+                visible={showMinResumePctPicker}
+                onClose={() => setShowMinResumePctPicker(false)}
+                items={MIN_RESUME_PCT_OPTIONS.map((o) => ({
+                  id: o.value,
+                  label: o.label,
+                }))}
+                selectedId={minResumePct}
+                onSelect={(id) => {
+                  setMinResumePct(id);
+                  saveServerConfigField("MinResumePct", Number(id));
+                }}
+              />
+
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => setShowMaxResumePctPicker(true)}
+                disabled={savingServerConfig}
+              >
+                <Ionicons
+                  name="checkmark-done-outline"
+                  size={24}
+                  color="#fff"
+                />
+                <View style={styles.menuTextContainer}>
+                  <ThemedText style={styles.menuText}>
+                    Marqué comme vu
+                  </ThemedText>
+                  <ThemedText style={styles.menuSubtext}>
+                    Au-delà de ce %, l&apos;item est marqué comme vu. Valeur :{" "}
+                    {maxResumePct}%
+                  </ThemedText>
+                </View>
+                <Ionicons name="chevron-down" size={20} color="#666" />
+              </TouchableOpacity>
+              <CategoriesListModal
+                visible={showMaxResumePctPicker}
+                onClose={() => setShowMaxResumePctPicker(false)}
+                items={MAX_RESUME_PCT_OPTIONS.map((o) => ({
+                  id: o.value,
+                  label: o.label,
+                }))}
+                selectedId={maxResumePct}
+                onSelect={(id) => {
+                  setMaxResumePct(id);
+                  saveServerConfigField("MaxResumePct", Number(id));
+                }}
+              />
+
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => setShowMinResumeDurationPicker(true)}
+                disabled={savingServerConfig}
+              >
+                <Ionicons name="timer-outline" size={24} color="#fff" />
+                <View style={styles.menuTextContainer}>
+                  <ThemedText style={styles.menuText}>
+                    Durée minimum pour la reprise
+                  </ThemedText>
+                  <ThemedText style={styles.menuSubtext}>
+                    Les contenus plus courts sont directement marqués comme vus.
+                    Valeur :{" "}
+                    {minResumeDuration === "0"
+                      ? "Aucune"
+                      : `${Math.floor(Number(minResumeDuration) / 60)} min`}
+                  </ThemedText>
+                </View>
+                <Ionicons name="chevron-down" size={20} color="#666" />
+              </TouchableOpacity>
+              <CategoriesListModal
+                visible={showMinResumeDurationPicker}
+                onClose={() => setShowMinResumeDurationPicker(false)}
+                items={MIN_RESUME_DURATION_OPTIONS.map((o) => ({
+                  id: o.value,
+                  label: o.label,
+                }))}
+                selectedId={minResumeDuration}
+                onSelect={(id) => {
+                  setMinResumeDuration(id);
+                  saveServerConfigField("MinResumeDurationSeconds", Number(id));
+                }}
+              />
+
+              {savingServerConfig && (
                 <View style={styles.savingOverlay}>
                   <ActivityIndicator color="#E50914" size="small" />
                   <ThemedText style={styles.savingText}>

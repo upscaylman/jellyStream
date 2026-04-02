@@ -9,6 +9,7 @@ import {
   type MediaSource,
   type QualityProfile,
 } from "@/src/api/queries/usePlaybackInfo";
+import { usePlaybackReporting } from "@/src/hooks/usePlaybackReporting";
 import { useAuthStore } from "@/src/stores/authStore";
 import { getStreamUrl, getWebTranscodedUrl } from "@/src/utils/imageUrl";
 import { Ionicons } from "@expo/vector-icons";
@@ -147,6 +148,22 @@ function WebPlayer({
   );
   const [aspectRatio, setAspectRatio] = useState<AspectRatioValue>("contain");
   const { openSheet } = useBottomSheet();
+  const [localSettingsVisible, setLocalSettingsVisible] = useState(false);
+
+  // Reporting de la progression à Jellyfin
+  const { updatePosition: updateWebPosition, reportStop: reportWebStop } =
+    usePlaybackReporting({
+      itemId,
+      mediaSourceId: webMediaSource?.Id,
+      playSessionId: webPlaybackInfo?.PlaySessionId,
+      isPaused: !isPlaying,
+    });
+
+  // Fermer le player : envoyer STOP à Jellyfin PUIS naviguer
+  const handlePlayerClose = useCallback(async () => {
+    await reportWebStop();
+    onClose();
+  }, [reportWebStop, onClose]);
 
   // Initialiser depuis les defaults Jellyfin
   useEffect(() => {
@@ -316,12 +333,14 @@ function WebPlayer({
     if (!video) return;
     const handler = () => {
       if (!isSeeking) {
-        setCurrentTimeSec(startOffsetRef.current + video.currentTime);
+        const pos = startOffsetRef.current + video.currentTime;
+        setCurrentTimeSec(pos);
+        updateWebPosition(pos);
       }
     };
     video.addEventListener("timeupdate", handler);
     return () => video.removeEventListener("timeupdate", handler);
-  }, [isSeeking]);
+  }, [isSeeking, updateWebPosition]);
 
   // Fonction centrale : reconstruire le stream transcodé avec les paramètres voulus
   // startTimeSec = position en secondes dans le film
@@ -541,12 +560,12 @@ function WebPlayer({
         toggleFullscreen();
       }
       if (e.key === "Escape") {
-        onClose();
+        handlePlayerClose();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [togglePlayPause, seekRelative, toggleFullscreen, onClose]);
+  }, [togglePlayPause, seekRelative, toggleFullscreen, handlePlayerClose]);
 
   return (
     <View ref={fullscreenRef} style={s.container}>
@@ -606,7 +625,7 @@ function WebPlayer({
           ) : (
             <>
               <View style={s.topBar}>
-                <Pressable onPress={onClose} style={s.iconButton}>
+                <Pressable onPress={handlePlayerClose} style={s.iconButton}>
                   <Ionicons name="arrow-back" size={26} color="#fff" />
                 </Pressable>
                 <View style={s.titleContainer}>
@@ -619,24 +638,28 @@ function WebPlayer({
                     <CastIcon size={22} color="#fff" />
                   </Pressable>
                   <Pressable
-                    onPress={() =>
-                      openSheet({
-                        content: (
-                          <SettingsSheet
-                            mediaSource={webMediaSource}
-                            selectedSubIndex={selectedSubIndex}
-                            onSelectSubtitle={handleWebSelectSubtitle}
-                            selectedAudioIndex={selectedAudioIndex}
-                            onSelectAudio={handleWebSelectAudio}
-                            selectedQuality={selectedQuality}
-                            onSelectQuality={handleWebSelectQuality}
-                            selectedAspect={aspectRatio}
-                            onSelectAspect={handleWebSelectAspect}
-                          />
-                        ),
-                        maxHeight: 450,
-                      })
-                    }
+                    onPress={() => {
+                      if (isFullscreen) {
+                        setLocalSettingsVisible(true);
+                      } else {
+                        openSheet({
+                          content: (
+                            <SettingsSheet
+                              mediaSource={webMediaSource}
+                              selectedSubIndex={selectedSubIndex}
+                              onSelectSubtitle={handleWebSelectSubtitle}
+                              selectedAudioIndex={selectedAudioIndex}
+                              onSelectAudio={handleWebSelectAudio}
+                              selectedQuality={selectedQuality}
+                              onSelectQuality={handleWebSelectQuality}
+                              selectedAspect={aspectRatio}
+                              onSelectAspect={handleWebSelectAspect}
+                            />
+                          ),
+                          maxHeight: 450,
+                        });
+                      }
+                    }}
                     style={s.iconButton}
                   >
                     <Ionicons name="settings-outline" size={22} color="#fff" />
@@ -794,6 +817,32 @@ function WebPlayer({
           )}
         </View>
       )}
+
+      {/* Settings overlay local (visible en fullscreen où le GlobalBottomSheet est inaccessible) */}
+      {localSettingsVisible && (
+        <View style={localSettingsStyles.overlay}>
+          <Pressable
+            style={localSettingsStyles.backdrop}
+            onPress={() => setLocalSettingsVisible(false)}
+          />
+          <View style={localSettingsStyles.sheet}>
+            <View style={localSettingsStyles.handleContainer}>
+              <View style={localSettingsStyles.handle} />
+            </View>
+            <SettingsSheet
+              mediaSource={webMediaSource}
+              selectedSubIndex={selectedSubIndex}
+              onSelectSubtitle={handleWebSelectSubtitle}
+              selectedAudioIndex={selectedAudioIndex}
+              onSelectAudio={handleWebSelectAudio}
+              selectedQuality={selectedQuality}
+              onSelectQuality={handleWebSelectQuality}
+              selectedAspect={aspectRatio}
+              onSelectAspect={handleWebSelectAspect}
+            />
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -838,6 +887,24 @@ function NativePlayer({
   );
   const [aspectRatio, setAspectRatio] = useState<AspectRatioValue>("contain");
 
+  // Reporting de la progression à Jellyfin
+  const { data: nativePlaybackInfo } = usePlaybackInfo(itemId);
+  const nativeMediaSource: MediaSource | null =
+    nativePlaybackInfo?.MediaSources?.[0] ?? null;
+  const { updatePosition: updateNativePosition, reportStop: reportNativeStop } =
+    usePlaybackReporting({
+      itemId,
+      mediaSourceId: nativeMediaSource?.Id,
+      playSessionId: nativePlaybackInfo?.PlaySessionId,
+      isPaused: !isPlaying,
+    });
+
+  // Fermer le player : envoyer STOP à Jellyfin PUIS naviguer
+  const handlePlayerClose = useCallback(async () => {
+    await reportNativeStop();
+    onClose();
+  }, [reportNativeStop, onClose]);
+
   // Gestes volume/luminosité
   const [gestureType, setGestureType] = useState<
     "volume" | "brightness" | null
@@ -867,9 +934,7 @@ function NativePlayer({
     durationSec > 0 ? (displayTime / durationSec) * 100 : 0;
 
   // PlaybackInfo depuis Jellyfin (sous-titres, audio, sources)
-  const { data: playbackInfo } = usePlaybackInfo(itemId);
-  const mediaSource: MediaSource | null =
-    playbackInfo?.MediaSources?.[0] ?? null;
+  const mediaSource = nativeMediaSource;
 
   // Initialiser les index par défaut depuis la source
   useEffect(() => {
@@ -922,7 +987,10 @@ function NativePlayer({
     const timeSub = player.addListener(
       "timeUpdate",
       ({ currentTime: ct }: any) => {
-        if (!isSeekingRef.current) setCurrentTimeSec(ct);
+        if (!isSeekingRef.current) {
+          setCurrentTimeSec(ct);
+          updateNativePosition(ct);
+        }
         // Récupérer la durée dès qu'elle est disponible
         if (player.duration > 0) {
           setDurationSec((prev) =>
@@ -1314,7 +1382,7 @@ function NativePlayer({
             <>
               {/* Barre du haut */}
               <View style={s.topBar}>
-                <Pressable onPress={onClose} style={s.iconButton}>
+                <Pressable onPress={handlePlayerClose} style={s.iconButton}>
                   <Ionicons name="arrow-back" size={26} color="#fff" />
                 </Pressable>
                 <View style={s.titleContainer}>
@@ -1934,5 +2002,34 @@ const gestureStyles = StyleSheet.create({
     color: "#fff",
     fontSize: 10,
     fontWeight: "bold",
+  },
+});
+
+const localSettingsStyles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 9999,
+    justifyContent: "flex-end",
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+  },
+  sheet: {
+    backgroundColor: "#1a1a1a",
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    maxHeight: 450,
+    overflow: "hidden",
+  },
+  handleContainer: {
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#666",
   },
 });

@@ -136,7 +136,7 @@ export default function ProfileScreen() {
     toMovie(item, serverUrl, badgeMap),
   );
   const resumeRow = (resumeItems ?? []).map((item) =>
-    toMovie(item, serverUrl, badgeMap),
+    toMovie(item, serverUrl, badgeMap, true),
   );
 
   const getBackdrop = useCallback(

@@ -5,13 +5,17 @@ import {
   ItemFields,
   ItemFilter,
   ItemSortBy,
+  MetadataRefreshMode,
   SortOrder,
 } from "@jellyfin/sdk/lib/generated-client/models";
+import { getCollectionApi } from "@jellyfin/sdk/lib/utils/api/collection-api";
+import { getItemRefreshApi } from "@jellyfin/sdk/lib/utils/api/item-refresh-api";
 import { getItemsApi } from "@jellyfin/sdk/lib/utils/api/items-api";
 import { getLibraryApi } from "@jellyfin/sdk/lib/utils/api/library-api";
 import { getPlaystateApi } from "@jellyfin/sdk/lib/utils/api/playstate-api";
 import { getTvShowsApi } from "@jellyfin/sdk/lib/utils/api/tv-shows-api";
 import { getUserLibraryApi } from "@jellyfin/sdk/lib/utils/api/user-library-api";
+import { getVideosApi } from "@jellyfin/sdk/lib/utils/api/videos-api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 // Hook utilitaire : récupère api + userId depuis le store
@@ -108,6 +112,7 @@ export function useResumeItems(limit = 12) {
       return result.data.Items ?? [];
     },
     enabled: !!api && !!userId,
+    staleTime: 0,
   });
 }
 
@@ -286,6 +291,7 @@ export function useItemDetail(itemId: string) {
       return result.data;
     },
     enabled: !!api && !!userId && !!itemId,
+    staleTime: 0,
   });
 }
 
@@ -689,6 +695,27 @@ export function useEpisodes(seriesId: string, seasonId: string) {
   });
 }
 
+// Prochain épisode à regarder pour une série (Next Up)
+export function useNextUp(seriesId: string) {
+  const { api, userId } = useJellyfinApi();
+
+  return useQuery({
+    queryKey: ["nextUp", seriesId],
+    queryFn: async () => {
+      const tvApi = getTvShowsApi(api!);
+      const result = await tvApi.getNextUp({
+        userId,
+        seriesId,
+        limit: 1,
+        fields: [ItemFields.Overview],
+      });
+      return result.data.Items?.[0] ?? null;
+    },
+    enabled: !!api && !!userId && !!seriesId,
+    staleTime: 0,
+  });
+}
+
 const TMDB_API_KEY = "0d6ab6b7b423555a44bd9a18c7330e06";
 
 // Liste des BoxSets avec ProviderIds (1 seule requête, pas de chargement d'enfants)
@@ -880,5 +907,149 @@ export function useTop10Movies(limit = 10) {
       return result.data.Items ?? [];
     },
     enabled: !!api && !!userId,
+  });
+}
+
+// ─── ACTIONS ADMIN JELLYFIN ────────────────────────────────────────
+
+// Rafraîchir les métadonnées d'un item
+export function useRefreshMetadata() {
+  const { api } = useJellyfinApi();
+
+  return useMutation({
+    mutationFn: async ({
+      itemId,
+      mode = MetadataRefreshMode.Default,
+      replaceAllMetadata = false,
+      replaceAllImages = false,
+    }: {
+      itemId: string;
+      mode?: MetadataRefreshMode;
+      replaceAllMetadata?: boolean;
+      replaceAllImages?: boolean;
+    }) => {
+      if (!api) throw new Error("API non disponible");
+      const refreshApi = getItemRefreshApi(api);
+      await refreshApi.refreshItem({
+        itemId,
+        metadataRefreshMode: mode,
+        imageRefreshMode: mode,
+        replaceAllMetadata,
+        replaceAllImages,
+      });
+    },
+  });
+}
+
+// Supprimer un item du serveur
+export function useDeleteItem() {
+  const { api } = useJellyfinApi();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ itemId }: { itemId: string }) => {
+      if (!api) throw new Error("API non disponible");
+      const libraryApi = getLibraryApi(api);
+      await libraryApi.deleteItem({ itemId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["movies"] });
+      queryClient.invalidateQueries({ queryKey: ["series"] });
+      queryClient.invalidateQueries({ queryKey: ["latest"] });
+    },
+  });
+}
+
+// Lister toutes les collections (BoxSets) existantes
+export function useAllCollections() {
+  const { api, userId } = useJellyfinApi();
+
+  return useQuery({
+    queryKey: ["all-collections"],
+    queryFn: async () => {
+      if (!api || !userId) return [];
+      const itemsApi = getItemsApi(api);
+      const result = await itemsApi.getItems({
+        userId,
+        includeItemTypes: [BaseItemKind.BoxSet],
+        sortBy: [ItemSortBy.SortName],
+        sortOrder: [SortOrder.Ascending],
+        recursive: true,
+      });
+      return result.data.Items ?? [];
+    },
+    enabled: !!api && !!userId,
+  });
+}
+
+// Ajouter un item à une collection existante
+export function useAddToCollection() {
+  const { api } = useJellyfinApi();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      collectionId,
+      itemIds,
+    }: {
+      collectionId: string;
+      itemIds: string[];
+    }) => {
+      if (!api) throw new Error("API non disponible");
+      const collectionApi = getCollectionApi(api);
+      await collectionApi.addToCollection({ collectionId, ids: itemIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["collection-for-item"] });
+      queryClient.invalidateQueries({ queryKey: ["boxset-index"] });
+      queryClient.invalidateQueries({ queryKey: ["all-collections"] });
+    },
+  });
+}
+
+// Créer une nouvelle collection
+export function useCreateCollection() {
+  const { api } = useJellyfinApi();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      name,
+      itemIds,
+    }: {
+      name: string;
+      itemIds?: string[];
+    }) => {
+      if (!api) throw new Error("API non disponible");
+      const collectionApi = getCollectionApi(api);
+      const result = await collectionApi.createCollection({
+        name,
+        ids: itemIds,
+        isLocked: false,
+      });
+      return result.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["boxset-index"] });
+      queryClient.invalidateQueries({ queryKey: ["all-collections"] });
+    },
+  });
+}
+
+// Fusionner les versions (merge alternatives) de vidéos
+export function useMergeVersions() {
+  const { api } = useJellyfinApi();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ itemIds }: { itemIds: string[] }) => {
+      if (!api) throw new Error("API non disponible");
+      const videosApi = getVideosApi(api);
+      await videosApi.mergeVersions({ ids: itemIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["movies"] });
+      queryClient.invalidateQueries({ queryKey: ["series"] });
+    },
   });
 }

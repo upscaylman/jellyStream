@@ -5,12 +5,16 @@ export interface Movie {
   badge?: string;
   genres?: string[];
   isTopRated?: boolean;
+  progressPercent?: number;
+  backdropUrl?: string;
+  logoUrl?: string;
+  title?: string;
 }
 
 export interface MovieRow {
   rowTitle: string;
   movies: Movie[];
-  type?: "normal" | "top_10" | "games";
+  type?: "normal" | "top_10" | "games" | "big_card";
   showAll?: boolean;
   showAllRoute?: string;
 }

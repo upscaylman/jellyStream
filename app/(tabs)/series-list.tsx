@@ -1,6 +1,7 @@
 import { FeaturedContent } from "@/components/FeaturedContent/FeaturedContent";
 import { AnimatedHeader } from "@/components/Header/AnimatedHeader";
 import { MovieList } from "@/components/MovieList/MovieList";
+import { WatchedFilmsRow } from "@/components/MovieList/WatchedFilmsRow";
 import { useAllItemsByType } from "@/src/api/queries/useMediaQueries";
 import { toMovie } from "@/src/hooks/useJellyfinHome";
 import { useAuthStore } from "@/src/stores/authStore";
@@ -187,9 +188,13 @@ export default function SeriesListScreen() {
             dominantColor={dominantColor}
           />
 
-          {rows.map((row) => (
-            <MovieList key={row.rowTitle} {...row} />
+          {rows.map((row, index) => (
+            <React.Fragment key={row.rowTitle}>
+              <MovieList {...row} />
+              {index === 4 && <WatchedFilmsRow />}
+            </React.Fragment>
           ))}
+          {rows.length <= 4 && <WatchedFilmsRow />}
         </Animated.ScrollView>
       )}
     </View>

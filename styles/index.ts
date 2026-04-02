@@ -313,19 +313,19 @@ export const styles = StyleSheet.create({
     fontSize: 12,
   },
   top10Item: {
-    marginRight: 44,
+    marginRight: 37,
     marginLeft: 40,
     width: 140,
   },
   top10Thumbnail: {
     width: 140,
-    height: 200,
+    height: 180,
     borderRadius: 4,
   },
   numberContainer: {
     position: "absolute",
     left: 0,
-    bottom: 28,
+    bottom: 11,
     width: 140,
     height: "100%",
     justifyContent: "flex-end",
@@ -335,6 +335,7 @@ export const styles = StyleSheet.create({
   numberText: {
     position: "absolute",
     left: -43,
+    top: 80,
   },
   numberOutline: {
     color: "red",

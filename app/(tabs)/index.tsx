@@ -1,6 +1,7 @@
 import { FeaturedContent } from "@/components/FeaturedContent/FeaturedContent";
 import { AnimatedHeader } from "@/components/Header/AnimatedHeader";
 import { MovieList } from "@/components/MovieList/MovieList";
+import { WatchedFilmsRow } from "@/components/MovieList/WatchedFilmsRow";
 import { VisionContainer } from "@/components/ui/VisionContainer";
 import { useDeviceMotion } from "@/hooks/useDeviceMotion";
 import { useDominantColor } from "@/hooks/useDominantColor";
@@ -194,9 +195,13 @@ export default function HomeScreen() {
             dominantColor={dominantColor}
           />
 
-          {filteredRows.map((row) => (
-            <MovieList key={row.rowTitle} {...row} />
+          {filteredRows.map((row, index) => (
+            <React.Fragment key={row.rowTitle}>
+              <MovieList {...row} />
+              {index === 4 && <WatchedFilmsRow />}
+            </React.Fragment>
           ))}
+          {filteredRows.length <= 4 && <WatchedFilmsRow />}
         </Animated.ScrollView>
       )}
     </VisionContainer>

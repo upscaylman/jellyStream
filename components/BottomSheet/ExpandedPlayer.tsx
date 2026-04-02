@@ -1,3 +1,5 @@
+import { useBottomSheet } from "@/components/BottomSheet/BottomSheetContext";
+import { ManageSheet } from "@/components/BottomSheet/ManageSheet";
 import { CategoriesListModal } from "@/components/CategoriesListModal/CategoriesListModal";
 import { ThemedText } from "@/components/ThemedText";
 import { useCastSheet } from "@/hooks/useCastSheet";
@@ -8,6 +10,8 @@ import {
   useIsFavorite,
   useIsLiked,
   useIsPlayed,
+  useItemDetail,
+  useNextUp,
   useSeasons,
   useSimilarItems,
   useToggleFavorite,
@@ -84,6 +88,7 @@ export function ExpandedPlayer({
   const router = useRouter();
   const [isMuted, setIsMuted] = useState(true);
   const openCast = useCastSheet();
+  const { openSheet } = useBottomSheet();
   const [showControls, setShowControls] = useState(true);
   const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progress = useSharedValue(0);
@@ -103,6 +108,11 @@ export function ExpandedPlayer({
   const isBoxSet = movie.type === "BoxSet";
   const itemId = typeof movie.id === "string" ? movie.id : movie.id.toString();
 
+  // Détail item pour la progression de lecture
+  const { data: itemDetail } = useItemDetail(itemId);
+  const playbackTicks = itemDetail?.UserData?.PlaybackPositionTicks ?? 0;
+  const hasProgress = playbackTicks > 0;
+
   // Favoris / Ma liste
   const { data: isFavorite } = useIsFavorite(itemId);
   const toggleFavorite = useToggleFavorite();
@@ -117,6 +127,16 @@ export function ExpandedPlayer({
 
   // Pour un épisode, on remonte à la série parente via seriesId
   const seriesId = movie.seriesId ?? (movie.type === "Series" ? itemId : "");
+
+  // Next Up pour les séries (épisode en cours / à reprendre)
+  const { data: nextUpEpisode } = useNextUp(isSeries ? seriesId : "");
+  const seriesHasResume =
+    isSeries &&
+    nextUpEpisode &&
+    (nextUpEpisode.UserData?.PlaybackPositionTicks ?? 0) > 0;
+  const nextUpLabel = seriesHasResume
+    ? `Reprendre S${nextUpEpisode.ParentIndexNumber ?? "?"} : E${nextUpEpisode.IndexNumber ?? "?"}`
+    : null;
 
   // Collection (BoxSet) pour les films et les BoxSets
   const { data: collectionData, isLoading: isLoadingCollection } =
@@ -147,10 +167,10 @@ export function ExpandedPlayer({
   }, [movie.trailerUrls, movie.trailerUrl]);
   const hasTrailers = trailers.length > 0;
 
-  // Tab par défaut : collection si dispo, sinon episodes si série, sinon similar
+  // Tab par défaut : séries → épisodes, films seuls → similar, BoxSet → collection
   const defaultTab = isSeries
     ? "episodes"
-    : showCollectionTab || isMovie || isBoxSet
+    : isBoxSet
       ? "collection"
       : "similar";
   const [activeTab, setActiveTab] = useState<
@@ -159,10 +179,6 @@ export function ExpandedPlayer({
 
   // Quand les données chargent, corriger le tab initial
   useEffect(() => {
-    // Collection chargée et dispo → forcer collection
-    if (showCollectionTab && !isSeries && activeTab !== "collection") {
-      setActiveTab("collection");
-    }
     // Collection non dispo (plus en loading) → fallback
     if (
       activeTab === "collection" &&
@@ -371,6 +387,24 @@ export function ExpandedPlayer({
         <Pressable style={styles.backButton} onPress={openCast}>
           <CastIcon size={24} color="#fff" />
         </Pressable>
+        <Pressable
+          style={styles.backButton}
+          onPress={() =>
+            openSheet({
+              content: (
+                <ManageSheet
+                  itemId={itemId}
+                  itemName={movie.title}
+                  itemType={movie.type}
+                />
+              ),
+              maxHeight: 650,
+              showHandle: true,
+            })
+          }
+        >
+          <Ionicons name="ellipsis-vertical" size={22} color="#fff" />
+        </Pressable>
       </View>
 
       <ScrollComponentToUse
@@ -529,6 +563,17 @@ export function ExpandedPlayer({
               style={styles.playButton}
               onPress={() => {
                 player.pause();
+                // Série avec épisode à reprendre → lancer le nextUp
+                if (isSeries && nextUpEpisode?.Id) {
+                  router.push({
+                    pathname: "/player",
+                    params: {
+                      itemId: nextUpEpisode.Id,
+                      title: nextUpEpisode.Name ?? movieData.title,
+                    },
+                  });
+                  return;
+                }
                 // Pour une BoxSet, lancer le premier film de la collection
                 // Pour une série, lancer le premier épisode disponible
                 const firstCollectionItem =
@@ -560,7 +605,9 @@ export function ExpandedPlayer({
               }}
             >
               <Ionicons name="play" size={24} color="black" />
-              <ThemedText style={styles.playButtonText}>Play</ThemedText>
+              <ThemedText style={styles.playButtonText}>
+                {nextUpLabel ?? (hasProgress ? "Reprendre" : "Lecture")}
+              </ThemedText>
             </Pressable>
 
             <Pressable style={styles.downloadButton}>
@@ -813,6 +860,28 @@ export function ExpandedPlayer({
                             color="white"
                           />
                         </View>
+                        {(() => {
+                          const posTicks =
+                            ep.UserData?.PlaybackPositionTicks ?? 0;
+                          const totalTicks = ep.RunTimeTicks ?? 0;
+                          const pct =
+                            totalTicks > 0
+                              ? Math.min((posTicks / totalTicks) * 100, 100)
+                              : 0;
+                          return (
+                            <View style={episodeStyles.progressContainer}>
+                              <View style={episodeStyles.progressTrack} />
+                              {pct > 0 && (
+                                <View
+                                  style={[
+                                    episodeStyles.progressFill,
+                                    { width: `${pct}%` },
+                                  ]}
+                                />
+                              )}
+                            </View>
+                          );
+                        })()}
                       </View>
                       <View style={episodeStyles.itemInfo}>
                         <ThemedText
@@ -987,6 +1056,32 @@ export function ExpandedPlayer({
                                 color="white"
                               />
                             </View>
+                            {(() => {
+                              const posTicks =
+                                colItem.UserData?.PlaybackPositionTicks ?? 0;
+                              const totalTicks = colItem.RunTimeTicks ?? 0;
+                              const pct =
+                                totalTicks > 0
+                                  ? Math.min((posTicks / totalTicks) * 100, 100)
+                                  : 0;
+                              return (
+                                <View
+                                  style={collectionStyles.progressContainer}
+                                >
+                                  <View
+                                    style={collectionStyles.progressTrack}
+                                  />
+                                  {pct > 0 && (
+                                    <View
+                                      style={[
+                                        collectionStyles.progressFill,
+                                        { width: `${pct}%` },
+                                      ]}
+                                    />
+                                  )}
+                                </View>
+                              );
+                            })()}
                           </View>
                           <View style={collectionStyles.itemInfo}>
                             <ThemedText
@@ -1171,6 +1266,24 @@ const episodeStyles = StyleSheet.create({
     marginTop: 8,
     width: "75%",
   },
+  progressContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+  },
+  progressTrack: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(255,255,255,0.3)",
+  },
+  progressFill: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: "#E50914",
+  },
 });
 
 const trailerStyles = StyleSheet.create({
@@ -1272,5 +1385,23 @@ const collectionStyles = StyleSheet.create({
     color: "#888",
     marginTop: 8,
     width: "75%",
+  },
+  progressContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+  },
+  progressTrack: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(255,255,255,0.3)",
+  },
+  progressFill: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: "#E50914",
   },
 });

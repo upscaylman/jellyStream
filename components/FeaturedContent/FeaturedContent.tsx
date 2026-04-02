@@ -1,5 +1,6 @@
 import {
   useIsFavorite,
+  useItemDetail,
   useToggleFavorite,
 } from "@/src/api/queries/useMediaQueries";
 import { styles } from "@/styles";
@@ -33,6 +34,8 @@ export function FeaturedContent({
   const isValidId = movie.id && movie.id !== "placeholder";
   const { data: isFavorite } = useIsFavorite(isValidId ? movie.id : "");
   const toggleFavorite = useToggleFavorite();
+  const { data: itemDetail } = useItemDetail(isValidId ? movie.id : "");
+  const hasProgress = (itemDetail?.UserData?.PlaybackPositionTicks ?? 0) > 0;
 
   return (
     <Pressable
@@ -114,7 +117,9 @@ export function FeaturedContent({
               }}
             >
               <Ionicons name="play" size={24} color="#000" />
-              <Text style={styles.playButtonText}>Play</Text>
+              <Text style={styles.playButtonText}>
+                {hasProgress ? "Reprendre" : "Lecture"}
+              </Text>
             </Pressable>
             <Pressable
               style={styles.myListButton}

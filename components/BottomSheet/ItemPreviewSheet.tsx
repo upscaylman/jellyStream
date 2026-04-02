@@ -60,6 +60,8 @@ export function ItemPreviewSheet({ itemId }: IItemPreviewSheetProps) {
     });
   };
 
+  const hasProgress = (item.UserData?.PlaybackPositionTicks ?? 0) > 0;
+
   const navigateToPlayer = () => {
     closeSheet();
     router.push({
@@ -122,7 +124,9 @@ export function ItemPreviewSheet({ itemId }: IItemPreviewSheetProps) {
       <View style={sheetStyles.actions}>
         <Pressable style={sheetStyles.playBtn} onPress={navigateToPlayer}>
           <Ionicons name="play" size={22} color="#000" />
-          <Text style={sheetStyles.playBtnText}>Lecture</Text>
+          <Text style={sheetStyles.playBtnText}>
+            {hasProgress ? "Reprendre" : "Lecture"}
+          </Text>
         </Pressable>
         <Pressable style={sheetStyles.detailBtn} onPress={navigateToDetail}>
           <Ionicons name="information-circle-outline" size={22} color="#fff" />
