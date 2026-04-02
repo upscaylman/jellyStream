@@ -211,7 +211,7 @@ export default function ProfileSelectScreen() {
   // Appliquer un avatar
   const setAvatar = useCallback(
     async (avatarId: string) => {
-      if (!serverUrl || !token) return;
+      if (!serverUrl || !token || !userId) return;
       setSettingAvatar(true);
       try {
         const res = await fetch(`${serverUrl}/GetAvatar/SetAvatar`, {
@@ -220,7 +220,7 @@ export default function ProfileSelectScreen() {
             "X-Emby-Token": token,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ AvatarId: avatarId }),
+          body: JSON.stringify({ UserId: userId, AvatarId: avatarId }),
         });
         if (res.ok) {
           setAvatarPickerVisible(false);
@@ -232,7 +232,7 @@ export default function ProfileSelectScreen() {
         setSettingAvatar(false);
       }
     },
-    [serverUrl, token, bumpAvatarVersion],
+    [serverUrl, token, userId, bumpAvatarVersion],
   );
 
   const handleEdit = useCallback(() => {

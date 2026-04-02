@@ -423,7 +423,7 @@ export default function SwitchProfileScreen() {
   // Appliquer un avatar
   const setAvatar = useCallback(
     async (avatarId: string) => {
-      if (!serverUrl || !token) return;
+      if (!serverUrl || !token || !userId) return;
       setSettingAvatar(true);
       try {
         const res = await fetch(`${serverUrl}/GetAvatar/SetAvatar`, {
@@ -432,12 +432,15 @@ export default function SwitchProfileScreen() {
             "X-Emby-Token": token,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ AvatarId: avatarId }),
+          body: JSON.stringify({ UserId: userId, AvatarId: avatarId }),
         });
         if (res.ok) {
           setAvatarPickerVisible(false);
           // Forcer le refresh des images de profil partout
           bumpAvatarVersion();
+          queryClient.invalidateQueries({
+            queryKey: ["server", "currentUser"],
+          });
         } else {
           const msg =
             Platform.OS === "web"
@@ -455,7 +458,7 @@ export default function SwitchProfileScreen() {
         setSettingAvatar(false);
       }
     },
-    [serverUrl, token],
+    [serverUrl, token, userId, bumpAvatarVersion, queryClient],
   );
 
   // Ouvrir le picker
@@ -1450,9 +1453,7 @@ export default function SwitchProfileScreen() {
               </View>
 
               {/* === À SUIVRE === */}
-              <ThemedText style={styles.sectionTitle}>
-                À suivre
-              </ThemedText>
+              <ThemedText style={styles.sectionTitle}>À suivre</ThemedText>
 
               <View style={styles.menuItem}>
                 <Ionicons

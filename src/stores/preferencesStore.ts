@@ -404,9 +404,12 @@ export const usePreferencesStore = create<PreferencesState>((set) => ({
     const theme = storage.getString(KEYS.THEME) ?? "dark";
     const fastAnimations = storage.getString(KEYS.FAST_ANIMATIONS) === "1";
     const blurPlaceholders = storage.getString(KEYS.BLUR_PLACEHOLDERS) !== "0";
-    const nextUpExpiryDays = storage.getString(KEYS.NEXT_UP_EXPIRY_DAYS) ?? "365";
-    const allowWatchedNextUp = storage.getString(KEYS.ALLOW_WATCHED_NEXT_UP) === "1";
-    const useEpisodeImageNextUp = storage.getString(KEYS.USE_EPISODE_IMAGE_NEXT_UP) === "1";
+    const nextUpExpiryDays =
+      storage.getString(KEYS.NEXT_UP_EXPIRY_DAYS) ?? "365";
+    const allowWatchedNextUp =
+      storage.getString(KEYS.ALLOW_WATCHED_NEXT_UP) === "1";
+    const useEpisodeImageNextUp =
+      storage.getString(KEYS.USE_EPISODE_IMAGE_NEXT_UP) === "1";
 
     set({
       defaultQualityLabel: qualityLabel,
