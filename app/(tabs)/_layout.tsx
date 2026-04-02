@@ -30,7 +30,7 @@ function ProfileImage({ focused }: { focused: boolean }) {
   // URL de l'avatar Jellyfin, fallback sur ui-avatars si pas d'image
   const jellyfinAvatar =
     serverUrl && userId
-      ? `${serverUrl.replace(/\/+$/, "")}/Users/${userId}/Images/Primary?maxWidth=48&quality=90${avatarVersion ? `&_r=${avatarVersion}` : ""}`
+      ? `${serverUrl.replace(/\/+$/, "")}/Users/${userId}/Images/Primary?maxWidth=48&quality=90&_r=${avatarVersion}`
       : null;
   const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName ?? "U")}&background=E50914&color=fff&size=48`;
 

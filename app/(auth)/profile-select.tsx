@@ -45,7 +45,7 @@ function getUserImageUrl(
   const base = serverUrl.replace(/\/+$/, "");
   const params = new URLSearchParams({ quality: "90", maxWidth: "200" });
   if (token) params.set("api_key", token);
-  if (version) params.set("_r", String(version));
+  params.set("_r", String(version ?? 0));
   return `${base}/Users/${userId}/Images/Primary?${params.toString()}`;
 }
 

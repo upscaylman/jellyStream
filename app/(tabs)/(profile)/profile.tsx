@@ -45,7 +45,7 @@ export default function ProfileScreen() {
   const avatarVersion = useAuthStore((s) => s.avatarVersion);
   const jellyfinAvatar =
     serverUrl && userId
-      ? `${serverUrl.replace(/\/+$/, "")}/Users/${userId}/Images/Primary?maxWidth=120&quality=90${avatarVersion ? `&_r=${avatarVersion}` : ""}`
+      ? `${serverUrl.replace(/\/+$/, "")}/Users/${userId}/Images/Primary?maxWidth=120&quality=90&_r=${avatarVersion}`
       : null;
   const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName || "U")}&background=E50914&color=fff&size=120`;
   const avatarUri = jellyfinAvatar ?? fallbackAvatar;
