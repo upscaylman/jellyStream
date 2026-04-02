@@ -69,7 +69,7 @@ export const TAB_SCREENS = [
   },
   {
     name: "direct-tv",
-    title: "Direct TV",
+    title: "IPTV",
     icon: ({ color }: { color: string }) => (
       <Ionicons name="tv-outline" size={24} color={color} />
     ),

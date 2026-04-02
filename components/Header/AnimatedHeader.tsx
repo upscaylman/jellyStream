@@ -37,7 +37,7 @@ interface AnimatedHeaderProps {
   selectedGenre?: string | null;
   /** Callback quand un genre est sélectionné */
   onGenreSelect?: (genre: string | null) => void;
-  /** Nombre d'items à afficher (style Direct TV) */
+  /** Nombre d'items à afficher (style IPTV) */
   itemCount?: number;
 }
 

@@ -5,12 +5,13 @@ import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
   FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -19,6 +20,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useCastSheet } from "@/hooks/useCastSheet";
+import { useWebDragScroll } from "@/hooks/useWebDragScroll";
 import { CastIcon } from "@/icons/CastIcon";
 import {
   useFavoriteChannels,
@@ -31,14 +33,220 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CHANNEL_COLUMNS = 2;
 const CHANNEL_GAP = 10;
 const CHANNEL_PADDING = 12;
-const CHANNEL_CARD_WIDTH =
-  (SCREEN_WIDTH - CHANNEL_PADDING * 2 - CHANNEL_GAP * (CHANNEL_COLUMNS - 1)) /
-  CHANNEL_COLUMNS;
+const CHANNEL_CARD_WIDTH = SCREEN_WIDTH * 0.42;
 
 const TAB_OPTIONS = [
-  { id: "all", label: "Toutes", icon: "tv-outline" as const },
+  { id: "all", label: "Chaînes", icon: "tv-outline" as const },
   { id: "favorites", label: "Favoris", icon: "heart-outline" as const },
 ];
+
+// Classification des chaînes par genre/type basée sur le nom
+const CHANNEL_CATEGORIES: { label: string; keywords: string[] }[] = [
+  {
+    label: "Généralistes",
+    keywords: [
+      "tf1",
+      "france 2",
+      "france 3",
+      "france 4",
+      "france 5",
+      "m6",
+      "arte",
+      "c8",
+      "w9",
+      "tmc",
+      "tfx",
+      "nrj 12",
+      "nrj12",
+      "cstar",
+      "gulli",
+      "6ter",
+      "rmcstory",
+      "rmc story",
+      "cherie 25",
+      "l'equipe",
+      "lequipe",
+      "lci",
+      "franceinfo",
+      "la une",
+      "la deux",
+      "rts un",
+      "rts deux",
+    ],
+  },
+  {
+    label: "Information",
+    keywords: [
+      "bfm",
+      "cnews",
+      "lci",
+      "franceinfo",
+      "france info",
+      "france 24",
+      "euronews",
+      "i24",
+      "africa news",
+      "africanews",
+      "tv5monde",
+      "rt france",
+      "rfi",
+      "public sénat",
+      "public senat",
+    ],
+  },
+  {
+    label: "Sport",
+    keywords: [
+      "rmc sport",
+      "bein",
+      "beinsport",
+      "canal+ sport",
+      "eurosport",
+      "sport",
+      "l'equipe",
+      "lequipe",
+      "infosport",
+      "golf+",
+      "foot+",
+      "multisports",
+      "olympic",
+    ],
+  },
+  {
+    label: "Cinéma",
+    keywords: [
+      "canal+",
+      "cine+",
+      "ciné+",
+      "ocs",
+      "paramount",
+      "tcm",
+      "action",
+      "star",
+      "frisson",
+      "famiz",
+      "cinema",
+      "cinéma",
+    ],
+  },
+  {
+    label: "Jeunesse",
+    keywords: [
+      "gulli",
+      "disney",
+      "cartoon",
+      "nickelodeon",
+      "nick",
+      "boomerang",
+      "boing",
+      "tiji",
+      "piwi",
+      "canal j",
+      "teletoon",
+      "télétoon",
+      "manga",
+      "game one",
+    ],
+  },
+  {
+    label: "Divertissement",
+    keywords: [
+      "comédie",
+      "comedie",
+      "comedy",
+      "ab1",
+      "ab3",
+      "tv breizh",
+      "tvbreizh",
+      "série club",
+      "serie club",
+      "warner",
+      "13eme rue",
+      "13ème rue",
+      "syfy",
+      "teva",
+      "elle girl",
+      "novelas",
+      "e!",
+    ],
+  },
+  {
+    label: "Découverte",
+    keywords: [
+      "national geo",
+      "nat geo",
+      "discovery",
+      "planete+",
+      "planète",
+      "histoire",
+      "science",
+      "ushuaia",
+      "voyage",
+      "trek",
+      "animaux",
+      "chasse",
+      "peche",
+      "nature",
+    ],
+  },
+  {
+    label: "Musique",
+    keywords: [
+      "mtv",
+      "trace",
+      "mezzo",
+      "melody",
+      "rtl2",
+      "mcm",
+      "m6 music",
+      "nrj hits",
+      "musique",
+    ],
+  },
+  {
+    label: "Régionales",
+    keywords: [
+      "france 3 ",
+      "weo",
+      "bip",
+      "tébéo",
+      "tébésud",
+      "vià",
+      "via ",
+      "tvr",
+      "tlc",
+      "alsace",
+      "bretagne",
+      "normandie",
+      "provence",
+      "occitanie",
+      "corse",
+      "réunion",
+      "reunion",
+      "martinique",
+      "guadeloupe",
+      "guyane",
+      "mayotte",
+      "nouvelle-calédonie",
+      "polynésie",
+    ],
+  },
+];
+
+function getChannelCategory(channel: BaseItemDto): string {
+  const name = (channel.Name ?? "").toLowerCase();
+  for (const cat of CHANNEL_CATEGORIES) {
+    for (const kw of cat.keywords) {
+      if (name.includes(kw)) return cat.label;
+    }
+  }
+  return "Autres";
+}
+
+interface ChannelSection {
+  title: string;
+  data: BaseItemDto[];
+}
 
 // Nom du programme en cours sur une chaîne
 function getCurrentProgramName(channel: BaseItemDto): string | undefined {
@@ -103,7 +311,7 @@ function ChannelCard({
   return (
     <Pressable style={localStyles.channelCard} onPress={onPress}>
       <LinearGradient
-        colors={["#1a1a2e", "#16213e"]}
+        colors={["#2d2d2d", "#232323"]}
         style={localStyles.channelCardGradient}
       >
         {/* Logo chaîne */}
@@ -154,6 +362,37 @@ function ChannelCard({
   );
 }
 
+function ChannelRow({
+  channels,
+  serverUrl,
+  onPress,
+}: {
+  channels: BaseItemDto[];
+  serverUrl: string;
+  onPress: (channel: BaseItemDto) => void;
+}) {
+  const flatListRef = useRef<FlatList>(null);
+  useWebDragScroll(flatListRef);
+
+  return (
+    <FlatList
+      ref={flatListRef}
+      data={channels}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      keyExtractor={(item) => item.Id ?? ""}
+      contentContainerStyle={localStyles.horizontalRow}
+      renderItem={({ item: channel }) => (
+        <ChannelCard
+          channel={channel}
+          serverUrl={serverUrl}
+          onPress={() => onPress(channel)}
+        />
+      )}
+    />
+  );
+}
+
 export default function DirectTVScreen() {
   const router = useRouter();
   const serverUrl = useAuthStore((s) => s.serverUrl) ?? "";
@@ -171,11 +410,29 @@ export default function DirectTVScreen() {
   const isLoading =
     activeTab === "favorites" ? isLoadingFavorites : isLoadingAll;
 
+  // Grouper les chaînes par catégorie pour l'onglet "Chaînes"
+  const channelSections = useMemo<ChannelSection[]>(() => {
+    if (!allChannels?.length) return [];
+    const grouped: Record<string, BaseItemDto[]> = {};
+    for (const ch of allChannels) {
+      const cat = getChannelCategory(ch);
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(ch);
+    }
+    const order = CHANNEL_CATEGORIES.map((c) => c.label);
+    const sorted = Object.entries(grouped).sort(([a], [b]) => {
+      const ia = order.indexOf(a);
+      const ib = order.indexOf(b);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
+    return sorted.map(([title, items]) => ({ title, data: items }));
+  }, [allChannels]);
+
   const handleChannelPress = (channel: BaseItemDto) => {
     if (!channel.Id) return;
     router.push({
       pathname: "/player",
-      params: { itemId: channel.Id, title: channel.Name ?? "Direct TV" },
+      params: { itemId: channel.Id, title: channel.Name ?? "IPTV" },
     });
   };
 
@@ -228,7 +485,7 @@ export default function DirectTVScreen() {
         {/* Header */}
         <View style={localStyles.header}>
           <View style={localStyles.headerContent}>
-            <Text style={localStyles.headerTitle}>Direct TV</Text>
+            <Text style={localStyles.headerTitle}>IPTV</Text>
             <View style={localStyles.headerRight}>
               <Pressable onPress={openCast}>
                 <CastIcon size={24} color="#fff" />
@@ -267,6 +524,22 @@ export default function DirectTVScreen() {
                 : "Configurez la TV en direct dans Jellyfin"}
             </Text>
           </View>
+        ) : activeTab === "all" ? (
+          <ScrollView
+            contentContainerStyle={localStyles.channelGrid}
+            showsVerticalScrollIndicator={false}
+          >
+            {channelSections.map((section) => (
+              <View key={section.title} style={localStyles.sectionContainer}>
+                <Text style={localStyles.sectionHeader}>{section.title}</Text>
+                <ChannelRow
+                  channels={section.data}
+                  serverUrl={serverUrl}
+                  onPress={handleChannelPress}
+                />
+              </View>
+            ))}
+          </ScrollView>
         ) : (
           <FlatList
             ref={scrollViewRef}
@@ -375,6 +648,20 @@ const localStyles = StyleSheet.create({
     paddingHorizontal: CHANNEL_PADDING,
     paddingBottom: 100,
   },
+  sectionHeader: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+    paddingHorizontal: CHANNEL_PADDING,
+    marginBottom: 8,
+  },
+  sectionContainer: {
+    marginBottom: 16,
+  },
+  horizontalRow: {
+    paddingHorizontal: CHANNEL_PADDING,
+    gap: CHANNEL_GAP,
+  },
   channelRow: {
     gap: CHANNEL_GAP,
     marginBottom: CHANNEL_GAP,
@@ -389,6 +676,7 @@ const localStyles = StyleSheet.create({
   channelCardGradient: {
     padding: 12,
     minHeight: 160,
+    flex: 1,
   },
   channelLogoContainer: {
     width: 56,
