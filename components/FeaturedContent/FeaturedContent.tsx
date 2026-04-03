@@ -116,7 +116,7 @@ export function FeaturedContent({
                 }
               }}
             >
-              <Ionicons name="play" size={24} color="#000" />
+              <Ionicons name="play" size={20} color="#000" />
               <Text style={styles.playButtonText}>
                 {hasProgress ? "Reprendre" : "Lecture"}
               </Text>
@@ -134,7 +134,7 @@ export function FeaturedContent({
             >
               <Ionicons
                 name={isFavorite ? "checkmark" : "add"}
-                size={24}
+                size={20}
                 color="#fff"
               />
               <Text style={styles.myListButtonText}>Ma liste</Text>
