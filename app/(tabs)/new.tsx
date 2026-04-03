@@ -520,13 +520,7 @@ export default function NewScreen() {
         )}
 
         {showSkeleton && (
-          <View
-            style={{
-              ...StyleSheet.absoluteFillObject,
-              backgroundColor: "#000",
-              zIndex: 2,
-            }}
-          >
+          <View style={{ flex: 1, backgroundColor: "#000" }}>
             {isTop10 ? <Top10Skeleton /> : <NewItemSkeleton />}
           </View>
         )}

@@ -710,9 +710,8 @@ const localStyles = StyleSheet.create({
     alignItems: "center",
   },
   skeletonOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
     backgroundColor: "#000",
-    zIndex: 2,
   },
   emptyContainer: {
     flex: 1,

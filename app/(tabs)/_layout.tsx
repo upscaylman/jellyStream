@@ -136,10 +136,10 @@ export default function TabLayout() {
           height: 70,
           paddingTop: 8,
           paddingBottom: 10,
-          backgroundColor: "transparent",
+          backgroundColor: "#121212",
         },
         tabBarBackground: () => (
-          <BlurView tint="dark" intensity={99} style={styles.blurView} />
+          <View style={[styles.blurView, { backgroundColor: "#121212" }]} />
         ),
         tabBarLabelStyle: {
           fontSize: 10,

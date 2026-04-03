@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
 import { useRouter } from "expo-router";
@@ -17,8 +16,6 @@ import { CastIcon } from "@/icons/CastIcon";
 import { useNotificationBadgeCount } from "@/src/stores/notificationStore";
 import { styles } from "@/styles";
 import { CategoriesListModal } from "../CategoriesListModal/CategoriesListModal";
-
-const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
 type MediaFilter = "Movie" | "Series" | null;
 
@@ -129,11 +126,7 @@ export function AnimatedHeader({
             blurOpacityStyle,
           ]}
         >
-          <AnimatedBlurView
-            tint="systemThickMaterialDark"
-            style={{ width: "100%", height: "100%" }}
-            animatedProps={headerAnimatedProps}
-          />
+          <View style={{ width: "100%", height: "100%", backgroundColor: "#000000" }} />
         </Animated.View>
         <View style={[styles.blurContainer, { paddingTop: insets.top }]}>
           <Animated.View
