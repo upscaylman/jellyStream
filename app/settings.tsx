@@ -705,17 +705,19 @@ export default function SettingsScreen() {
 
       {/* Header */}
       <View style={s.header}>
-        <TouchableOpacity
-          onPress={() => {
-            if (router.canGoBack()) router.back();
-            else router.replace("/(tabs)");
-          }}
-          style={s.backButton}
-        >
-          <Ionicons name="arrow-back" size={20} color="#fff" />
-        </TouchableOpacity>
+        <View style={{ flex: 1 }} />
         <ThemedText style={s.headerTitle}>Paramètres</ThemedText>
-        <View style={{ width: 32 }} />
+        <View style={{ flex: 1, alignItems: "flex-end" }}>
+          <TouchableOpacity
+            onPress={() => {
+              if (router.canDismiss()) router.dismissAll();
+              else router.replace("/(tabs)");
+            }}
+            style={s.closeButton}
+          >
+            <Ionicons name="close" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -1469,15 +1471,15 @@ export default function SettingsScreen() {
 const s = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#141414",
+    backgroundColor: "#232323",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 12,
   },
-  backButton: {
+  closeButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
@@ -1486,7 +1488,6 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   headerTitle: {
-    flex: 1,
     fontSize: 20,
     fontWeight: "700",
     color: "#fff",
@@ -1501,7 +1502,7 @@ const s = StyleSheet.create({
 
   // Accordéon
   accordionContainer: {
-    backgroundColor: "#1e1e1e",
+    backgroundColor: "#2d2d2d",
     borderRadius: 12,
     overflow: "hidden",
   },
