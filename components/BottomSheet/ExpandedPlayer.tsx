@@ -13,6 +13,7 @@ import {
   useIsPlayed,
   useItemDetail,
   useNextUp,
+  useResumeItems,
   useSeasons,
   useSimilarItems,
   useToggleFavorite,
@@ -130,15 +131,22 @@ export function ExpandedPlayer({
   // Pour un épisode, on remonte à la série parente via seriesId
   const seriesId = movie.seriesId ?? (movie.type === "Series" ? itemId : "");
 
-  // Next Up pour les séries (épisode en cours / à reprendre)
+  // Épisodes en cours de lecture (global) — pour trouver celui de cette série
+  const { data: resumeItems } = useResumeItems(30);
+  const resumeEpisode = isSeriesRoot
+    ? resumeItems?.find((ep) => ep.SeriesId === seriesId)
+    : undefined;
+
+  // Next Up (fallback si aucun épisode en cours)
   const { data: nextUpEpisode } = useNextUp(isSeriesRoot ? seriesId : "");
 
+  // L'épisode à reprendre : resume en priorité, sinon nextUp
+  const seriesResumeEp = resumeEpisode ?? nextUpEpisode;
+
   // Label du bouton Reprendre
-  // - Sur la page Série : utiliser le nextUp de Jellyfin
-  // - Sur la page Épisode : utiliser les infos de l'épisode courant
   const nextUpLabel = (() => {
-    if (isSeriesRoot && nextUpEpisode) {
-      return `Reprendre S${nextUpEpisode.ParentIndexNumber ?? "?"} : E${nextUpEpisode.IndexNumber ?? "?"}`;
+    if (isSeriesRoot && seriesResumeEp) {
+      return `Reprendre S${seriesResumeEp.ParentIndexNumber ?? "?"} : E${seriesResumeEp.IndexNumber ?? "?"}`;
     }
     if (isEpisode && itemDetail) {
       const sNum = itemDetail.ParentIndexNumber ?? "?";
@@ -228,46 +236,12 @@ export function ExpandedPlayer({
   );
   const selectedSeason = seasons?.find((s) => s.Id === selectedSeasonId);
 
-  // Calcul du statut "Vue" et des IDs enfants selon le contexte :
-  // - Série : tous les épisodes de la saison courante
-  // - Collection (BoxSet) : tous les films de la collection
-  // - Film simple : l'item lui-même
-  const playedChildIds = useMemo(() => {
-    if (isSeries && episodes?.length) {
-      return episodes.map((ep) => ep.Id!).filter(Boolean);
-    }
-    if ((isBoxSet || hasCollection) && collectionData?.items.length) {
-      return collectionData.items.map((item) => item.Id!).filter(Boolean);
-    }
-    return undefined;
-  }, [isSeries, episodes, isBoxSet, hasCollection, collectionData]);
-
-  const isPlayed = useMemo(() => {
-    if (isSeries && episodes?.length) {
-      return episodes.every((ep) => ep.UserData?.Played === true);
-    }
-    if ((isBoxSet || hasCollection) && collectionData?.items.length) {
-      return collectionData.items.every(
-        (item) => item.UserData?.Played === true,
-      );
-    }
-    return isPlayedSingle ?? false;
-  }, [
-    isSeries,
-    episodes,
-    isBoxSet,
-    hasCollection,
-    collectionData,
-    isPlayedSingle,
-  ]);
+  // Statut "Vue" — même approche que ManageSheet (useIsPlayed direct)
+  const isPlayed = isPlayedSingle ?? false;
 
   const handleTogglePlayed = useCallback(() => {
-    togglePlayed.mutate({
-      itemId,
-      isPlayed,
-      childItemIds: playedChildIds,
-    });
-  }, [itemId, isPlayed, playedChildIds, togglePlayed]);
+    togglePlayed.mutate({ itemId, isPlayed: !!isPlayed });
+  }, [itemId, isPlayed, togglePlayed]);
 
   const defaultMovieData = {
     video_url: "",
@@ -586,13 +560,13 @@ export function ExpandedPlayer({
                   });
                   return;
                 }
-                // Série avec épisode à reprendre → lancer le nextUp
-                if (isSeriesRoot && nextUpEpisode?.Id) {
+                // Série avec épisode à reprendre → resume en priorité, sinon nextUp
+                if (isSeriesRoot && seriesResumeEp?.Id) {
                   router.push({
                     pathname: "/player",
                     params: {
-                      itemId: nextUpEpisode.Id,
-                      title: nextUpEpisode.Name ?? movieData.title,
+                      itemId: seriesResumeEp.Id,
+                      title: seriesResumeEp.Name ?? movieData.title,
                     },
                   });
                   return;

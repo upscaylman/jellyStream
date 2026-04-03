@@ -299,7 +299,7 @@ export function AnimatedHeader({
                       activeFilter === "Series" && { fontWeight: "bold" },
                     ]}
                   >
-                    TV Shows
+                    Séries
                   </Text>
                 </Pressable>
                 <Pressable
@@ -321,7 +321,7 @@ export function AnimatedHeader({
                       activeFilter === "Movie" && { fontWeight: "bold" },
                     ]}
                   >
-                    Movies
+                    Films
                   </Text>
                 </Pressable>
                 {selectedGenre ? (

@@ -624,12 +624,11 @@ const styles = StyleSheet.create({
   itemThumbContainer: {
     width: 130,
     aspectRatio: 16 / 9,
-    borderRadius: 4,
-    overflow: "hidden",
   },
   itemThumb: {
     width: "100%",
     height: "100%",
+    borderRadius: 4,
   },
   itemInfo: {
     flex: 1,

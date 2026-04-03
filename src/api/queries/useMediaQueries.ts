@@ -403,9 +403,23 @@ export function useToggleFavorite() {
       }
       return !isFavorite;
     },
-    onSuccess: (newValue, { itemId }) => {
-      queryClient.setQueryData(["isFavorite", itemId], newValue);
+    onMutate: async ({ itemId, isFavorite }) => {
+      await queryClient.cancelQueries({ queryKey: ["isFavorite", itemId] });
+      const previous = queryClient.getQueryData(["isFavorite", itemId]);
+      queryClient.setQueryData(["isFavorite", itemId], !isFavorite);
+      return { previous, itemId };
+    },
+    onError: (_err, _vars, context) => {
+      if (context) {
+        queryClient.setQueryData(
+          ["isFavorite", context.itemId],
+          context.previous,
+        );
+      }
+    },
+    onSuccess: (_newValue, { itemId }) => {
       queryClient.invalidateQueries({ queryKey: ["favorites"] });
+      queryClient.invalidateQueries({ queryKey: ["isFavorite", itemId] });
     },
   });
 }
@@ -450,9 +464,20 @@ export function useToggleLike() {
       }
       return !isLiked;
     },
-    onSuccess: (newValue, { itemId }) => {
-      queryClient.setQueryData(["isLiked", itemId], newValue);
+    onMutate: async ({ itemId, isLiked }) => {
+      await queryClient.cancelQueries({ queryKey: ["isLiked", itemId] });
+      const previous = queryClient.getQueryData(["isLiked", itemId]);
+      queryClient.setQueryData(["isLiked", itemId], !isLiked);
+      return { previous, itemId };
+    },
+    onError: (_err, _vars, context) => {
+      if (context) {
+        queryClient.setQueryData(["isLiked", context.itemId], context.previous);
+      }
+    },
+    onSuccess: (_newValue, { itemId }) => {
       queryClient.invalidateQueries({ queryKey: ["trending"] });
+      queryClient.invalidateQueries({ queryKey: ["isLiked", itemId] });
     },
   });
 }
@@ -500,14 +525,32 @@ export function useTogglePlayed() {
       );
       return !isPlayed;
     },
-    onSuccess: (newValue, { itemId, childItemIds }) => {
-      // Invalider le cache pour l'item parent et tous les enfants
-      queryClient.setQueryData(["isPlayed", itemId], newValue);
+    onMutate: async ({ itemId, isPlayed, childItemIds }) => {
+      await queryClient.cancelQueries({ queryKey: ["isPlayed", itemId] });
+      const previous = queryClient.getQueryData(["isPlayed", itemId]);
+      queryClient.setQueryData(["isPlayed", itemId], !isPlayed);
+      const previousChildren: Record<string, unknown> = {};
       if (childItemIds) {
         for (const id of childItemIds) {
-          queryClient.setQueryData(["isPlayed", id], newValue);
+          previousChildren[id] = queryClient.getQueryData(["isPlayed", id]);
+          queryClient.setQueryData(["isPlayed", id], !isPlayed);
         }
       }
+      return { previous, previousChildren, itemId };
+    },
+    onError: (_err, _vars, context) => {
+      if (context) {
+        queryClient.setQueryData(
+          ["isPlayed", context.itemId],
+          context.previous,
+        );
+        for (const [id, val] of Object.entries(context.previousChildren)) {
+          queryClient.setQueryData(["isPlayed", id], val);
+        }
+      }
+    },
+    onSuccess: (_newValue, { itemId }) => {
+      queryClient.invalidateQueries({ queryKey: ["isPlayed", itemId] });
       queryClient.invalidateQueries({ queryKey: ["movies"] });
       queryClient.invalidateQueries({ queryKey: ["series"] });
       queryClient.invalidateQueries({ queryKey: ["recently-played"] });

@@ -896,6 +896,18 @@ export default function SwitchProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        <ThemedText
+          style={{
+            color: "#555",
+            fontSize: 11,
+            textAlign: "center",
+            marginTop: 16,
+            marginBottom: 8,
+          }}
+        >
+          JellyStream v{require("../package.json").version}
+        </ThemedText>
+
         {saving && (
           <View style={styles.savingOverlay}>
             <ActivityIndicator color="#E50914" size="small" />

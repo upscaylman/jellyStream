@@ -166,19 +166,34 @@ function WebPlayer({
   }, [reportWebStop, onClose]);
 
   // Initialiser depuis les defaults Jellyfin
+  // Quand PlaybackInfo arrive, reconstruire le stream avec le bon AudioStreamIndex
+  // (le stream initial est créé sans audioStreamIndex → pas de son sur certains fichiers)
+  const defaultsApplied = useRef(false);
   useEffect(() => {
-    if (webMediaSource) {
+    if (webMediaSource && !defaultsApplied.current) {
+      defaultsApplied.current = true;
       if (
         webMediaSource.DefaultSubtitleStreamIndex != null &&
         webMediaSource.DefaultSubtitleStreamIndex >= 0
       ) {
         setSelectedSubIndex(webMediaSource.DefaultSubtitleStreamIndex);
       }
-      if (webMediaSource.DefaultAudioStreamIndex != null) {
-        setSelectedAudioIndex(webMediaSource.DefaultAudioStreamIndex);
+      const audioIdx = webMediaSource.DefaultAudioStreamIndex ?? 0;
+      setSelectedAudioIndex(audioIdx);
+
+      // Reconstruire le stream avec le bon audio (si le player est déjà monté)
+      const video = videoRef.current;
+      if (video) {
+        const newUrl = getWebTranscodedUrl(serverUrl, itemId, token, {
+          audioStreamIndex: audioIdx,
+          playSessionId: webPlaybackInfo?.PlaySessionId,
+        });
+        video.src = newUrl;
+        video.load();
+        video.play().catch(() => {});
       }
     }
-  }, [webMediaSource]);
+  }, [webMediaSource, serverUrl, itemId, token, webPlaybackInfo]);
 
   // Durée depuis Jellyfin (seule source fiable pour les streams transcodés)
   const jellyfinDurationSec = webMediaSource?.RunTimeTicks

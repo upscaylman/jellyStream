@@ -56,7 +56,7 @@ export const styles = StyleSheet.create({
   categoryTab: {
     // paddingVertical: 7,
     paddingHorizontal: 16,
-    height: 34,
+    height: 38,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.3)",
     borderRadius: 20,
@@ -79,10 +79,10 @@ export const styles = StyleSheet.create({
   },
   featuredContent: {
     width: "100%",
-    height: 528,
-    marginBottom: 14,
+    height: 507,
+    marginBottom: 9,
     position: "relative",
-    paddingHorizontal: 20,
+    paddingHorizontal: 25,
   },
   featuredWrapper: {
     width: "100%",

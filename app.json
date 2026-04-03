@@ -37,12 +37,7 @@
     "experiments": {
       "typedRoutes": true
     },
-    "platforms": [
-      "ios",
-      "android",
-      "web",
-      "visionOS"
-    ],
+    "platforms": ["ios", "android", "web", "visionOS"],
     "visionOS": {
       "bundleIdentifier": "your.app.identifier",
       "buildNumber": "1.0.0",

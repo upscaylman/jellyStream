@@ -70,6 +70,86 @@ export function usePlaybackInfo(itemId: string) {
     queryKey: ["playbackInfo", itemId],
     queryFn: async () => {
       const baseUrl = (serverUrl ?? "").replace(/\/+$/, "");
+      // DeviceProfile indique au serveur les codecs supportés par le client web
+      // Sans ça, Jellyfin ne retourne pas de TranscodingUrl
+      const deviceProfile = {
+        DeviceProfile: {
+          MaxStreamingBitrate: 120000000,
+          MaxStaticBitrate: 100000000,
+          MusicStreamingTranscodingBitrate: 384000,
+          DirectPlayProfiles: [
+            {
+              Container: "mp4,m4v",
+              Type: "Video",
+              VideoCodec: "h264,h265,vp9",
+              AudioCodec: "aac,mp3,opus,flac,vorbis",
+            },
+            {
+              Container: "webm",
+              Type: "Video",
+              VideoCodec: "vp8,vp9,av1",
+              AudioCodec: "vorbis,opus",
+            },
+            { Container: "mp3", Type: "Audio" },
+            { Container: "aac", Type: "Audio" },
+            { Container: "flac", Type: "Audio" },
+            { Container: "webma,webm", Type: "Audio" },
+            { Container: "wav", Type: "Audio" },
+            { Container: "ogg", Type: "Audio" },
+          ],
+          TranscodingProfiles: [
+            {
+              Container: "ts",
+              Type: "Audio",
+              AudioCodec: "aac",
+              Context: "Streaming",
+              Protocol: "hls",
+              MaxAudioChannels: "2",
+              BreakOnNonKeyFrames: true,
+            },
+            {
+              Container: "aac",
+              Type: "Audio",
+              AudioCodec: "aac",
+              Context: "Streaming",
+              Protocol: "http",
+              MaxAudioChannels: "6",
+            },
+            {
+              Container: "mp3",
+              Type: "Audio",
+              AudioCodec: "mp3",
+              Context: "Streaming",
+              Protocol: "http",
+              MaxAudioChannels: "2",
+            },
+            {
+              Container: "ts",
+              Type: "Video",
+              AudioCodec: "aac,mp3",
+              VideoCodec: "h264",
+              Context: "Streaming",
+              Protocol: "hls",
+              MaxAudioChannels: "6",
+              MinSegments: 1,
+              BreakOnNonKeyFrames: true,
+            },
+            {
+              Container: "mp4",
+              Type: "Video",
+              AudioCodec: "aac,mp3,opus,flac,vorbis",
+              VideoCodec: "h264",
+              Context: "Static",
+              Protocol: "http",
+            },
+          ],
+          SubtitleProfiles: [
+            { Format: "vtt", Method: "External" },
+            { Format: "ass", Method: "External" },
+            { Format: "ssa", Method: "External" },
+          ],
+        },
+      };
       const response = await fetch(
         `${baseUrl}/Items/${encodeURIComponent(itemId)}/PlaybackInfo?userId=${encodeURIComponent(userId ?? "")}`,
         {
@@ -78,7 +158,7 @@ export function usePlaybackInfo(itemId: string) {
             Authorization: `MediaBrowser Token="${token}"`,
             "Content-Type": "application/json",
           },
-          body: "{}",
+          body: JSON.stringify(deviceProfile),
         },
       );
 
