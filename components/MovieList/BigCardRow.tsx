@@ -9,8 +9,8 @@ import { useRouter } from "expo-router";
 import React, { useRef } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
-const CARD_WIDTH = 200.32;
-const CARD_HEIGHT = 380.48;
+const CARD_WIDTH = 165.32;
+const CARD_HEIGHT = 340.48;
 const CARD_GAP = 10;
 
 const BigCard = ({
