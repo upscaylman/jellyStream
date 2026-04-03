@@ -53,7 +53,7 @@ const MovieItem = ({
       style={[
         {
           position: "relative",
-          borderRadius: isTop10 ? 4 : 6,
+          borderRadius: 4,
           overflow: "hidden",
         },
       ]}
@@ -219,7 +219,7 @@ const topRatedStyles = StyleSheet.create({
   iconContainer: {
     position: "absolute",
     top: 0,
-    right: -4,
+    right: -5,
     zIndex: 1,
   },
   icon: {

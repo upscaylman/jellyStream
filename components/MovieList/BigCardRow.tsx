@@ -118,7 +118,7 @@ const cardStyles = StyleSheet.create({
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
     marginRight: CARD_GAP,
-    borderRadius: 8,
+    borderRadius: 4,
     overflow: "hidden",
   },
   imageContainer: {
