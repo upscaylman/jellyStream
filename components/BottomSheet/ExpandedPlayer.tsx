@@ -104,6 +104,8 @@ export function ExpandedPlayer({
   );
 
   const isSeries = movie.type === "Series" || movie.type === "Episode";
+  const isSeriesRoot = movie.type === "Series";
+  const isEpisode = movie.type === "Episode";
   const isMovie = movie.type === "Movie" || (!isSeries && !movie.type);
   const isBoxSet = movie.type === "BoxSet";
   const itemId = typeof movie.id === "string" ? movie.id : movie.id.toString();
@@ -129,14 +131,24 @@ export function ExpandedPlayer({
   const seriesId = movie.seriesId ?? (movie.type === "Series" ? itemId : "");
 
   // Next Up pour les séries (épisode en cours / à reprendre)
-  const { data: nextUpEpisode } = useNextUp(isSeries ? seriesId : "");
-  const seriesHasResume =
-    isSeries &&
-    nextUpEpisode &&
-    (nextUpEpisode.UserData?.PlaybackPositionTicks ?? 0) > 0;
-  const nextUpLabel = seriesHasResume
-    ? `Reprendre S${nextUpEpisode.ParentIndexNumber ?? "?"} : E${nextUpEpisode.IndexNumber ?? "?"}`
-    : null;
+  const { data: nextUpEpisode } = useNextUp(isSeriesRoot ? seriesId : "");
+
+  // Label du bouton Reprendre
+  // - Sur la page Série : utiliser le nextUp de Jellyfin
+  // - Sur la page Épisode : utiliser les infos de l'épisode courant
+  const nextUpLabel = (() => {
+    if (isSeriesRoot && nextUpEpisode) {
+      return `Reprendre S${nextUpEpisode.ParentIndexNumber ?? "?"} : E${nextUpEpisode.IndexNumber ?? "?"}`;
+    }
+    if (isEpisode && itemDetail) {
+      const sNum = itemDetail.ParentIndexNumber ?? "?";
+      const eNum = itemDetail.IndexNumber ?? "?";
+      return hasProgress
+        ? `Reprendre S${sNum} : E${eNum}`
+        : `S${sNum} : E${eNum}`;
+    }
+    return null;
+  })();
 
   // Collection (BoxSet) pour les films et les BoxSets
   const { data: collectionData, isLoading: isLoadingCollection } =
@@ -563,8 +575,19 @@ export function ExpandedPlayer({
               style={styles.playButton}
               onPress={() => {
                 player.pause();
+                // Épisode : lancer directement cet épisode
+                if (isEpisode) {
+                  router.push({
+                    pathname: "/player",
+                    params: {
+                      itemId,
+                      title: movieData.title,
+                    },
+                  });
+                  return;
+                }
                 // Série avec épisode à reprendre → lancer le nextUp
-                if (isSeries && nextUpEpisode?.Id) {
+                if (isSeriesRoot && nextUpEpisode?.Id) {
                   router.push({
                     pathname: "/player",
                     params: {

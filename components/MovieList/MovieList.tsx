@@ -27,12 +27,14 @@ const MovieItem = ({
   router,
   index,
   isTop10,
+  showProgress,
   onLongPress,
 }: {
   item: Movie;
   router: any;
   index: number;
   isTop10: boolean;
+  showProgress?: boolean;
   onLongPress?: () => void;
 }) => (
   <Pressable
@@ -87,18 +89,20 @@ const MovieItem = ({
           />
         </View>
       )}
-      {item.progressPercent != null && item.progressPercent > 0 && (
-        <View style={progressStyles.container}>
-          <View style={progressStyles.track}>
-            <View
-              style={[
-                progressStyles.fill,
-                { width: `${item.progressPercent}%` },
-              ]}
-            />
+      {showProgress &&
+        item.progressPercent != null &&
+        item.progressPercent > 0 && (
+          <View style={progressStyles.container}>
+            <View style={progressStyles.track}>
+              <View
+                style={[
+                  progressStyles.fill,
+                  { width: `${item.progressPercent}%` },
+                ]}
+              />
+            </View>
           </View>
-        </View>
-      )}
+        )}
     </View>
     {item.badge && (
       <View
@@ -145,6 +149,7 @@ export function MovieList({
         router={router}
         index={index}
         isTop10={isTop10}
+        showProgress={rowTitle === "Reprendre la lecture"}
         onLongPress={() => handleLongPress(item.id)}
       />
     </HoverableView>
@@ -192,7 +197,7 @@ const badgeStyles = StyleSheet.create({
     alignItems: "center",
   },
   badgeContainerTop10: {
-    bottom: 16,
+    bottom: 0,
   },
   badge: {
     backgroundColor: "#E50914",
@@ -214,7 +219,7 @@ const topRatedStyles = StyleSheet.create({
   iconContainer: {
     position: "absolute",
     top: 0,
-    right: 0,
+    right: -4,
     zIndex: 1,
   },
   icon: {
