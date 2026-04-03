@@ -7,18 +7,10 @@ import { Image as ExpoImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useRef } from "react";
-import {
-  Dimensions,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const CARD_WIDTH = SCREEN_WIDTH * 0.46;
-const CARD_HEIGHT = CARD_WIDTH * 1.5;
+const CARD_WIDTH = 200.32;
+const CARD_HEIGHT = 380.48;
 const CARD_GAP = 10;
 
 const BigCard = ({
