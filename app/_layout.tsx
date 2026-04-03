@@ -5,7 +5,7 @@ import { RootScaleProvider, useRootScale } from "@/contexts/RootScaleContext";
 import useCachedResources from "@/hooks/useCachedResources";
 import { useVisionOS } from "@/hooks/useVisionOS";
 import { JellyQueryProvider } from "@/src/api/queryProvider";
-import { useAuthStore } from "@/src/stores/authStore";
+import { KEYS, storage, useAuthStore } from "@/src/stores/authStore";
 import { useNotificationStore } from "@/src/stores/notificationStore";
 import { usePreferencesStore } from "@/src/stores/preferencesStore";
 import {
@@ -17,10 +17,80 @@ import { BlurView } from "expo-blur";
 import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
-import { StyleSheet, useColorScheme, View } from "react-native";
+import React, { Component, useEffect, useRef, useState } from "react";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  useColorScheme,
+  View,
+} from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
+
+// ErrorBoundary — attrape les crashes React et affiche un écran de recovery
+class ErrorBoundary extends Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: Error) {
+    console.warn("[ErrorBoundary] Crash attrapé :", error.message);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "#000",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 24,
+          }}
+        >
+          <Text
+            style={{
+              color: "#fff",
+              fontSize: 20,
+              fontWeight: "bold",
+              marginBottom: 12,
+            }}
+          >
+            Oups, quelque chose a planté
+          </Text>
+          <Text
+            style={{
+              color: "#B3B3B3",
+              fontSize: 14,
+              textAlign: "center",
+              marginBottom: 24,
+            }}
+          >
+            L'application a rencontré une erreur inattendue.
+          </Text>
+          <Pressable
+            onPress={() => this.setState({ hasError: false })}
+            style={{
+              backgroundColor: "#E50914",
+              paddingHorizontal: 24,
+              paddingVertical: 12,
+              borderRadius: 4,
+            }}
+          >
+            <Text style={{ color: "#fff", fontSize: 16, fontWeight: "bold" }}>
+              Réessayer
+            </Text>
+          </Pressable>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function AnimatedStack() {
   const { scale } = useRootScale();
@@ -64,9 +134,9 @@ function AnimatedStack() {
 
     if (!isAuthenticated) {
       try {
-        sessionStorage.removeItem("profileSelected");
+        storage.delete(KEYS.PROFILE_SELECTED);
       } catch {
-        /* native */
+        /* noop */
       }
       requestAnimationFrame(() => router.replace("/(auth)/server-select"));
     } else if (wasAuthenticated === false) {
@@ -76,9 +146,9 @@ function AnimatedStack() {
       // Session restaurée au démarrage — vérifier si c'est un refresh ou un cold start
       let alreadySelected = false;
       try {
-        alreadySelected = sessionStorage.getItem("profileSelected") === "1";
+        alreadySelected = storage.getString(KEYS.PROFILE_SELECTED) === "1";
       } catch {
-        /* native : pas de sessionStorage → toujours montrer profile-select */
+        /* noop */
       }
       if (!alreadySelected) {
         requestAnimationFrame(() => router.replace("/(auth)/profile-select"));
@@ -225,7 +295,9 @@ export default function RootLayout() {
           <RootScaleProvider>
             <OverlayProvider>
               <BottomSheetProvider>
-                <AnimatedStack />
+                <ErrorBoundary>
+                  <AnimatedStack />
+                </ErrorBoundary>
                 {!splashDone && (
                   <SplashAnimation onFinished={() => setSplashDone(true)} />
                 )}

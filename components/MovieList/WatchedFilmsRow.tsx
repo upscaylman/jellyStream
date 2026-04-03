@@ -17,5 +17,5 @@ export function WatchedFilmsRow() {
 
   if (movies.length === 0) return null;
 
-  return <BigCardRow rowTitle="Vous avez regardé" movies={movies} />;
+  return <BigCardRow rowTitle="Vous avez regardé" movies={movies} cardWidth={160.32} cardHeight={300.48} />;
 }

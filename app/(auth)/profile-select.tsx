@@ -1,6 +1,6 @@
 // Écran de sélection de profil après connexion — style Netflix
 import { ThemedText } from "@/components/ThemedText";
-import { useAuthStore } from "@/src/stores/authStore";
+import { KEYS, storage, useAuthStore } from "@/src/stores/authStore";
 import { Ionicons } from "@expo/vector-icons";
 import type { UserDto } from "@jellyfin/sdk/lib/generated-client/models";
 import { getUserApi } from "@jellyfin/sdk/lib/utils/api/user-api";
@@ -171,9 +171,9 @@ export default function ProfileSelectScreen() {
 
       // Marquer le profil comme sélectionné (évite redirect au refresh)
       try {
-        sessionStorage.setItem("profileSelected", "1");
+        storage.set(KEYS.PROFILE_SELECTED, "1");
       } catch {
-        /* native */
+        /* noop */
       }
 
       // Chercher dans les savedProfiles

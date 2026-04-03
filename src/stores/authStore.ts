@@ -59,7 +59,11 @@ const KEYS = {
   SAVED_PROFILES: "jellyfin_saved_profiles",
   REMEMBER_ME: "jellyfin_remember_me",
   AVATAR_VERSION: "jellyfin_avatar_version",
+  PROFILE_SELECTED: "jellyfin_profile_selected",
 } as const;
+
+// Export du storage pour usage direct (profileSelected flag, etc.)
+export { KEYS, storage };
 
 interface SavedProfile {
   id: string;
@@ -194,6 +198,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     storage.delete(KEYS.TOKEN);
     storage.delete(KEYS.USER_ID);
     storage.delete(KEYS.USER_NAME);
+    storage.delete(KEYS.PROFILE_SELECTED);
     // On garde le serverUrl pour faciliter la reconnexion
 
     set({

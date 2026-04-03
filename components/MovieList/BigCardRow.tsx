@@ -9,19 +9,25 @@ import { useRouter } from "expo-router";
 import React, { useRef } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
-const CARD_WIDTH = 160.32;
-const CARD_HEIGHT = 300.48;
+const CARD_WIDTH = 165.32;
+const CARD_HEIGHT = 320.48;
 const CARD_GAP = 10;
 
 const BigCard = ({
   item,
   router,
   onLongPress,
+  cardWidth,
+  cardHeight,
 }: {
   item: Movie;
   router: ReturnType<typeof useRouter>;
   onLongPress?: () => void;
+  cardWidth?: number;
+  cardHeight?: number;
 }) => {
+  const width = cardWidth ?? CARD_WIDTH;
+  const height = cardHeight ?? CARD_HEIGHT;
   const imageUri = item.backdropUrl || item.imageUrl;
 
   return (
@@ -34,7 +40,7 @@ const BigCard = ({
       }
       onLongPress={onLongPress}
       delayLongPress={400}
-      style={cardStyles.card}
+      style={[cardStyles.card, { width, height }]}
     >
       <View style={cardStyles.imageContainer}>
         {imageUri ? (
@@ -72,7 +78,7 @@ const BigCard = ({
   );
 };
 
-export function BigCardRow({ rowTitle, movies }: MovieRow) {
+export function BigCardRow({ rowTitle, movies, cardWidth, cardHeight }: MovieRow & { cardWidth?: number; cardHeight?: number }) {
   const router = useRouter();
   const flatListRef = useRef<FlatList>(null);
   const { openSheet } = useBottomSheet();
@@ -90,6 +96,8 @@ export function BigCardRow({ rowTitle, movies }: MovieRow) {
       item={item}
       router={router}
       onLongPress={() => handleLongPress(item.id)}
+      cardWidth={cardWidth}
+      cardHeight={cardHeight}
     />
   );
 
