@@ -1,5 +1,6 @@
 import { BottomSheetProvider } from "@/components/BottomSheet/BottomSheetContext";
 import { OverlayProvider } from "@/components/Overlay/OverlayProvider";
+import { SplashAnimation } from "@/components/SplashAnimation";
 import { RootScaleProvider, useRootScale } from "@/contexts/RootScaleContext";
 import useCachedResources from "@/hooks/useCachedResources";
 import { useVisionOS } from "@/hooks/useVisionOS";
@@ -198,13 +199,18 @@ function AnimatedStack() {
   );
 }
 
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const isLoaded = useCachedResources();
+  const [splashDone, setSplashDone] = useState(false);
 
   useEffect(() => {
-    SplashScreen.hideAsync();
-  }, []);
+    if (isLoaded) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [isLoaded]);
 
   if (!isLoaded) {
     return null;
@@ -220,6 +226,9 @@ export default function RootLayout() {
             <OverlayProvider>
               <BottomSheetProvider>
                 <AnimatedStack />
+                {!splashDone && (
+                  <SplashAnimation onFinished={() => setSplashDone(true)} />
+                )}
               </BottomSheetProvider>
             </OverlayProvider>
           </RootScaleProvider>

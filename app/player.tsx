@@ -130,10 +130,17 @@ function WebPlayer({
   const openCast = useCastSheet();
   const [isLocked, setIsLocked] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Signal incrémenté quand l'élément <video> est créé, pour déclencher le retry audio
+  const [videoInstanceId, setVideoInstanceId] = useState(0);
 
   // Offset de seek : quand on seek à 300s, le stream reprend à 0 mais on affiche 300s
   const startOffsetRef = useRef(0);
+
+  // URL de base HLS depuis PlaybackInfo (utilisée si TranscodingUrl est disponible)
+  // Stocke l'URL complète (serverUrl + TranscodingUrl) sans StartTimeTicks
+  const transcodingBaseUrlRef = useRef<string | null>(null);
 
   // Sous-titres et audio pour le web
   const serverUrl = useAuthStore((s) => s.serverUrl) ?? "";
@@ -168,32 +175,163 @@ function WebPlayer({
   // Initialiser depuis les defaults Jellyfin
   // Quand PlaybackInfo arrive, reconstruire le stream avec le bon AudioStreamIndex
   // (le stream initial est créé sans audioStreamIndex → pas de son sur certains fichiers)
+  // videoInstanceId garantit que cet effet retente après que la <video> soit créée,
+  // au cas où PlaybackInfo était déjà en cache au premier rendu (avant création de la vidéo)
   const defaultsApplied = useRef(false);
   useEffect(() => {
-    if (webMediaSource && !defaultsApplied.current) {
-      defaultsApplied.current = true;
-      if (
-        webMediaSource.DefaultSubtitleStreamIndex != null &&
-        webMediaSource.DefaultSubtitleStreamIndex >= 0
-      ) {
-        setSelectedSubIndex(webMediaSource.DefaultSubtitleStreamIndex);
-      }
-      const audioIdx = webMediaSource.DefaultAudioStreamIndex ?? 0;
-      setSelectedAudioIndex(audioIdx);
+    console.log(
+      "[WebPlayer] defaultsApplied effect: webMediaSource=",
+      !!webMediaSource,
+      "defaultsApplied=",
+      defaultsApplied.current,
+      "video=",
+      !!videoRef.current,
+      "videoInstanceId=",
+      videoInstanceId,
+    );
+    if (!webMediaSource || defaultsApplied.current) return;
+    const video = videoRef.current;
+    // Pas encore de vidéo : on attend le prochain tick (videoInstanceId va changer)
+    if (!video) return;
 
-      // Reconstruire le stream avec le bon audio (si le player est déjà monté)
-      const video = videoRef.current;
-      if (video) {
-        const newUrl = getWebTranscodedUrl(serverUrl, itemId, token, {
-          audioStreamIndex: audioIdx,
-          playSessionId: webPlaybackInfo?.PlaySessionId,
-        });
-        video.src = newUrl;
-        video.load();
-        video.play().catch(() => {});
-      }
+    defaultsApplied.current = true;
+    console.log(
+      "[WebPlayer] Applying defaults, TranscodingUrl=",
+      webMediaSource.TranscodingUrl?.substring(0, 100),
+    );
+    if (
+      webMediaSource.DefaultSubtitleStreamIndex != null &&
+      webMediaSource.DefaultSubtitleStreamIndex >= 0
+    ) {
+      setSelectedSubIndex(webMediaSource.DefaultSubtitleStreamIndex);
     }
-  }, [webMediaSource, serverUrl, itemId, token, webPlaybackInfo]);
+
+    // Trouver l'index RÉEL de la piste audio par défaut depuis MediaStreams.
+    // DefaultAudioStreamIndex peut pointer vers un mauvais stream si le fichier
+    // a des chapitres/pistes texte avant l'audio (ex: Babysitting → pas de son).
+    const allAudioStreams = (webMediaSource.MediaStreams ?? []).filter(
+      (s) => s.Type === "Audio",
+    );
+    const defaultAudioStream =
+      allAudioStreams.find(
+        (s) => s.Index === webMediaSource.DefaultAudioStreamIndex,
+      ) ??
+      allAudioStreams.find((s) => s.IsDefault) ??
+      allAudioStreams[0];
+    const audioIdx =
+      defaultAudioStream?.Index ?? webMediaSource.DefaultAudioStreamIndex ?? 0;
+    setSelectedAudioIndex(audioIdx);
+
+    console.log(
+      "[AUDIO] DefaultAudioStreamIndex:",
+      webMediaSource.DefaultAudioStreamIndex,
+      "→ Index utilisé:",
+      audioIdx,
+      "| Pistes:",
+      JSON.stringify(
+        allAudioStreams.map((s) => ({
+          Index: s.Index,
+          Codec: s.Codec,
+          Channels: s.Channels,
+          Language: s.Language,
+        })),
+      ),
+    );
+
+    setIsBuffering(true);
+
+    // Utiliser la TranscodingUrl de PlaybackInfo directement (comme Jellyfin web le fait).
+    // La TranscodingUrl est précalculée par le serveur avec tous les bons paramètres
+    // (AudioStreamIndex, VideoCodec, AudioCodec, MediaSourceId, etc.).
+    // C'est la seule approche fiable pour les fichiers avec des codecs/configurations inhabituels.
+    const transcodingPath = webMediaSource.TranscodingUrl;
+    if (transcodingPath) {
+      // Construire l'URL complète (serverUrl + path)
+      let fullUrl = `${serverUrl.replace(/\/+$/, "")}${transcodingPath.startsWith("/") ? "" : "/"}${transcodingPath}`;
+      // Ajouter le token si absent (normalement déjà inclus dans TranscodingUrl)
+      if (!fullUrl.includes("api_key=") && !fullUrl.includes("ApiKey=")) {
+        fullUrl +=
+          (fullUrl.includes("?") ? "&" : "?") +
+          `api_key=${encodeURIComponent(token)}`;
+      }
+      transcodingBaseUrlRef.current = fullUrl;
+
+      // Détruire l'instance HLS.js existante si présente (créée pour le stream.mp4 initial)
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+      video.pause();
+      // Ne PAS faire removeAttribute("src") — ça déclenche MEDIA_ELEMENT_ERROR: Empty src
+      // HLS.js attachMedia() prend le contrôle via MediaSource API automatiquement
+
+      import("hls.js").then(({ default: Hls }) => {
+        const v = videoRef.current;
+        if (!v) return;
+        if (Hls.isSupported()) {
+          const hls = new Hls({
+            enableWorker: true,
+            xhrSetup: (xhr: XMLHttpRequest, url: string) => {
+              let fixedUrl = url
+                .replace(/AudioCodec=copy/gi, "AudioCodec=aac")
+                .replace(/AudioStreamIndex=-1/gi, "")
+                .replace(/&&+/g, "&")
+                .replace(/&$/, "")
+                .replace(/\?&/, "?");
+              if (fixedUrl !== url) xhr.open("GET", fixedUrl, true);
+            },
+          });
+          hls.loadSource(fullUrl);
+          hls.attachMedia(v);
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            console.log("[WebPlayer] HLS MANIFEST_PARSED — lancement lecture");
+            v.play().catch((err) => {
+              console.warn("[WebPlayer] play() rejeté:", err?.message);
+            });
+          });
+          hls.on(Hls.Events.ERROR, (_event, data) => {
+            if (data.fatal) {
+              console.error("[WebPlayer] HLS FATAL:", data.type, data.details);
+              switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                  hls.startLoad();
+                  break;
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                  hls.recoverMediaError();
+                  break;
+                default:
+                  hls.destroy();
+                  break;
+              }
+            }
+          });
+          hlsRef.current = hls;
+        } else if (v.canPlayType("application/vnd.apple.mpegurl")) {
+          // Safari : HLS natif
+          v.src = fullUrl;
+          v.play().catch(() => {});
+        }
+      });
+    } else {
+      // Fallback : stream.mp4 si TranscodingUrl non disponible (direct play ou stream direct)
+      const newUrl = getWebTranscodedUrl(serverUrl, itemId, token, {
+        audioStreamIndex: audioIdx,
+        playSessionId: webPlaybackInfo?.PlaySessionId,
+        mediaSourceId: webMediaSource.Id,
+      });
+      video.src = newUrl;
+      video.load();
+      video.play().catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    webMediaSource,
+    serverUrl,
+    itemId,
+    token,
+    webPlaybackInfo,
+    videoInstanceId,
+  ]);
 
   // Durée depuis Jellyfin (seule source fiable pour les streams transcodés)
   const jellyfinDurationSec = webMediaSource?.RunTimeTicks
@@ -248,6 +386,8 @@ function WebPlayer({
     video.controls = false;
     containerRef.current.appendChild(video);
     videoRef.current = video;
+    // Signaler que la vidéo est montée — déclenche le retry de l'effet audio
+    setVideoInstanceId((v) => v + 1);
 
     const isHls = streamUrl.includes(".m3u8");
 
@@ -321,14 +461,57 @@ function WebPlayer({
         }
       });
     } else {
-      video.src = streamUrl;
+      // Ne PAS charger stream.mp4 ici — l'effet defaultsApplied s'en charge
+      // (avec les bons paramètres audio/sous-titres depuis PlaybackInfo).
+      // Charger stream.mp4 ici puis le remplacer par HLS crée un conflit → VIDEO ERROR 4.
+      console.log(
+        "[WebPlayer] Vidéo montée, attente de PlaybackInfo pour charger le stream...",
+      );
+
+      // Fallback : si PlaybackInfo n'arrive pas en 5s, charger stream.mp4 directement
+      const fallbackTimer = setTimeout(() => {
+        if (
+          !defaultsApplied.current &&
+          videoRef.current &&
+          !videoRef.current.src
+        ) {
+          console.warn(
+            "[WebPlayer] Fallback: PlaybackInfo timeout, chargement stream.mp4 direct",
+          );
+          videoRef.current.src = streamUrl;
+          videoRef.current.load();
+          videoRef.current.play().catch(() => {});
+        }
+      }, 5000);
+      // Stocker pour cleanup
+      (video as any).__fallbackTimer = fallbackTimer;
     }
 
-    video.addEventListener("loadedmetadata", () => setIsBuffering(false));
-    video.addEventListener("play", () => setIsPlaying(true));
+    video.addEventListener("loadedmetadata", () => {
+      console.log("[WebPlayer] loadedmetadata, duration:", video.duration);
+      setIsBuffering(false);
+    });
+    video.addEventListener("play", () => {
+      console.log("[WebPlayer] play event");
+      setIsPlaying(true);
+    });
     video.addEventListener("pause", () => setIsPlaying(false));
     video.addEventListener("waiting", () => setIsBuffering(true));
-    video.addEventListener("canplay", () => setIsBuffering(false));
+    video.addEventListener("canplay", () => {
+      console.log(
+        "[WebPlayer] canplay, readyState:",
+        video.readyState,
+        "muted:",
+        video.muted,
+        "volume:",
+        video.volume,
+      );
+      setIsBuffering(false);
+    });
+    video.addEventListener("error", () => {
+      const e = video.error;
+      console.error("[WebPlayer] VIDEO ERROR:", e?.code, e?.message);
+    });
     video.addEventListener("ended", () => setIsPlaying(false));
 
     return () => {
@@ -336,8 +519,14 @@ function WebPlayer({
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
+      // Reset defaultsApplied pour que le prochain montage relance l'initialisation
+      defaultsApplied.current = false;
+      if ((video as any).__fallbackTimer)
+        clearTimeout((video as any).__fallbackTimer);
       video.pause();
-      video.src = "";
+      video.onerror = null; // Éviter l'erreur "Empty src" au démontage
+      video.removeAttribute("src");
+      video.load(); // Reset propre de l'élément média
       video.remove();
     };
   }, [streamUrl]);
@@ -379,13 +568,25 @@ function WebPlayer({
       setIsBuffering(true);
 
       const ticks = Math.round(seekTo * 10_000_000);
-      let newUrl = getWebTranscodedUrl(serverUrl, itemId, token, {
+
+      // Détruire l'instance HLS.js si elle est active — on passe en stream.mp4
+      // Jellyfin ne supporte pas l'ajout de StartTimeTicks sur une TranscodingUrl HLS existante
+      // (les segments .ts retournent 400 Bad Request)
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+
+      // Toujours utiliser stream.mp4 pour le seek/changement d'options
+      // C'est l'approche fiable : chaque requête démarre à StartTimeTicks
+      const newUrl = getWebTranscodedUrl(serverUrl, itemId, token, {
         startTimeTicks: ticks,
         audioStreamIndex: audioIdx,
         subtitleStreamIndex: subIdx,
         playSessionId: webPlaybackInfo?.PlaySessionId,
         videoBitRate: q.maxBitrate > 0 ? q.maxBitrate : undefined,
         maxWidth: q.maxWidth,
+        mediaSourceId: webMediaSource?.Id ?? undefined,
       });
       video.src = newUrl;
       video.load();
@@ -399,6 +600,7 @@ function WebPlayer({
       selectedSubIndex,
       selectedQuality,
       webPlaybackInfo,
+      webMediaSource,
     ],
   );
 
@@ -482,10 +684,26 @@ function WebPlayer({
     }
   }, []);
 
+  const toggleMute = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.muted = !v.muted;
+    setIsMuted(v.muted);
+    resetHideTimer();
+  }, [resetHideTimer]);
+
   const seekFromMouse = useCallback(
     (clientX: number, commit: boolean) => {
       const bar = progressRef.current;
-      if (!bar || durationSec <= 0) return;
+      if (!bar || durationSec <= 0) {
+        console.warn(
+          "[WebPlayer] seekFromMouse blocked: bar=",
+          !!bar,
+          "durationSec=",
+          durationSec,
+        );
+        return;
+      }
       const rect = bar.getBoundingClientRect();
       const ratio = Math.max(
         0,
@@ -503,39 +721,54 @@ function WebPlayer({
     [durationSec, rebuildWebStream],
   );
 
-  useEffect(() => {
-    const bar = progressRef.current;
+  // Refs stables pour les callbacks utilisés dans les listeners de la progress bar
+  const seekFromMouseRef = useRef(seekFromMouse);
+  seekFromMouseRef.current = seekFromMouse;
+  const resetHideTimerRef = useRef(resetHideTimer);
+  resetHideTimerRef.current = resetHideTimer;
+
+  // Callback ref pour la progress bar : attache les listeners à chaque montage du <div>
+  // Évite le problème d'un useEffect qui tourne quand progressRef est null
+  const progressCleanupRef = useRef<(() => void) | null>(null);
+  const progressBarRef = useCallback((bar: HTMLDivElement | null) => {
+    // Nettoyer les anciens listeners
+    if (progressCleanupRef.current) {
+      progressCleanupRef.current();
+      progressCleanupRef.current = null;
+    }
+    progressRef.current = bar;
     if (!bar) return;
+
     let dragging = false;
 
     const onDown = (e: MouseEvent) => {
       dragging = true;
-      seekFromMouse(e.clientX, false);
+      seekFromMouseRef.current(e.clientX, false);
       e.preventDefault();
     };
     const onMove = (e: MouseEvent) => {
-      if (dragging) seekFromMouse(e.clientX, false);
+      if (dragging) seekFromMouseRef.current(e.clientX, false);
     };
     const onUp = (e: MouseEvent) => {
       if (dragging) {
-        seekFromMouse(e.clientX, true);
+        seekFromMouseRef.current(e.clientX, true);
         dragging = false;
-        resetHideTimer();
+        resetHideTimerRef.current();
       }
     };
     const onTouchStart = (e: TouchEvent) => {
       dragging = true;
-      seekFromMouse(e.touches[0].clientX, false);
+      seekFromMouseRef.current(e.touches[0].clientX, false);
       e.preventDefault();
     };
     const onTouchMove = (e: TouchEvent) => {
-      if (dragging) seekFromMouse(e.touches[0].clientX, false);
+      if (dragging) seekFromMouseRef.current(e.touches[0].clientX, false);
     };
     const onTouchEnd = (e: TouchEvent) => {
       if (dragging) {
-        seekFromMouse(e.changedTouches[0].clientX, true);
+        seekFromMouseRef.current(e.changedTouches[0].clientX, true);
         dragging = false;
-        resetHideTimer();
+        resetHideTimerRef.current();
       }
     };
 
@@ -546,7 +779,7 @@ function WebPlayer({
     window.addEventListener("touchmove", onTouchMove);
     window.addEventListener("touchend", onTouchEnd);
 
-    return () => {
+    progressCleanupRef.current = () => {
       bar.removeEventListener("mousedown", onDown);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
@@ -554,7 +787,7 @@ function WebPlayer({
       window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("touchend", onTouchEnd);
     };
-  }, [seekFromMouse, resetHideTimer, showControls]);
+  }, []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -745,6 +978,13 @@ function WebPlayer({
                       </Text>
                     </View>
                     <View style={{ flex: 1 }} />
+                    <Pressable onPress={toggleMute} style={s.iconButton}>
+                      <Ionicons
+                        name={isMuted ? "volume-mute" : "volume-high"}
+                        size={22}
+                        color="#fff"
+                      />
+                    </Pressable>
                     <Pressable onPress={toggleFullscreen} style={s.iconButton}>
                       <Ionicons
                         name={
@@ -764,6 +1004,13 @@ function WebPlayer({
                         {formatTime(durationSec)}
                       </Text>
                       <View style={{ flex: 1 }} />
+                      <Pressable onPress={toggleMute} style={s.iconButton}>
+                        <Ionicons
+                          name={isMuted ? "volume-mute" : "volume-high"}
+                          size={22}
+                          color="#fff"
+                        />
+                      </Pressable>
                       <Pressable
                         onPress={toggleFullscreen}
                         style={s.iconButton}
@@ -778,7 +1025,7 @@ function WebPlayer({
                       </Pressable>
                     </View>
                     <div
-                      ref={progressRef as any}
+                      ref={progressBarRef as any}
                       style={{
                         height: 40,
                         display: "flex",
@@ -892,6 +1139,7 @@ function NativePlayer({
   const [seekValue, setSeekValue] = useState(0);
   const openCast = useCastSheet();
   const [isLocked, setIsLocked] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
 
   // State paramètres
   const { openSheet: openNativeSheet } = useBottomSheet();
@@ -937,6 +1185,7 @@ function NativePlayer({
   // Pinch-to-zoom
   const pinchActive = useRef(false);
   const pinchStartDist = useRef(0);
+  const pinchLastDist = useRef(0);
 
   // Refs
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -951,20 +1200,48 @@ function NativePlayer({
   // PlaybackInfo depuis Jellyfin (sous-titres, audio, sources)
   const mediaSource = nativeMediaSource;
 
-  // Initialiser les index par défaut depuis la source
+  // Initialiser les index par défaut depuis la source et reconstruire le stream
+  const nativeDefaultsApplied = useRef(false);
   useEffect(() => {
-    if (mediaSource) {
+    if (mediaSource && !nativeDefaultsApplied.current) {
+      nativeDefaultsApplied.current = true;
+      let subIdx = -1;
       if (
         mediaSource.DefaultSubtitleStreamIndex != null &&
         mediaSource.DefaultSubtitleStreamIndex >= 0
       ) {
-        setSelectedSubIndex(mediaSource.DefaultSubtitleStreamIndex);
+        subIdx = mediaSource.DefaultSubtitleStreamIndex;
+        setSelectedSubIndex(subIdx);
       }
-      if (mediaSource.DefaultAudioStreamIndex != null) {
-        setSelectedAudioIndex(mediaSource.DefaultAudioStreamIndex);
-      }
+
+      // Trouver l'index RÉEL de la piste audio (même logique que WebPlayer)
+      const allAudioStreams = (mediaSource.MediaStreams ?? []).filter(
+        (s) => s.Type === "Audio",
+      );
+      const defaultAudioStream =
+        allAudioStreams.find(
+          (s) => s.Index === mediaSource.DefaultAudioStreamIndex,
+        ) ??
+        allAudioStreams.find((s) => s.IsDefault) ??
+        allAudioStreams[0];
+      const audioIdx =
+        defaultAudioStream?.Index ?? mediaSource.DefaultAudioStreamIndex ?? 0;
+      setSelectedAudioIndex(audioIdx);
+
+      const newUrl = getStreamUrl(serverUrl, itemId, token, {
+        audioStreamIndex: audioIdx,
+        subtitleStreamIndex: subIdx >= 0 ? subIdx : undefined,
+        mediaSourceId: mediaSource.Id,
+      });
+      player.replace(newUrl);
+      const sub = player.addListener("statusChange", ({ status }: any) => {
+        if (status === "readyToPlay") {
+          player.play();
+          sub.remove();
+        }
+      });
     }
-  }, [mediaSource]);
+  }, [mediaSource, player, serverUrl, itemId, token]);
 
   // Fallback : utiliser la durée Jellyfin si le player ne la rapporte pas
   useEffect(() => {
@@ -1232,6 +1509,7 @@ function NativePlayer({
           subtitleStreamIndex: selectedSubIndex,
           videoBitRate: q.maxBitrate,
           maxWidth: q.maxWidth,
+          mediaSourceId: mediaSource?.Id ?? undefined,
         });
       } else {
         // Auto → direct play
@@ -1280,6 +1558,13 @@ function NativePlayer({
     resetHideTimer();
   }, [resetHideTimer]);
 
+  const toggleMute = useCallback(() => {
+    const muted = !player.muted;
+    player.muted = muted;
+    setIsMuted(muted);
+    resetHideTimer();
+  }, [player, resetHideTimer]);
+
   return (
     <View style={s.container}>
       <StatusBar hidden />
@@ -1313,6 +1598,7 @@ function NativePlayer({
             const dx = touches[1].pageX - touches[0].pageX;
             const dy = touches[1].pageY - touches[0].pageY;
             const dist = Math.sqrt(dx * dx + dy * dy);
+            pinchLastDist.current = dist;
             if (!pinchActive.current) {
               pinchStartDist.current = dist;
               pinchActive.current = true;
@@ -1324,14 +1610,8 @@ function NativePlayer({
         onResponderRelease={(e) => {
           if (isLocked) return;
           if (pinchActive.current) {
-            // Pinch end — check final distance vs start
-            const touches = e.nativeEvent.touches;
-            let finalDist = pinchStartDist.current;
-            if (touches && touches.length >= 2) {
-              const dx = touches[1].pageX - touches[0].pageX;
-              const dy = touches[1].pageY - touches[0].pageY;
-              finalDist = Math.sqrt(dx * dx + dy * dy);
-            }
+            // Pinch end — utiliser la dernière distance connue pendant le move
+            const finalDist = pinchLastDist.current || pinchStartDist.current;
             const ratio = finalDist / (pinchStartDist.current || 1);
             if (ratio > 1.15) {
               // Pinch out → remplir l'écran
@@ -1492,6 +1772,13 @@ function NativePlayer({
                     {formatTime(durationSec)}
                   </Text>
                   <View style={{ flex: 1 }} />
+                  <Pressable onPress={toggleMute} style={s.iconButton}>
+                    <Ionicons
+                      name={isMuted ? "volume-mute" : "volume-high"}
+                      size={22}
+                      color="#fff"
+                    />
+                  </Pressable>
                   <Pressable
                     onPress={() => videoViewRef.current?.enterFullscreen()}
                     style={s.iconButton}
@@ -1776,6 +2063,15 @@ export default function PlayerScreen() {
       ? getWebTranscodedUrl(serverUrl, itemId ?? "", token)
       : getStreamUrl(serverUrl, itemId ?? "", token);
 
+  console.log(
+    "[PlayerScreen] streamUrl:",
+    streamUrl?.substring(0, 120),
+    "| itemId:",
+    itemId,
+    "| liveStreamUrl:",
+    !!liveStreamUrl,
+  );
+
   const handleClose = useCallback(() => {
     if (router.canGoBack()) {
       router.back();
@@ -1896,10 +2192,12 @@ const s = StyleSheet.create({
     padding: 8,
   },
   centerControls: {
+    ...StyleSheet.absoluteFillObject,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 56,
+    pointerEvents: "box-none",
   },
   playPauseButton: {
     width: 68,
@@ -1924,6 +2222,7 @@ const s = StyleSheet.create({
   bottomBar: {
     paddingHorizontal: 16,
     paddingBottom: 4,
+    pointerEvents: "auto" as const,
   },
   progressBarContainer: {
     height: 32,

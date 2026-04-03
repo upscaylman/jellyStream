@@ -110,6 +110,7 @@ export function getWebTranscodedUrl(
     audioStreamIndex?: number;
     subtitleStreamIndex?: number;
     playSessionId?: string;
+    mediaSourceId?: string;
   },
 ): string {
   if (!serverUrl || !itemId || !token) return "";
@@ -117,14 +118,18 @@ export function getWebTranscodedUrl(
   const params = new URLSearchParams({
     api_key: token,
     DeviceId: `jellystream-web-${Date.now()}`,
-    MediaSourceId: itemId,
+    // Utiliser le MediaSourceId réel de PlaybackInfo (peut différer de itemId pour certains fichiers)
+    MediaSourceId: options?.mediaSourceId ?? itemId,
     Container: "mp4",
     VideoCodec: "h264",
     AudioCodec: "aac",
+    // Forcer le transcodage audio (jamais de stream-copy) → évite DTS/AC3/TrueHD silencieux dans MP4
+    AllowAudioStreamCopy: "false",
     MaxStreamingBitrate: String(options?.videoBitRate ?? 8000000),
     VideoBitrate: String(options?.videoBitRate ?? 8000000),
     AudioBitrate: String(options?.audioBitRate ?? 192000),
-    TranscodingMaxAudioChannels: "2",
+    // MaxAudioChannels est le bon paramètre pour stream.mp4 (TranscodingMaxAudioChannels = HLS uniquement)
+    MaxAudioChannels: "2",
   });
   if (options?.maxWidth) {
     params.set("MaxWidth", String(options.maxWidth));
