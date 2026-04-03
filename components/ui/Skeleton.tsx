@@ -246,13 +246,22 @@ export function ChannelRowSkeleton() {
         style={{ marginLeft: 12, marginBottom: 10 }}
       />
       <View style={channelStyles.row}>
-        {[0, 1, 2].map((i) => (
-          <SkeletonBox
-            key={i}
-            width={CHANNEL_CARD_WIDTH}
-            height={CHANNEL_CARD_WIDTH * 1.2}
-            borderRadius={12}
-          />
+        {[0, 1, 2, 3].map((i) => (
+          <View key={i} style={channelStyles.gameCardContainer}>
+            <SkeletonBox width={120} height={120} borderRadius={16} />
+            <SkeletonBox
+              width={80}
+              height={10}
+              borderRadius={4}
+              style={{ marginTop: 8 }}
+            />
+            <SkeletonBox
+              width={60}
+              height={8}
+              borderRadius={4}
+              style={{ marginTop: 4 }}
+            />
+          </View>
         ))}
       </View>
     </View>
@@ -263,12 +272,21 @@ export function ChannelGridSkeleton({ count = 4 }: { count?: number }) {
   return (
     <View style={channelStyles.grid}>
       {Array.from({ length: count }).map((_, i) => (
-        <SkeletonBox
-          key={i}
-          width={CHANNEL_CARD_WIDTH}
-          height={CHANNEL_CARD_WIDTH * 1.2}
-          borderRadius={12}
-        />
+        <View key={i} style={channelStyles.gameCardContainer}>
+          <SkeletonBox width={120} height={120} borderRadius={16} />
+          <SkeletonBox
+            width={80}
+            height={10}
+            borderRadius={4}
+            style={{ marginTop: 8 }}
+          />
+          <SkeletonBox
+            width={60}
+            height={8}
+            borderRadius={4}
+            style={{ marginTop: 4 }}
+          />
+        </View>
       ))}
     </View>
   );
@@ -289,6 +307,10 @@ const channelStyles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 12,
     gap: 10,
+  },
+  gameCardContainer: {
+    alignItems: "center",
+    width: 120,
   },
 });
 

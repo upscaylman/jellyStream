@@ -7,7 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import { useRouter } from "expo-router";
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 interface IItemPreviewSheetProps {
   itemId: string;
@@ -62,6 +62,22 @@ export function ItemPreviewSheet({ itemId }: IItemPreviewSheetProps) {
 
   const hasProgress = (item.UserData?.PlaybackPositionTicks ?? 0) > 0;
 
+  // Acteurs (max 10)
+  const actors = (item.People ?? [])
+    .filter((p) => p.Type === "Actor")
+    .slice(0, 10);
+
+  const getPersonImageUrl = (personId: string, tag?: string | null) => {
+    if (!personId || !tag) return "";
+    return getImageUrl({
+      serverUrl,
+      itemId: personId,
+      maxWidth: 150,
+      quality: 80,
+      tag,
+    });
+  };
+
   const navigateToPlayer = () => {
     closeSheet();
     router.push({
@@ -72,67 +88,122 @@ export function ItemPreviewSheet({ itemId }: IItemPreviewSheetProps) {
 
   return (
     <View style={sheetStyles.container}>
-      {/* Backdrop */}
-      {backdropUri ? (
-        <View style={sheetStyles.backdropContainer}>
-          <ExpoImage
-            source={{ uri: backdropUri }}
-            style={sheetStyles.backdrop}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            transition={200}
-          />
-          <View style={sheetStyles.backdropGradient} />
-          {/* Bouton X en haut à droite */}
-          <Pressable
-            style={sheetStyles.closeBtn}
-            onPress={closeSheet}
-            hitSlop={12}
-          >
-            <Ionicons name="close" size={20} color="#fff" />
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Backdrop */}
+        {backdropUri ? (
+          <View style={sheetStyles.backdropContainer}>
+            <ExpoImage
+              source={{ uri: backdropUri }}
+              style={sheetStyles.backdrop}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={200}
+            />
+            <View style={sheetStyles.backdropGradient} />
+            {/* Bouton X en haut à droite */}
+            <Pressable
+              style={sheetStyles.closeBtn}
+              onPress={closeSheet}
+              hitSlop={12}
+            >
+              <Ionicons name="close" size={20} color="#fff" />
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* Infos */}
+        <View style={sheetStyles.info}>
+          <Text style={sheetStyles.title} numberOfLines={2}>
+            {item.Name}
+          </Text>
+          <View style={sheetStyles.meta}>
+            {year ? <Text style={sheetStyles.metaText}>{year}</Text> : null}
+            {rating ? (
+              <View style={sheetStyles.ratingBadge}>
+                <Text style={sheetStyles.ratingText}>{rating}</Text>
+              </View>
+            ) : null}
+            {runtime ? (
+              <Text style={sheetStyles.metaText}>{runtime}</Text>
+            ) : null}
+          </View>
+          {genres ? (
+            <Text style={sheetStyles.genres} numberOfLines={1}>
+              {genres}
+            </Text>
+          ) : null}
+          {item.Overview ? (
+            <Text style={sheetStyles.overview} numberOfLines={3}>
+              {item.Overview}
+            </Text>
+          ) : null}
+        </View>
+
+        {/* Casting */}
+        {actors.length > 0 ? (
+          <View style={sheetStyles.castSection}>
+            <Text style={sheetStyles.castTitle}>Casting</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={sheetStyles.castList}
+            >
+              {actors.map((person) => {
+                const personImg = getPersonImageUrl(
+                  person.Id!,
+                  person.PrimaryImageTag,
+                );
+                return (
+                  <View
+                    key={person.Id ?? person.Name ?? ""}
+                    style={sheetStyles.castCard}
+                  >
+                    {personImg ? (
+                      <ExpoImage
+                        source={{ uri: personImg }}
+                        style={sheetStyles.castImage}
+                        cachePolicy="memory-disk"
+                        contentFit="cover"
+                        transition={200}
+                      />
+                    ) : (
+                      <View style={sheetStyles.castImagePlaceholder}>
+                        <Ionicons name="person" size={20} color="#555" />
+                      </View>
+                    )}
+                    <Text style={sheetStyles.castName} numberOfLines={1}>
+                      {person.Name}
+                    </Text>
+                    {person.Role ? (
+                      <Text style={sheetStyles.castRole} numberOfLines={1}>
+                        {person.Role}
+                      </Text>
+                    ) : null}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ) : null}
+
+        {/* Boutons d'action */}
+        <View style={sheetStyles.actions}>
+          <Pressable style={sheetStyles.playBtn} onPress={navigateToPlayer}>
+            <Ionicons name="play" size={22} color="#000" />
+            <Text style={sheetStyles.playBtnText}>
+              {hasProgress ? "Reprendre" : "Lecture"}
+            </Text>
+          </Pressable>
+          <Pressable style={sheetStyles.detailBtn} onPress={navigateToDetail}>
+            <Ionicons
+              name="information-circle-outline"
+              size={22}
+              color="#fff"
+            />
+            <Text style={sheetStyles.detailBtnText}>Détails</Text>
           </Pressable>
         </View>
-      ) : null}
-
-      {/* Infos */}
-      <View style={sheetStyles.info}>
-        <Text style={sheetStyles.title} numberOfLines={2}>
-          {item.Name}
-        </Text>
-        <View style={sheetStyles.meta}>
-          {year ? <Text style={sheetStyles.metaText}>{year}</Text> : null}
-          {rating ? (
-            <View style={sheetStyles.ratingBadge}>
-              <Text style={sheetStyles.ratingText}>{rating}</Text>
-            </View>
-          ) : null}
-          {runtime ? <Text style={sheetStyles.metaText}>{runtime}</Text> : null}
-        </View>
-        {genres ? (
-          <Text style={sheetStyles.genres} numberOfLines={1}>
-            {genres}
-          </Text>
-        ) : null}
-        {item.Overview ? (
-          <Text style={sheetStyles.overview} numberOfLines={3}>
-            {item.Overview}
-          </Text>
-        ) : null}
-      </View>
-
-      {/* Boutons d'action */}
-      <View style={sheetStyles.actions}>
-        <Pressable style={sheetStyles.playBtn} onPress={navigateToPlayer}>
-          <Ionicons name="play" size={22} color="#000" />
-          <Text style={sheetStyles.playBtnText}>
-            {hasProgress ? "Reprendre" : "Lecture"}
-          </Text>
-        </Pressable>
-        <Pressable style={sheetStyles.detailBtn} onPress={navigateToDetail}>
-          <Ionicons name="information-circle-outline" size={22} color="#fff" />
-          <Text style={sheetStyles.detailBtnText}>Détails</Text>
-        </Pressable>
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -252,5 +323,49 @@ const sheetStyles = StyleSheet.create({
     color: "#fff",
     fontSize: 15,
     fontWeight: "600",
+  },
+  castSection: {
+    marginTop: 14,
+  },
+  castTitle: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "bold",
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  castList: {
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  castCard: {
+    width: 70,
+    alignItems: "center",
+  },
+  castImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  castImagePlaceholder: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#2a2a2a",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  castName: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "600",
+    marginTop: 6,
+    textAlign: "center",
+  },
+  castRole: {
+    color: "#808080",
+    fontSize: 10,
+    textAlign: "center",
+    marginTop: 1,
   },
 });

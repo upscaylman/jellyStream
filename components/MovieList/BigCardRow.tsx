@@ -81,7 +81,7 @@ export function BigCardRow({ rowTitle, movies }: MovieRow) {
   const handleLongPress = (itemId: string) => {
     openSheet({
       content: <ItemPreviewSheet itemId={itemId} />,
-      maxHeight: 480,
+      maxHeight: 600,
     });
   };
 

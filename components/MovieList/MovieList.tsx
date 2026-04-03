@@ -138,7 +138,7 @@ export function MovieList({
   const handleLongPress = (itemId: string) => {
     openSheet({
       content: <ItemPreviewSheet itemId={itemId} />,
-      maxHeight: 480,
+      maxHeight: 600,
     });
   };
 

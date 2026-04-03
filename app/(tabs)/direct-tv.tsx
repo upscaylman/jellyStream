@@ -393,6 +393,83 @@ function ChannelRow({
   );
 }
 
+// Card style "jeux" : carrée avec logo centré
+function ChannelGameCard({
+  channel,
+  serverUrl,
+  onPress,
+}: {
+  channel: BaseItemDto;
+  serverUrl: string;
+  onPress: () => void;
+}) {
+  const primaryTag = channel.ImageTags?.["Primary"];
+  const channelImageUrl = channel.Id
+    ? getImageUrl({
+        serverUrl,
+        itemId: channel.Id,
+        maxWidth: 200,
+        quality: 90,
+        tag: primaryTag,
+      })
+    : "";
+
+  return (
+    <Pressable style={localStyles.gameCard} onPress={onPress}>
+      <View style={localStyles.gameCardInner}>
+        {channelImageUrl ? (
+          <ExpoImage
+            source={{ uri: channelImageUrl }}
+            style={localStyles.gameCardImage}
+            cachePolicy="memory-disk"
+            contentFit="contain"
+            transition={200}
+          />
+        ) : (
+          <Ionicons name="tv-outline" size={36} color="#555" />
+        )}
+      </View>
+      <Text style={localStyles.gameCardName} numberOfLines={1}>
+        {channel.Name ?? "Chaîne"}
+      </Text>
+      <Text style={localStyles.gameCardProgram} numberOfLines={1}>
+        {getCurrentProgramName(channel) ?? ""}
+      </Text>
+    </Pressable>
+  );
+}
+
+function ChannelGameRow({
+  channels,
+  serverUrl,
+  onPress,
+}: {
+  channels: BaseItemDto[];
+  serverUrl: string;
+  onPress: (channel: BaseItemDto) => void;
+}) {
+  const flatListRef = useRef<FlatList>(null);
+  useWebDragScroll(flatListRef);
+
+  return (
+    <FlatList
+      ref={flatListRef}
+      data={channels}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      keyExtractor={(item) => item.Id ?? ""}
+      contentContainerStyle={localStyles.horizontalRow}
+      renderItem={({ item: channel }) => (
+        <ChannelGameCard
+          channel={channel}
+          serverUrl={serverUrl}
+          onPress={() => onPress(channel)}
+        />
+      )}
+    />
+  );
+}
+
 export default function DirectTVScreen() {
   const router = useRouter();
   const serverUrl = useAuthStore((s) => s.serverUrl) ?? "";
@@ -530,7 +607,7 @@ export default function DirectTVScreen() {
             {channelSections.map((section) => (
               <View key={section.title} style={localStyles.sectionContainer}>
                 <Text style={localStyles.sectionHeader}>{section.title}</Text>
-                <ChannelRow
+                <ChannelGameRow
                   channels={section.data}
                   serverUrl={serverUrl}
                   onPress={handleChannelPress}
@@ -762,5 +839,38 @@ const localStyles = StyleSheet.create({
     height: "100%",
     backgroundColor: "#E50914",
     borderRadius: 1,
+  },
+  // Style carte "jeux" carrée
+  gameCard: {
+    width: 120,
+    alignItems: "center",
+  },
+  gameCardInner: {
+    width: 120,
+    height: 120,
+    borderRadius: 16,
+    backgroundColor: "#2a2a2a",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+  },
+  gameCardImage: {
+    width: 80,
+    height: 80,
+  },
+  gameCardName: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
+    marginTop: 8,
+    textAlign: "center",
+  },
+  gameCardProgram: {
+    color: "#999",
+    fontSize: 11,
+    textAlign: "center",
+    marginTop: 2,
   },
 });
