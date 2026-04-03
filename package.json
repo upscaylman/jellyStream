@@ -1,7 +1,7 @@
 {
   "name": "jellystream",
   "main": "expo-router/entry",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
@@ -10,7 +10,10 @@
     "test": "jest --watchAll",
     "test:ci": "jest --ci --coverage",
     "lint": "expo lint",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "release:patch": "node scripts/bump-version.js patch",
+    "release:minor": "node scripts/bump-version.js minor",
+    "release:major": "node scripts/bump-version.js major"
   },
   "jest": {
     "preset": "jest-expo"
