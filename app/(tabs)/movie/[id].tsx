@@ -1,17 +1,12 @@
 import { ExpandedPlayer } from "@/components/BottomSheet/ExpandedPlayer";
+import { MovieDetailSkeleton } from "@/components/ui/Skeleton";
 import { useItemDetail } from "@/src/api/queries/useMediaQueries";
 import { useAuthStore } from "@/src/stores/authStore";
 import { getImageUrl } from "@/src/utils/imageUrl";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function MovieScreen() {
   const { id } = useLocalSearchParams();
@@ -54,9 +49,7 @@ export default function MovieScreen() {
     return (
       <View style={styles.container}>
         <StatusBar style="light" />
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#E50914" />
-        </View>
+        <MovieDetailSkeleton />
       </View>
     );
   }

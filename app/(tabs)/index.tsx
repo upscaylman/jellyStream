@@ -2,6 +2,7 @@ import { FeaturedContent } from "@/components/FeaturedContent/FeaturedContent";
 import { AnimatedHeader } from "@/components/Header/AnimatedHeader";
 import { MovieList } from "@/components/MovieList/MovieList";
 import { WatchedFilmsRow } from "@/components/MovieList/WatchedFilmsRow";
+import { HomeScreenSkeleton, useSmoothLoading } from "@/components/ui/Skeleton";
 import { VisionContainer } from "@/components/ui/VisionContainer";
 import { useDeviceMotion } from "@/hooks/useDeviceMotion";
 import { useDominantColor } from "@/hooks/useDominantColor";
@@ -14,7 +15,7 @@ import { useScrollToTop } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Dimensions, View } from "react-native";
+import { Dimensions, StyleSheet, View } from "react-native";
 import Animated, {
   interpolate,
   useAnimatedProps,
@@ -36,6 +37,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function HomeScreen() {
   const { rows, featured, genres, isLoading, isError } = useJellyfinHome();
+  const showSkeleton = useSmoothLoading(rows.length > 0);
   const serverName = useAuthStore((s) => s.serverName);
   const serverUrl = useAuthStore((s) => s.serverUrl);
   const setServer = useAuthStore((s) => s.setServer);
@@ -159,18 +161,7 @@ export default function HomeScreen() {
         onGenreSelect={setSelectedGenre}
       />
 
-      {isLoading && rows.length === 0 ? (
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: "#000",
-          }}
-        >
-          <ActivityIndicator size="large" color="#E50914" />
-        </View>
-      ) : (
+      {rows.length > 0 && (
         <Animated.ScrollView
           ref={scrollViewRef}
           style={[styles.scrollView, isVisionOS && { paddingHorizontal: 20 }]}
@@ -203,6 +194,18 @@ export default function HomeScreen() {
           ))}
           {filteredRows.length <= 4 && <WatchedFilmsRow />}
         </Animated.ScrollView>
+      )}
+
+      {showSkeleton && (
+        <View
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: "#000",
+            zIndex: 2,
+          }}
+        >
+          <HomeScreenSkeleton topMargin={insets.top + 90} />
+        </View>
       )}
     </VisionContainer>
   );

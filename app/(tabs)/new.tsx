@@ -1,3 +1,8 @@
+import {
+  NewItemSkeleton,
+  Top10Skeleton,
+  useSmoothLoading,
+} from "@/components/ui/Skeleton";
 import { useCastSheet } from "@/hooks/useCastSheet";
 import { CastIcon } from "@/icons/CastIcon";
 import {
@@ -18,7 +23,6 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Platform,
   Pressable,
   ScrollView,
@@ -201,6 +205,8 @@ export default function NewScreen() {
           ? isLoadingTop10Tv
           : isLoadingTop10Movies;
   const isTop10 = activeTab === "top10-tv" || activeTab === "top10-movies";
+
+  const showSkeleton = useSmoothLoading(!!displayItems);
 
   const getItemBackdrop = (item: BaseItemDto) => {
     const backdropTag = item.BackdropImageTags?.[0];
@@ -477,17 +483,7 @@ export default function NewScreen() {
           </ScrollView>
         </View>
 
-        {isLoading ? (
-          <View
-            style={{
-              flex: 1,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <ActivityIndicator size="large" color="#E50914" />
-          </View>
-        ) : (
+        {displayItems && (
           <Animated.ScrollView
             ref={scrollViewRef}
             showsVerticalScrollIndicator={false}
@@ -521,6 +517,18 @@ export default function NewScreen() {
               </View>
             )}
           </Animated.ScrollView>
+        )}
+
+        {showSkeleton && (
+          <View
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              backgroundColor: "#000",
+              zIndex: 2,
+            }}
+          >
+            {isTop10 ? <Top10Skeleton /> : <NewItemSkeleton />}
+          </View>
         )}
       </SafeAreaView>
     </View>

@@ -1,4 +1,5 @@
 import { useBottomSheet } from "@/components/BottomSheet/BottomSheetContext";
+import { SkeletonBox } from "@/components/ui/Skeleton";
 import { useItemDetail } from "@/src/api/queries/useMediaQueries";
 import { useAuthStore } from "@/src/stores/authStore";
 import { getBackdropUrl, getImageUrl } from "@/src/utils/imageUrl";
@@ -6,13 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import { useRouter } from "expo-router";
 import React from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 interface IItemPreviewSheetProps {
   itemId: string;
@@ -27,7 +22,12 @@ export function ItemPreviewSheet({ itemId }: IItemPreviewSheetProps) {
   if (isLoading) {
     return (
       <View style={sheetStyles.loading}>
-        <ActivityIndicator size="large" color="#E50914" />
+        <SkeletonBox width="100%" height={180} borderRadius={0} />
+        <View style={{ padding: 16, gap: 10 }}>
+          <SkeletonBox width={200} height={20} borderRadius={4} />
+          <SkeletonBox width={150} height={14} borderRadius={4} />
+          <SkeletonBox width="100%" height={40} borderRadius={4} />
+        </View>
       </View>
     );
   }

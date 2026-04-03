@@ -7,7 +7,6 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Dimensions,
   FlatList,
   Pressable,
@@ -19,6 +18,7 @@ import {
 
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { ChannelRowSkeleton, useSmoothLoading } from "@/components/ui/Skeleton";
 import { useCastSheet } from "@/hooks/useCastSheet";
 import { useWebDragScroll } from "@/hooks/useWebDragScroll";
 import { CastIcon } from "@/icons/CastIcon";
@@ -410,6 +410,8 @@ export default function DirectTVScreen() {
   const isLoading =
     activeTab === "favorites" ? isLoadingFavorites : isLoadingAll;
 
+  const showSkeleton = useSmoothLoading(!!channels);
+
   // Grouper les chaînes par catégorie pour l'onglet "Chaînes"
   const channelSections = useMemo<ChannelSection[]>(() => {
     if (!allChannels?.length) return [];
@@ -506,11 +508,7 @@ export default function DirectTVScreen() {
         </View>
 
         {/* Contenu */}
-        {isLoading ? (
-          <View style={localStyles.loadingContainer}>
-            <ActivityIndicator size="large" color="#E50914" />
-          </View>
-        ) : !channels?.length ? (
+        {channels && !channels.length ? (
           <View style={localStyles.emptyContainer}>
             <Ionicons name="tv-outline" size={64} color="#333" />
             <Text style={localStyles.emptyTitle}>
@@ -524,7 +522,7 @@ export default function DirectTVScreen() {
                 : "Configurez la TV en direct dans Jellyfin"}
             </Text>
           </View>
-        ) : activeTab === "all" ? (
+        ) : channels && activeTab === "all" ? (
           <ScrollView
             contentContainerStyle={localStyles.channelGrid}
             showsVerticalScrollIndicator={false}
@@ -540,7 +538,7 @@ export default function DirectTVScreen() {
               </View>
             ))}
           </ScrollView>
-        ) : (
+        ) : channels ? (
           <FlatList
             ref={scrollViewRef}
             data={channels}
@@ -551,6 +549,14 @@ export default function DirectTVScreen() {
             columnWrapperStyle={localStyles.channelRow}
             showsVerticalScrollIndicator={false}
           />
+        ) : null}
+
+        {showSkeleton && (
+          <View style={localStyles.skeletonOverlay}>
+            <ChannelRowSkeleton />
+            <ChannelRowSkeleton />
+            <ChannelRowSkeleton />
+          </View>
         )}
       </SafeAreaView>
     </View>
@@ -625,6 +631,11 @@ const localStyles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  skeletonOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000",
+    zIndex: 2,
   },
   emptyContainer: {
     flex: 1,

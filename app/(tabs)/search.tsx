@@ -1,3 +1,8 @@
+import {
+  PosterGridSkeleton,
+  SearchDefaultSkeleton,
+  useSmoothLoading,
+} from "@/components/ui/Skeleton";
 import { useCastSheet } from "@/hooks/useCastSheet";
 import { CastIcon } from "@/icons/CastIcon";
 import { useSearchItems, useTrending } from "@/src/api/queries/useMediaQueries";
@@ -12,7 +17,6 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Dimensions,
   FlatList,
   Platform,
@@ -55,11 +59,15 @@ export default function SearchTab() {
 
   const { data: searchResults, isLoading: isSearching } =
     useSearchItems(debouncedSearchTerm);
-  const { data: trendingItems } = useTrending(30);
+  const { data: trendingItems, isLoading: isLoadingTrending } = useTrending(30);
 
   const isSearchActive = debouncedSearchTerm.length >= 1;
   const displayItems = isSearchActive ? searchResults : trendingItems;
-  const isLoading = isSearchActive && isSearching;
+  const isLoading = isSearchActive
+    ? isSearching && !searchResults
+    : isLoadingTrending && !trendingItems;
+
+  const showSkeleton = useSmoothLoading(!isLoading);
 
   // Mode poster : 1-2 lettres, mode genre rows : 3+ lettres
   const isShortSearch =
@@ -217,18 +225,16 @@ export default function SearchTab() {
         </View>
       </View>
 
-      {isLoading ? (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#E50914" />
-        </View>
-      ) : isSearchActive && (!searchResults || searchResults.length === 0) ? (
+      {!isLoading &&
+      isSearchActive &&
+      (!searchResults || searchResults.length === 0) ? (
         <View style={styles.noResults}>
           <Text style={styles.noResultsTitle}>Aucun résultat</Text>
           <Text style={styles.noResultsSubtitle}>
             Essayez de rechercher un autre film, série, acteur ou genre.
           </Text>
         </View>
-      ) : isShortSearch && searchResults?.length ? (
+      ) : !isLoading && isShortSearch && searchResults?.length ? (
         /* 1-2 lettres : grille de posters comme les titres similaires */
         <ScrollView
           style={styles.content}
@@ -498,6 +504,22 @@ export default function SearchTab() {
             </View>
           </View>
         </ScrollView>
+      )}
+
+      {showSkeleton && (
+        <View
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: "#000",
+            zIndex: 2,
+          }}
+        >
+          {isSearchActive ? (
+            <PosterGridSkeleton count={12} />
+          ) : (
+            <SearchDefaultSkeleton />
+          )}
+        </View>
       )}
     </View>
   );

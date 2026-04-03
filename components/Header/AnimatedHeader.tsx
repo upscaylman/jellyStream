@@ -290,7 +290,7 @@ export function AnimatedHeader({
                   ]}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    router.push("/(tabs)/series-list");
+                    router.navigate("/(tabs)/series-list");
                   }}
                 >
                   <Text
@@ -312,7 +312,7 @@ export function AnimatedHeader({
                   ]}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    router.push("/(tabs)/films");
+                    router.navigate("/(tabs)/films");
                   }}
                 >
                   <Text

@@ -1,3 +1,4 @@
+import { ListItemSkeleton, useSmoothLoading } from "@/components/ui/Skeleton";
 import { useCastSheet } from "@/hooks/useCastSheet";
 import { CastIcon } from "@/icons/CastIcon";
 import {
@@ -21,7 +22,6 @@ import { Image as ExpoImage } from "expo-image";
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   StyleSheet,
   Text,
@@ -108,6 +108,10 @@ export default function NotificationsScreen() {
   }, [latestMovies, latestSeries]);
 
   const isLoading = loadingMovies || loadingSeries;
+
+  const showNotifSkeleton = useSmoothLoading(!!(latestMovies || latestSeries));
+  const showActivitySkeleton = useSmoothLoading(!!sessions);
+  const showServerSkeleton = useSmoothLoading(!!activityLog);
 
   const getItemImage = (item: BaseItemDto): string => {
     const tag = item.ImageTags?.["Backdrop"] ?? item.ImageTags?.["Primary"];
@@ -344,72 +348,85 @@ export default function NotificationsScreen() {
         </TouchableOpacity>
       </View>
 
-      {activeTab === "notifications" ? (
-        isLoading ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color="#E50914" />
-          </View>
-        ) : notifications.length === 0 ? (
-          <View style={styles.center}>
-            <Ionicons name="notifications-off-outline" size={60} color="#444" />
-            <Text style={styles.emptyText}>Aucune notification</Text>
-          </View>
+      <View style={{ flex: 1 }}>
+        {activeTab === "notifications" ? (
+          notifications.length === 0 && !isLoading ? (
+            <View style={styles.center}>
+              <Ionicons
+                name="notifications-off-outline"
+                size={60}
+                color="#444"
+              />
+              <Text style={styles.emptyText}>Aucune notification</Text>
+            </View>
+          ) : notifications.length > 0 ? (
+            <FlatList
+              data={notifications}
+              keyExtractor={(item) => item.id}
+              renderItem={renderNotification}
+              contentContainerStyle={styles.list}
+              showsVerticalScrollIndicator={false}
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
+            />
+          ) : null
+        ) : activeTab === "activity" ? (
+          activeSessions.length === 0 && !loadingSessions ? (
+            <View style={styles.center}>
+              <Ionicons name="people-outline" size={60} color="#444" />
+              <Text style={styles.emptyText}>Aucune session active</Text>
+              <Text style={styles.emptySubtext}>
+                Personne ne regarde en ce moment
+              </Text>
+            </View>
+          ) : activeSessions.length > 0 ? (
+            <FlatList
+              data={activeSessions}
+              keyExtractor={(item: SessionInfoDto) => item.Id ?? ""}
+              renderItem={({ item }: { item: SessionInfoDto }) =>
+                renderSession(item)
+              }
+              contentContainerStyle={styles.list}
+              showsVerticalScrollIndicator={false}
+              ItemSeparatorComponent={() => <View style={styles.separator} />}
+            />
+          ) : null
+        ) : !activityLog || activityLog.length === 0 ? (
+          !loadingLog ? (
+            <View style={styles.center}>
+              <Ionicons name="server-outline" size={60} color="#444" />
+              <Text style={styles.emptyText}>Aucun événement serveur</Text>
+            </View>
+          ) : null
         ) : (
           <FlatList
-            data={notifications}
-            keyExtractor={(item) => item.id}
-            renderItem={renderNotification}
-            contentContainerStyle={styles.list}
-            showsVerticalScrollIndicator={false}
-            ItemSeparatorComponent={() => <View style={styles.separator} />}
-          />
-        )
-      ) : activeTab === "activity" ? (
-        loadingSessions ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color="#E50914" />
-          </View>
-        ) : activeSessions.length === 0 ? (
-          <View style={styles.center}>
-            <Ionicons name="people-outline" size={60} color="#444" />
-            <Text style={styles.emptyText}>Aucune session active</Text>
-            <Text style={styles.emptySubtext}>
-              Personne ne regarde en ce moment
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={activeSessions}
-            keyExtractor={(item: SessionInfoDto) => item.Id ?? ""}
-            renderItem={({ item }: { item: SessionInfoDto }) =>
-              renderSession(item)
+            data={activityLog}
+            keyExtractor={(item: ActivityLogEntry) =>
+              String(item.Id ?? Math.random())
             }
+            renderItem={renderLogEntry}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
             ItemSeparatorComponent={() => <View style={styles.separator} />}
           />
-        )
-      ) : loadingLog ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#E50914" />
-        </View>
-      ) : !activityLog || activityLog.length === 0 ? (
-        <View style={styles.center}>
-          <Ionicons name="server-outline" size={60} color="#444" />
-          <Text style={styles.emptyText}>Aucun événement serveur</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={activityLog}
-          keyExtractor={(item: ActivityLogEntry) =>
-            String(item.Id ?? Math.random())
-          }
-          renderItem={renderLogEntry}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
-      )}
+        )}
+
+        {/* Skeleton overlay par onglet */}
+        {activeTab === "notifications" && showNotifSkeleton && (
+          <View style={styles.skeletonOverlay}>
+            <ListItemSkeleton count={8} />
+          </View>
+        )}
+        {activeTab === "activity" && showActivitySkeleton && (
+          <View style={styles.skeletonOverlay}>
+            <ListItemSkeleton count={4} />
+          </View>
+        )}
+        {activeTab === "server" && showServerSkeleton && (
+          <View style={styles.skeletonOverlay}>
+            <ListItemSkeleton count={10} />
+          </View>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -418,6 +435,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000",
+  },
+  skeletonOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000",
+    zIndex: 2,
   },
   header: {
     flexDirection: "row",

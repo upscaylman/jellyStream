@@ -2,6 +2,7 @@ import { useBottomSheet } from "@/components/BottomSheet/BottomSheetContext";
 import { ManageSheet } from "@/components/BottomSheet/ManageSheet";
 import { CategoriesListModal } from "@/components/CategoriesListModal/CategoriesListModal";
 import { ThemedText } from "@/components/ThemedText";
+import { SkeletonBox } from "@/components/ui/Skeleton";
 import { useCastSheet } from "@/hooks/useCastSheet";
 import { CastIcon } from "@/icons/CastIcon";
 import {
@@ -32,7 +33,6 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Linking,
   Platform,
   Pressable,
@@ -962,7 +962,11 @@ export function ExpandedPlayer({
           <View style={collectionStyles.container}>
             {isLoadingCollection && !hasCollection ? (
               <View style={{ padding: 20, alignItems: "center" }}>
-                <ActivityIndicator color="#E50914" size="small" />
+                <SkeletonBox width="60%" height={16} borderRadius={4} />
+                <View style={{ marginTop: 12, gap: 10, width: "100%" }}>
+                  <SkeletonBox width="100%" height={70} borderRadius={6} />
+                  <SkeletonBox width="100%" height={70} borderRadius={6} />
+                </View>
               </View>
             ) : hasCollection ? (
               <>

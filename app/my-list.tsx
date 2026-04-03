@@ -1,3 +1,4 @@
+import { ListItemSkeleton, useSmoothLoading } from "@/components/ui/Skeleton";
 import {
   useFavoriteItems,
   useToggleFavorite,
@@ -11,14 +12,7 @@ import { Image as ExpoImage } from "expo-image";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const MAIN_TABS = [{ id: "all", label: "Séries et films" }] as const;
@@ -40,6 +34,8 @@ export default function MyListScreen() {
   const insets = useSafeAreaInsets();
   const serverUrl = useAuthStore((s) => s.serverUrl) ?? "";
   const { data: favorites, isLoading } = useFavoriteItems(100);
+
+  const showSkeleton = useSmoothLoading(!!favorites);
 
   const [activeMainTab, setActiveMainTab] = useState<MainTab>("all");
   const [activeFilter, setActiveFilter] = useState<FilterTab>(null);
@@ -275,11 +271,7 @@ export default function MyListScreen() {
       </View>
 
       {/* Liste */}
-      {isLoading ? (
-        <View style={s.loadingContainer}>
-          <ActivityIndicator size="large" color="#E50914" />
-        </View>
-      ) : (
+      {favorites && (
         <FlatList
           data={filteredItems}
           renderItem={renderItem}
@@ -287,6 +279,18 @@ export default function MyListScreen() {
           contentContainerStyle={s.listContent}
           showsVerticalScrollIndicator={false}
         />
+      )}
+
+      {showSkeleton && (
+        <View
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: "#141414",
+            zIndex: 2,
+          }}
+        >
+          <ListItemSkeleton count={8} />
+        </View>
       )}
     </View>
   );

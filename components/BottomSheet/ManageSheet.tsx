@@ -1,4 +1,5 @@
 import { useBottomSheet } from "@/components/BottomSheet/BottomSheetContext";
+import { SkeletonBox } from "@/components/ui/Skeleton";
 import {
   useAddToCollection,
   useAllCollections,
@@ -337,11 +338,11 @@ export function ManageSheet({ itemId, itemName, itemType }: IManageSheetProps) {
         {/* Collections existantes */}
         <ScrollView style={s.collectionList}>
           {isLoadingCollections ? (
-            <ActivityIndicator
-              size="small"
-              color="#E50914"
-              style={{ marginTop: 20 }}
-            />
+            <View style={{ marginTop: 20, gap: 10 }}>
+              <SkeletonBox width="100%" height={44} borderRadius={6} />
+              <SkeletonBox width="100%" height={44} borderRadius={6} />
+              <SkeletonBox width="80%" height={44} borderRadius={6} />
+            </View>
           ) : (
             (collections ?? []).map((col) => (
               <Pressable

@@ -119,7 +119,13 @@ function AnimatedStack() {
       >
         <Stack>
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="(tabs)"
+            options={{
+              headerShown: false,
+              contentStyle: { backgroundColor: "#000" },
+            }}
+          />
           <Stack.Screen
             name="switch-profile"
             options={{

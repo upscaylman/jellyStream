@@ -15,7 +15,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import React, { useMemo, useState } from "react";
-import { ActivityIndicator, Dimensions, StyleSheet, View } from "react-native";
+import { Dimensions, StyleSheet, View } from "react-native";
 import Animated, {
   interpolate,
   useAnimatedProps,
@@ -25,6 +25,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { HomeScreenSkeleton, useSmoothLoading } from "@/components/ui/Skeleton";
 import { useDominantColor } from "@/hooks/useDominantColor";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -146,6 +147,8 @@ export default function FilmsScreen() {
 
   const dummyAnimStyle = { transform: [] };
 
+  const showSkeleton = useSmoothLoading(!!allMovies);
+
   return (
     <View style={s.container}>
       <StatusBar style="light" />
@@ -161,11 +164,7 @@ export default function FilmsScreen() {
         itemCount={filteredMovies?.length ?? 0}
       />
 
-      {isLoading ? (
-        <View style={s.loadingContainer}>
-          <ActivityIndicator size="large" color="#E50914" />
-        </View>
-      ) : (
+      {allMovies && (
         <Animated.ScrollView
           style={styles.scrollView}
           onScroll={scrollHandler}
@@ -198,6 +197,12 @@ export default function FilmsScreen() {
           {rows.length <= 4 && <WatchedFilmsRow />}
         </Animated.ScrollView>
       )}
+
+      {showSkeleton && (
+        <View style={s.skeletonOverlay}>
+          <HomeScreenSkeleton topMargin={insets.top + 90} />
+        </View>
+      )}
     </View>
   );
 }
@@ -206,6 +211,11 @@ const s = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000",
+  },
+  skeletonOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000",
+    zIndex: 2,
   },
   loadingContainer: {
     flex: 1,

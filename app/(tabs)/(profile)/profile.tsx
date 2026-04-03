@@ -1,4 +1,5 @@
 import { MovieList } from "@/components/MovieList/MovieList";
+import { ProfileSkeleton, useSmoothLoading } from "@/components/ui/Skeleton";
 import { useCastSheet } from "@/hooks/useCastSheet";
 import { CastIcon } from "@/icons/CastIcon";
 import {
@@ -96,9 +97,26 @@ export default function ProfileScreen() {
   }));
 
   const { data: likedItems, error: likedErr } = useLikedItems(20);
-  const { data: favorites } = useFavoriteItems(20);
-  const { data: resumeItems } = useResumeItems(20);
-  const { data: recentlyPlayed, error: recentErr } = useRecentlyPlayed(20);
+  const { data: favorites, isLoading: isLoadingFavorites } =
+    useFavoriteItems(20);
+  const { data: resumeItems, isLoading: isLoadingResume } = useResumeItems(20);
+  const {
+    data: recentlyPlayed,
+    error: recentErr,
+    isLoading: isLoadingRecent,
+  } = useRecentlyPlayed(20);
+
+  const isProfileLoading =
+    isLoadingFavorites &&
+    isLoadingResume &&
+    isLoadingRecent &&
+    !favorites &&
+    !resumeItems &&
+    !recentlyPlayed;
+
+  const showProfileSkeleton = useSmoothLoading(
+    !!(favorites || resumeItems || recentlyPlayed),
+  );
 
   if (__DEV__) {
     if (likedErr) console.warn("[Profile] likedItems error:", likedErr);
@@ -129,14 +147,20 @@ export default function ProfileScreen() {
     return map;
   }, [likedItems, favorites, resumeItems, recentlyPlayed]);
 
-  const likedRow = (likedItems ?? []).map((item) =>
-    toMovie(item, serverUrl, badgeMap),
+  const likedRow = useMemo(
+    () => (likedItems ?? []).map((item) => toMovie(item, serverUrl, badgeMap)),
+    [likedItems, serverUrl, badgeMap],
   );
-  const favoritesRow = (favorites ?? []).map((item) =>
-    toMovie(item, serverUrl, badgeMap),
+  const favoritesRow = useMemo(
+    () => (favorites ?? []).map((item) => toMovie(item, serverUrl, badgeMap)),
+    [favorites, serverUrl, badgeMap],
   );
-  const resumeRow = (resumeItems ?? []).map((item) =>
-    toMovie(item, serverUrl, badgeMap, true),
+  const resumeRow = useMemo(
+    () =>
+      (resumeItems ?? []).map((item) =>
+        toMovie(item, serverUrl, badgeMap, true),
+      ),
+    [resumeItems, serverUrl, badgeMap],
   );
 
   const getBackdrop = useCallback(
@@ -291,56 +315,66 @@ export default function ProfileScreen() {
       </Animated.View>
 
       {/* Contenu scrollable */}
-      <Animated.ScrollView
-        ref={scrollViewRef}
-        style={{ flex: 1 }}
-        onScroll={scrollHandler}
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-        contentContainerStyle={{
-          paddingTop: insets.top + 60,
-          paddingBottom: 100,
-        }}
-      >
-        {/* Séries et films que vous avez aimés */}
-        {likedRow.length > 0 && (
-          <MovieList
-            rowTitle="Séries et films que vous avez aimés"
-            movies={likedRow}
-          />
-        )}
-
-        {/* Ma liste */}
-        {favoritesRow.length > 0 && (
-          <MovieList
-            rowTitle="Ma liste"
-            movies={favoritesRow}
-            showAll
-            showAllRoute="/my-list"
-          />
-        )}
-
-        {/* Reprendre la lecture */}
-        {resumeRow.length > 0 && (
-          <MovieList rowTitle="Reprendre la lecture" movies={resumeRow} />
-        )}
-
-        {/* Vue récemment */}
-        {(recentlyPlayed?.length ?? 0) > 0 && (
-          <View style={styles.recentSection}>
-            <Text style={styles.sectionTitle}>Vue récemment</Text>
-            <FlatList
-              horizontal
-              data={recentlyPlayed}
-              keyExtractor={(item) => item.Id ?? ""}
-              renderItem={renderRecentItem}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 16 }}
+      {!isProfileLoading && (
+        <Animated.ScrollView
+          ref={scrollViewRef}
+          style={{ flex: 1 }}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+          contentContainerStyle={{
+            paddingTop: insets.top + 60,
+            paddingBottom: 100,
+          }}
+        >
+          {/* Séries et films que vous avez aimés */}
+          {likedRow.length > 0 && (
+            <MovieList
+              rowTitle="Séries et films que vous avez aimés"
+              movies={likedRow}
             />
+          )}
+
+          {/* Ma liste */}
+          {favoritesRow.length > 0 && (
+            <MovieList
+              rowTitle="Ma liste"
+              movies={favoritesRow}
+              showAll
+              showAllRoute="/my-list"
+            />
+          )}
+
+          {/* Reprendre la lecture */}
+          {resumeRow.length > 0 && (
+            <MovieList rowTitle="Reprendre la lecture" movies={resumeRow} />
+          )}
+
+          {/* Vue récemment */}
+          {(recentlyPlayed?.length ?? 0) > 0 && (
+            <View style={styles.recentSection}>
+              <Text style={styles.sectionTitle}>Vue récemment</Text>
+              <FlatList
+                horizontal
+                data={recentlyPlayed}
+                keyExtractor={(item) => item.Id ?? ""}
+                renderItem={renderRecentItem}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16 }}
+              />
+            </View>
+          )}
+        </Animated.ScrollView>
+      )}
+
+      {showProfileSkeleton && (
+        <View style={styles.skeletonOverlay}>
+          <View style={{ paddingTop: insets.top + 60 }}>
+            <ProfileSkeleton />
           </View>
-        )}
-      </Animated.ScrollView>
+        </View>
+      )}
     </View>
   );
 }
@@ -350,6 +384,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000",
     overflow: "hidden",
+  },
+  skeletonOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000",
+    zIndex: 2,
   },
   header: {
     position: "absolute",

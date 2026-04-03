@@ -7,7 +7,7 @@ import * as Haptics from "expo-haptics";
 import { Image as ExpoImage } from "expo-image";
 import { Tabs } from "expo-router";
 import React from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
 
 // Helper component for cross-platform icons
 function TabIcon({
@@ -127,7 +127,8 @@ export default function TabLayout() {
         tabBarActiveTintColor: "#FFFFFF",
         tabBarInactiveTintColor: "#B3B3B3",
         headerShown: false,
-        freezeOnBlur: true,
+        freezeOnBlur: Platform.OS !== "web",
+        sceneStyle: { backgroundColor: "#000" },
         tabBarStyle: {
           position: "absolute",
           borderTopWidth: 0,

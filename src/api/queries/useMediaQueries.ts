@@ -112,7 +112,7 @@ export function useResumeItems(limit = 12) {
       return result.data.Items ?? [];
     },
     enabled: !!api && !!userId,
-    staleTime: 0,
+    staleTime: 30_000, // 30s — évite le double refresh au changement de tab
   });
 }
 
